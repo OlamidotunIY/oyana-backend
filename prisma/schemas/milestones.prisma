@@ -1,0 +1,74 @@
+// ============================================================================
+// MILESTONES DOMAIN: Job Milestones, OTP, POD, Waybills
+// ============================================================================
+
+model JobMilestone {
+    id         String    @id @default(uuid()) @db.Uuid
+    jobId      String    @map("job_id") @db.Uuid
+    type       String
+    status     String
+    occurredAt DateTime? @map("occurred_at") @db.Timestamptz(6)
+    lat        Float?
+    lng        Float?
+    metadata   Json?
+    createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+    @@unique([jobId, type])
+    @@index([jobId])
+    @@map("job_milestones")
+}
+
+model OtpChallenge {
+    id           String    @id @default(uuid()) @db.Uuid
+    jobId        String    @unique @map("job_id") @db.Uuid
+    purpose      String    @default("delivery_completion")
+    otpHash      String    @map("otp_hash")
+    expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+    verifiedAt   DateTime? @map("verified_at") @db.Timestamptz(6)
+    attemptCount Int       @default(0) @map("attempt_count")
+    lockedUntil  DateTime? @map("locked_until") @db.Timestamptz(6)
+    createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+    @@map("otp_challenges")
+}
+
+model PodUpload {
+    id            String   @id @default(uuid()) @db.Uuid
+    jobId         String   @map("job_id") @db.Uuid
+    type          String
+    storageBucket String   @map("storage_bucket")
+    storagePath   String   @map("storage_path")
+    uploadedBy    String?  @map("uploaded_by") @db.Uuid
+    createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    job      Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+    uploader Profile? @relation(fields: [uploadedBy], references: [id])
+
+    @@index([jobId, createdAt(sort: Desc)])
+    @@map("pod_uploads")
+}
+
+model Waybill {
+    id            String    @id @default(uuid()) @db.Uuid
+    jobId         String    @map("job_id") @db.Uuid
+    storageBucket String    @map("storage_bucket")
+    storagePath   String    @map("storage_path")
+    status        String    @default("uploaded")
+    reviewedBy    String?   @map("reviewed_by") @db.Uuid
+    reviewedAt    DateTime? @map("reviewed_at") @db.Timestamptz(6)
+    createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    job      Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+    reviewer Profile? @relation(fields: [reviewedBy], references: [id])
+
+    @@index([jobId])
+    @@map("waybills")
+}

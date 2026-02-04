@@ -1,0 +1,53 @@
+// ============================================================================
+// RATINGS & SLA DOMAIN: Provider Ratings, SLA Rules, Penalties
+// ============================================================================
+
+model Rating {
+    id               String   @id @default(uuid()) @db.Uuid
+    jobId            String   @unique @map("job_id") @db.Uuid
+    ratedByProfileId String   @map("rated_by_profile_id") @db.Uuid
+    providerId       String   @map("provider_id") @db.Uuid
+    score            Int
+    comment          String?
+    createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    job      Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+    ratedBy  Profile  @relation(fields: [ratedByProfileId], references: [id])
+    provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+    @@index([providerId, createdAt(sort: Desc)])
+    @@map("ratings")
+}
+
+model SlaRule {
+    id              String   @id @default(uuid()) @db.Uuid
+    key             String   @unique
+    scope           String
+    vehicleCategory String?  @map("vehicle_category")
+    providerId      String?  @map("provider_id") @db.Uuid
+    value           Json
+    isActive        Boolean  @default(true) @map("is_active")
+    createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    provider Provider? @relation(fields: [providerId], references: [id])
+
+    @@map("sla_rules")
+}
+
+model ProviderPenalty {
+    id           String   @id @default(uuid()) @db.Uuid
+    providerId   String   @map("provider_id") @db.Uuid
+    type         String
+    points       Int      @default(0)
+    relatedJobId String?  @map("related_job_id") @db.Uuid
+    createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+    relatedJob Job?     @relation(fields: [relatedJobId], references: [id])
+
+    @@index([providerId, createdAt(sort: Desc)])
+    @@map("provider_penalties")
+}

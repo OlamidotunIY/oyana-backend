@@ -1,0 +1,103 @@
+// ============================================================================
+// WALLET DOMAIN: Financial Engine, Payments, Transactions
+// ============================================================================
+
+model WalletAccount {
+    id              String   @id @default(uuid()) @db.Uuid
+    ownerType       String   @map("owner_type")
+    ownerProfileId  String?  @map("owner_profile_id") @db.Uuid
+    ownerProviderId String?  @map("owner_provider_id") @db.Uuid
+    currency        String   @default("NGN") @db.Char(3)
+    balanceMinor    BigInt   @default(0) @map("balance_minor")
+    status          String   @default("active")
+    createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    ownerProfile   Profile?            @relation("ProfileWallet", fields: [ownerProfileId], references: [id])
+    ownerProvider  Provider?           @relation("ProviderWallet", fields: [ownerProviderId], references: [id])
+    transactions   WalletTransaction[]
+    paymentIntents PaymentIntent[]
+
+    @@index([ownerType, ownerProfileId])
+    @@index([ownerType, ownerProviderId])
+    @@map("wallet_accounts")
+}
+
+model WalletTransaction {
+    id                     String   @id @default(uuid()) @db.Uuid
+    walletAccountId        String   @map("wallet_account_id") @db.Uuid
+    direction              String
+    type                   String
+    amountMinor            BigInt   @map("amount_minor")
+    currency               String   @db.Char(3)
+    reference              String   @unique
+    relatedJobId           String?  @map("related_job_id") @db.Uuid
+    relatedPaymentIntentId String?  @map("related_payment_intent_id") @db.Uuid
+    metadata               Json?
+    createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    walletAccount        WalletAccount  @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+    relatedJob           Job?           @relation(fields: [relatedJobId], references: [id])
+    relatedPaymentIntent PaymentIntent? @relation(fields: [relatedPaymentIntentId], references: [id])
+
+    @@index([walletAccountId, createdAt(sort: Desc)])
+    @@index([relatedJobId])
+    @@map("wallet_transactions")
+}
+
+model PaymentIntent {
+    id                String   @id @default(uuid()) @db.Uuid
+    walletAccountId   String   @map("wallet_account_id") @db.Uuid
+    provider          String   @default("paystack")
+    amountMinor       BigInt   @map("amount_minor")
+    currency          String   @default("NGN") @db.Char(3)
+    status            String
+    paystackReference String?  @unique @map("paystack_reference")
+    authorizationUrl  String?  @map("authorization_url")
+    rawInitResponse   Json?    @map("raw_init_response")
+    rawWebhook        Json?    @map("raw_webhook")
+    createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    // Relations
+    walletAccount      WalletAccount       @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+    walletTransactions WalletTransaction[]
+
+    @@index([walletAccountId, createdAt(sort: Desc)])
+    @@index([status])
+    @@map("payment_intents")
+}
+
+model JobFinancials {
+    jobId                 String   @id @map("job_id") @db.Uuid
+    customerChargeMinor   BigInt   @map("customer_charge_minor")
+    providerEarningsMinor BigInt   @map("provider_earnings_minor")
+    commissionAmountMinor BigInt   @map("commission_amount_minor")
+    refundedMinor         BigInt   @default(0) @map("refunded_minor")
+    currency              String   @default("NGN") @db.Char(3)
+    createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+    @@map("job_financials")
+}
+
+model Refund {
+    id          String   @id @default(uuid()) @db.Uuid
+    jobId       String   @map("job_id") @db.Uuid
+    initiatedBy String   @map("initiated_by") @db.Uuid
+    amountMinor BigInt   @map("amount_minor")
+    currency    String   @db.Char(3)
+    status      String
+    reason      String?
+    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    // Relations
+    job       Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+    initiator Profile @relation(fields: [initiatedBy], references: [id])
+
+    @@index([jobId])
+    @@map("refunds")
+}

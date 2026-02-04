@@ -1,0 +1,41 @@
+// ============================================================================
+// MARKETPLACE DOMAIN: Truck Bidding System
+// ============================================================================
+
+model JobBid {
+    id          String   @id @default(uuid()) @db.Uuid
+    jobId       String   @map("job_id") @db.Uuid
+    providerId  String   @map("provider_id") @db.Uuid
+    amountMinor BigInt   @map("amount_minor")
+    currency    String   @default("NGN") @db.Char(3)
+    message     String?
+    status      String   @default("active")
+    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    // Relations
+    job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+    provider Provider  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+    award    BidAward?
+
+    @@unique([jobId, providerId])
+    @@index([jobId, amountMinor(sort: Asc)])
+    @@index([providerId, createdAt(sort: Desc)])
+    @@map("job_bids")
+}
+
+model BidAward {
+    id                 String   @id @default(uuid()) @db.Uuid
+    jobId              String   @unique @map("job_id") @db.Uuid
+    bidId              String   @unique @map("bid_id") @db.Uuid
+    awardedByProfileId String   @map("awarded_by_profile_id") @db.Uuid
+    awardedAt          DateTime @default(now()) @map("awarded_at") @db.Timestamptz(6)
+    notes              String?
+
+    // Relations
+    job       Job     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+    bid       JobBid  @relation(fields: [bidId], references: [id], onDelete: Cascade)
+    awardedBy Profile @relation(fields: [awardedByProfileId], references: [id])
+
+    @@map("bid_awards")
+}
