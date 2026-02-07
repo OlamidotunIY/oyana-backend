@@ -1,0 +1,574 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+input AddJobItemDto {
+  declaredValueCurrency: String
+  declaredValueMinor: BigInt
+  height: Float
+  itemCategory: String!
+  itemDescription: String!
+  jobId: String!
+  length: Float
+  quantity: Float!
+  weight: Float
+  width: Float
+}
+
+input AssignJobDto {
+  agreedPriceMinor: BigInt!
+  currency: String!
+  dispatchOfferId: String
+  jobId: String!
+  providerId: String!
+}
+
+input AwardBidDto {
+  bidId: String!
+  jobId: String!
+  providerId: String!
+}
+
+type BidAward {
+  awardedAt: DateTime!
+  bidId: String!
+  createdAt: DateTime!
+  id: ID!
+  jobId: String!
+  providerId: String!
+}
+
+enum BidStatus {
+  ACCEPTED
+  ACTIVE
+  REJECTED
+  WITHDRAWN
+}
+
+"""BigInt custom scalar type for money amounts in minor units"""
+scalar BigInt
+
+input CancelJobDto {
+  cancelReason: String!
+  jobId: String!
+}
+
+input CreateBidDto {
+  bidAmountMinor: BigInt!
+  coverLetter: String
+  currency: String!
+  jobId: String!
+  proposedDeliveryTime: DateTime
+  proposedPickupTime: DateTime
+  providerId: String!
+}
+
+input CreateDispatchBatchDto {
+  createdByProfileId: String!
+  currency: String!
+  regionId: String!
+  totalValueMinor: BigInt!
+}
+
+input CreateDispatchOfferDto {
+  batchId: String!
+  currency: String!
+  jobId: String!
+  offeredPriceMinor: BigInt!
+  providerId: String!
+}
+
+input CreateJobDto {
+  currency: String!
+  customerId: String!
+  customerNotes: String
+  deliveryTime: DateTime
+  jobType: JobMode!
+  pickupTime: DateTime
+  totalPriceMinor: BigInt!
+}
+
+input CreateLocationDto {
+  address: String!
+  city: String
+  contactName: String
+  contactPhone: String
+  country: String
+  jobId: String!
+  latitude: Float!
+  locationType: LocationType!
+  longitude: Float!
+  state: String
+}
+
+input CreatePaymentIntentDto {
+  amountMinor: BigInt!
+  currency: String!
+  metadata: JSON
+  paymentGateway: String!
+  walletAccountId: String!
+}
+
+input CreateTransactionDto {
+  amountMinor: BigInt!
+  currency: String!
+  description: String
+  jobId: String
+  paymentIntentId: String
+  referenceId: String
+  transactionType: TransactionType!
+  walletAccountId: String!
+}
+
+input CreateWalletAccountDto {
+  currency: String!
+  profileId: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+type DispatchBatch {
+  completedAt: DateTime
+  createdAt: DateTime!
+  createdByProfileId: String!
+  currency: String!
+  id: ID!
+  regionId: String!
+  status: DispatchBatchStatus!
+  totalValueMinor: BigInt!
+  updatedAt: DateTime!
+}
+
+enum DispatchBatchStatus {
+  ASSIGNED
+  CANCELLED
+  CLOSED
+  EXPIRED
+  OPEN
+}
+
+type DispatchOffer {
+  acceptedAt: DateTime
+  batchId: String!
+  createdAt: DateTime!
+  currency: String!
+  declinedAt: DateTime
+  expiredAt: DateTime
+  id: ID!
+  jobId: String!
+  offeredPriceMinor: BigInt!
+  providerId: String!
+  status: DispatchOfferStatus!
+  updatedAt: DateTime!
+}
+
+enum DispatchOfferStatus {
+  ACCEPTED
+  CANCELLED
+  DECLINED
+  EXPIRED
+  SENT
+  VIEWED
+}
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON @specifiedBy(url: "http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf")
+
+type Job {
+  assignedProviderId: String
+  cancelReason: String
+  cancelledAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+  currency: String!
+  customerId: String!
+  customerNotes: String
+  deliveryTime: DateTime
+  id: ID!
+  jobType: JobMode!
+  pickupTime: DateTime
+  status: JobStatus!
+  totalPriceMinor: BigInt!
+  updatedAt: DateTime!
+}
+
+type JobAssignment {
+  agreedPriceMinor: BigInt!
+  assignedAt: DateTime
+  cancelReason: String
+  cancelledAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+  currency: String!
+  dispatchOfferId: String
+  id: ID!
+  jobId: String!
+  providerId: String!
+  status: JobAssignmentStatus!
+  updatedAt: DateTime!
+}
+
+enum JobAssignmentStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+type JobBid {
+  bidAmountMinor: BigInt!
+  coverLetter: String
+  createdAt: DateTime!
+  currency: String!
+  id: ID!
+  jobId: String!
+  proposedDeliveryTime: DateTime
+  proposedPickupTime: DateTime
+  providerId: String!
+  status: BidStatus!
+  updatedAt: DateTime!
+}
+
+type JobItem {
+  createdAt: DateTime!
+  declaredValueCurrency: String
+  declaredValueMinor: BigInt
+  height: Float
+  id: ID!
+  itemCategory: String!
+  itemDescription: String!
+  jobId: String!
+  length: Float
+  quantity: Float!
+  updatedAt: DateTime!
+  weight: Float
+  width: Float
+}
+
+type JobLocation {
+  address: String!
+  city: String
+  contactName: String
+  contactPhone: String
+  country: String
+  createdAt: DateTime!
+  id: ID!
+  jobId: String!
+  latitude: Float!
+  locationType: LocationType!
+  longitude: Float!
+  state: String
+  updatedAt: DateTime!
+}
+
+enum JobMode {
+  DISPATCH
+  MARKETPLACE
+}
+
+enum JobStatus {
+  ASSIGNED
+  BROADCASTING
+  CANCELLED
+  COMPLETED
+  CREATED
+  DELIVERED
+  DRAFT
+  EN_ROUTE_DROPOFF
+  EN_ROUTE_PICKUP
+  EXPIRED
+  PICKED_UP
+}
+
+type KYCCase {
+  caseType: KYCCaseType!
+  createdAt: DateTime!
+  id: ID!
+  providerId: String!
+  rejectionReason: String
+  reviewedAt: DateTime
+  reviewedBy: String
+  status: KycCaseStatus!
+  updatedAt: DateTime!
+}
+
+enum KYCCaseType {
+  COMPANY
+  INDIVIDUAL
+}
+
+type KYCDocument {
+  caseId: String!
+  createdAt: DateTime!
+  documentType: KycDocumentType!
+  id: ID!
+  status: KycDocumentStatus!
+  updatedAt: DateTime!
+  uploadUrl: String!
+  verifiedAt: DateTime
+}
+
+enum KycCaseStatus {
+  APPROVED
+  DRAFT
+  NEEDS_MORE_INFO
+  REJECTED
+  SUBMITTED
+}
+
+enum KycDocumentStatus {
+  REJECTED
+  UPLOADED
+  VERIFIED
+}
+
+enum KycDocumentType {
+  DRIVERS_LICENSE
+  NIN
+  PASSPORT
+  VEHICLE_REG
+  WAYBILL_TEMPLATE
+}
+
+enum LocationType {
+  DROPOFF
+  PICKUP
+}
+
+type Mutation {
+  addJobItem(input: AddJobItemDto!): JobItem!
+  awardBid(input: AwardBidDto!): BidAward!
+  cancelAssignment(id: String!): JobAssignment!
+  cancelJob(input: CancelJobDto!): Job!
+  createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
+  createJob(input: CreateJobDto!): Job!
+  createJobAssignment(input: AssignJobDto!): JobAssignment!
+  createJobBid(input: CreateBidDto!): JobBid!
+  createKycCase(providerId: String!): KYCCase!
+  createLocation(input: CreateLocationDto!): JobLocation!
+  createWalletAccount(input: CreateWalletAccountDto!): WalletAccount!
+  createWalletTransaction(input: CreateTransactionDto!): Transaction!
+  initiateNinVerification(input: VerifyNINDto!): NINVerification!
+  initiatePayment(input: CreatePaymentIntentDto!): PaymentIntent!
+  initiateRefund(input: RequestRefundDto!): Refund!
+  respondToDispatchOffer(input: UpdateDispatchOfferDto!): DispatchOffer!
+  reviewKycCase(approved: Boolean!, id: String!): KYCCase!
+  sendDispatchOffer(input: CreateDispatchOfferDto!): DispatchOffer!
+  submitKycCase(id: String!): KYCCase!
+  updateJob(id: String!, input: UpdateJobDto!): Job!
+  updateJobAssignment(id: String!, input: AssignJobDto!): JobAssignment!
+  updateJobBid(id: String!, input: UpdateBidDto!): JobBid!
+  updatePaymentIntent(id: String!): PaymentIntent!
+  uploadKycDocument(input: UploadKYCDocumentDto!): KYCDocument!
+  withdrawBid(id: String!): JobBid!
+}
+
+type NINVerification {
+  createdAt: DateTime!
+  dateOfBirth: DateTime
+  firstName: String
+  gender: String
+  id: ID!
+  lastName: String
+  middleName: String
+  ninNumber: String!
+  profileId: String!
+  rawResponseData: JSON
+  updatedAt: DateTime!
+  verificationStatus: NinVerificationStatus!
+  verifiedAt: DateTime
+}
+
+enum NinVerificationStatus {
+  FAILED
+  PENDING
+  VERIFIED
+}
+
+type PaymentIntent {
+  amountMinor: BigInt!
+  confirmedAt: DateTime
+  createdAt: DateTime!
+  currency: String!
+  gatewayPaymentId: String!
+  id: ID!
+  metadata: JSON
+  paymentGateway: String!
+  status: PaymentIntentStatus!
+  updatedAt: DateTime!
+  walletAccountId: String!
+}
+
+enum PaymentIntentStatus {
+  CANCELLED
+  FAILED
+  INITIALIZED
+  PENDING
+  SUCCEEDED
+}
+
+type Permission {
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  key: String!
+  updatedAt: DateTime!
+}
+
+enum PreferredLanguage {
+  EN
+  ZH_HANS
+}
+
+type Profile {
+  createdAt: DateTime!
+  displayName: String
+  id: ID!
+  lastLoginAt: DateTime
+  phoneE164: String
+  preferredLanguage: PreferredLanguage!
+  roles: [Role!]!
+  status: ProfileStatus!
+  updatedAt: DateTime!
+}
+
+enum ProfileStatus {
+  ACTIVE
+  DELETED
+  SUSPENDED
+}
+
+type Query {
+  dispatchBatches: [DispatchBatch!]!
+  job(id: String!): Job!
+  jobBids(jobId: String!): [JobBid!]!
+  jobs: [Job!]!
+  kycCase(id: String!): KYCCase
+  kycCases: [KYCCase!]!
+  me: Profile
+  myBids: [JobBid!]!
+  myDispatchOffers: [DispatchOffer!]!
+  myWallet: WalletAccount
+  walletTransactions(walletAccountId: String!): [Transaction!]!
+}
+
+type Refund {
+  approvedAt: DateTime
+  approvedBy: String
+  createdAt: DateTime!
+  currency: String!
+  id: ID!
+  processedAt: DateTime
+  reason: String!
+  refundAmountMinor: BigInt!
+  status: RefundStatus!
+  transactionId: String!
+  updatedAt: DateTime!
+}
+
+enum RefundStatus {
+  FAILED
+  PENDING
+  SUCCEEDED
+}
+
+input RequestRefundDto {
+  currency: String!
+  reason: String!
+  refundAmountMinor: BigInt!
+  transactionId: String!
+}
+
+type Role {
+  createdAt: DateTime!
+  id: ID!
+  key: String!
+  name: String
+  permissions: [Permission!]!
+  updatedAt: DateTime!
+}
+
+type Transaction {
+  amountMinor: BigInt!
+  createdAt: DateTime!
+  currency: String!
+  description: String
+  id: ID!
+  jobId: String
+  paymentIntentId: String
+  referenceId: String
+  status: TransactionStatus!
+  transactionType: TransactionType!
+  updatedAt: DateTime!
+  walletAccountId: String!
+}
+
+enum TransactionStatus {
+  COMPLETED
+  FAILED
+  PENDING
+  REVERSED
+}
+
+enum TransactionType {
+  ADJUSTMENT
+  COMMISSION
+  JOB_PAYMENT
+  PROVIDER_PAYOUT
+  REFUND
+  TOPUP
+}
+
+input UpdateBidDto {
+  status: BidStatus!
+}
+
+input UpdateDispatchOfferDto {
+  status: DispatchOfferStatus!
+}
+
+input UpdateJobDto {
+  assignedProviderId: String
+  customerNotes: String
+  deliveryTime: DateTime
+  pickupTime: DateTime
+  status: JobStatus
+  totalPriceMinor: BigInt
+}
+
+input UploadKYCDocumentDto {
+  caseId: String!
+  documentType: KycDocumentType!
+  uploadUrl: String!
+}
+
+input VerifyNINDto {
+  dateOfBirth: DateTime!
+  firstName: String!
+  gender: String
+  lastName: String!
+  middleName: String
+  ninNumber: String!
+  profileId: String!
+}
+
+type WalletAccount {
+  balanceMinor: BigInt!
+  createdAt: DateTime!
+  currency: String!
+  escrowMinor: BigInt!
+  id: ID!
+  profileId: String!
+  status: WalletAccountStatus!
+  updatedAt: DateTime!
+}
+
+enum WalletAccountStatus {
+  ACTIVE
+  CLOSED
+  SUSPENDED
+}

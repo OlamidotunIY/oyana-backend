@@ -1,4 +1,5 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
+import { Permission } from './permission.type';
 
 @ObjectType()
 export class Role {
@@ -16,4 +17,7 @@ export class Role {
 
   @Field()
   updatedAt: Date;
+
+  @Field(() => [Permission])
+  permissions: Permission[];
 }

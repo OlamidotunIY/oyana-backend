@@ -1,5 +1,6 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { ProfileStatus, PreferredLanguage } from '../../enums';
+import { Role } from './role.type';
 
 @ObjectType()
 export class Profile {
@@ -26,4 +27,7 @@ export class Profile {
 
   @Field()
   updatedAt: Date;
+
+  @Field(() => [Role])
+  roles: Role[];
 }
