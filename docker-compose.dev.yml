@@ -1,0 +1,12 @@
+version: '3.8'
+
+# Override file for development mode
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  backend-dev:
+    profiles: [] # Enable by default when using this compose file
+
+  backend:
+    profiles:
+      - production # Disable production backend in dev mode

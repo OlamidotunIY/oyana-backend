@@ -10,6 +10,7 @@ async function bootstrap() {
     origin: process.env.CORS_ORIGIN?.split(',') || [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:3500',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -18,7 +19,13 @@ async function bootstrap() {
       'Authorization',
       'Accept',
       'X-Requested-With',
+      'Apollo-Require-Preflight',
+      'x-apollo-operation-name',
+      'apollo-require-preflight',
     ],
+    exposedHeaders: ['Content-Length', 'Content-Type'],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   // Enable validation globally
