@@ -8,6 +8,9 @@ export class Profile {
   id: string; // Same as auth.users.id
 
   @Field({ nullable: true })
+  fullName?: string;
+
+  @Field({ nullable: true })
   displayName?: string;
 
   @Field({ nullable: true })

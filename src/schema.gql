@@ -363,6 +363,7 @@ type Mutation {
   updateJobAssignment(id: String!, input: AssignJobDto!): JobAssignment!
   updateJobBid(id: String!, input: UpdateBidDto!): JobBid!
   updatePaymentIntent(id: String!): PaymentIntent!
+  updateProfile(input: UpdateProfileInput!): Profile!
   uploadKycDocument(input: UploadKYCDocumentDto!): KYCDocument!
   withdrawBid(id: String!): JobBid!
 }
@@ -427,6 +428,7 @@ enum PreferredLanguage {
 type Profile {
   createdAt: DateTime!
   displayName: String
+  fullName: String
   id: ID!
   lastLoginAt: DateTime
   phoneE164: String
@@ -538,6 +540,14 @@ input UpdateJobDto {
   pickupTime: DateTime
   status: JobStatus
   totalPriceMinor: BigInt
+}
+
+input UpdateProfileInput {
+  displayName: String
+  fullName: String
+  phoneE164: String
+  preferredLanguage: PreferredLanguage
+  status: ProfileStatus
 }
 
 input UploadKYCDocumentDto {

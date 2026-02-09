@@ -7,6 +7,9 @@ export class CreateProfileInput {
   authUserId: string;
 
   @Field({ nullable: true })
+  fullName?: string;
+
+  @Field({ nullable: true })
   displayName?: string;
 
   @Field({ nullable: true })
@@ -18,6 +21,9 @@ export class CreateProfileInput {
 
 @InputType()
 export class UpdateProfileInput {
+  @Field({ nullable: true })
+  fullName?: string;
+
   @Field({ nullable: true })
   displayName?: string;
 
