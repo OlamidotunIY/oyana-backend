@@ -3,9 +3,9 @@ node_modules
 npm-debug.log
 yarn-error.log
 
-# Build output
-dist
-build
+# Build output (only ignore in intermediate stages, not when copying source)
+# dist - commented out to allow copying source for build
+# build - commented out to allow copying source for build
 coverage
 
 # Environment files
