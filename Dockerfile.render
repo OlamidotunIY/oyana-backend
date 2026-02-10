@@ -22,7 +22,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Verify build
-RUN ls -la dist/ && test -f dist/main.js || (echo "ERROR: dist/main.js not found" && exit 1)
+RUN ls -la dist/ && ls -la dist/src/ && test -f dist/src/main.js || (echo "ERROR: dist/src/main.js not found" && exit 1)
 
 # Remove dev dependencies
 RUN npm prune --production
@@ -31,4 +31,4 @@ RUN npm prune --production
 EXPOSE 3500
 
 # Start command
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

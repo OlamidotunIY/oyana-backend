@@ -70,7 +70,7 @@ services:
       - oyana-network
     volumes:
       - ./prisma:/app/prisma
-    command: sh -c "npx prisma migrate deploy && node dist/main"
+    command: sh -c "npx prisma migrate deploy && node dist/src/main.js"
 
   # Development mode (optional - use docker-compose -f docker-compose.yml -f docker-compose.dev.yml up)
   backend-dev:
