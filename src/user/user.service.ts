@@ -52,9 +52,14 @@ export class UserService {
       updateData.status = input.status;
     }
 
-    return this.prisma.profile.update({
+    // Use upsert to create profile if it doesn't exist
+    return this.prisma.profile.upsert({
       where: { id: profileId },
-      data: updateData,
+      update: updateData,
+      create: {
+        id: profileId,
+        ...updateData,
+      },
       include: {
         userRoles: {
           include: {

@@ -1,6 +1,15 @@
 import { registerEnumType } from '@nestjs/graphql';
 
 // ============================================================================
+// AUTH ENUMS
+// ============================================================================
+
+export enum OtpMode {
+  SIGNUP = 'signup',
+  SIGNIN = 'signin',
+}
+
+// ============================================================================
 // CORE ENUMS
 // ============================================================================
 
@@ -302,6 +311,7 @@ export enum WaybillStatus {
 // REGISTER ENUMS FOR GRAPHQL
 // ============================================================================
 
+registerEnumType(OtpMode, { name: 'OtpMode' });
 registerEnumType(ProfileStatus, { name: 'ProfileStatus' });
 registerEnumType(PreferredLanguage, { name: 'PreferredLanguage' });
 registerEnumType(ProviderType, { name: 'ProviderType' });
