@@ -25,17 +25,8 @@ input AssignJobDto {
 
 type AuthResponse {
   accessToken: String!
-  expiresIn: Float!
   refreshToken: String!
-  tokenType: String!
-  user: AuthUser!
-}
-
-type AuthUser {
-  email: String!
-  emailConfirmed: Boolean!
-  fullName: String
-  id: String!
+  user: Profile!
 }
 
 input AwardBidDto {
@@ -66,12 +57,6 @@ scalar BigInt
 input CancelJobDto {
   cancelReason: String!
   jobId: String!
-}
-
-input CompleteSignupInput {
-  fullName: String!
-  password: String!
-  phoneE164: String
 }
 
 input CreateBidDto {
@@ -374,7 +359,6 @@ type Mutation {
   awardBid(input: AwardBidDto!): BidAward!
   cancelAssignment(id: String!): JobAssignment!
   cancelJob(input: CancelJobDto!): Job!
-  completeSignup(input: CompleteSignupInput!): AuthResponse!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
   createJob(input: CreateJobDto!): Job!
   createJobAssignment(input: AssignJobDto!): JobAssignment!
@@ -394,7 +378,7 @@ type Mutation {
   reviewKycCase(approved: Boolean!, id: String!): KYCCase!
   sendDispatchOffer(input: CreateDispatchOfferDto!): DispatchOffer!
   signIn(input: SignInInput!): AuthResponse!
-  signUp(input: SignUpInput!): AuthResponse!
+  signUp(input: SignUpInput!): MessageResponse!
   submitKycCase(id: String!): KYCCase!
   updateJob(id: String!, input: UpdateJobDto!): Job!
   updateJobAssignment(id: String!, input: AssignJobDto!): JobAssignment!
@@ -465,15 +449,19 @@ enum PreferredLanguage {
 
 type Profile {
   createdAt: DateTime!
-  displayName: String
-  fullName: String
+  email: String!
+  firstName: String
   id: ID!
   lastLoginAt: DateTime
+  lastName: String
   phoneE164: String
   preferredLanguage: PreferredLanguage!
-  roles: [Role!]!
+  referralCode: String
+  state: String
   status: ProfileStatus!
   updatedAt: DateTime!
+  userRoles: [UserRole!]!
+  userType: UserType!
 }
 
 enum ProfileStatus {
@@ -537,8 +525,15 @@ type Role {
   id: ID!
   key: String!
   name: String
-  permissions: [Permission!]!
+  rolePermissions: [RolePermission!]!
   updatedAt: DateTime!
+}
+
+type RolePermission {
+  createdAt: DateTime!
+  permission: Permission!
+  permissionId: String!
+  roleId: String!
 }
 
 input SignInInput {
@@ -547,9 +542,16 @@ input SignInInput {
 }
 
 input SignUpInput {
+  businessAddress: String
+  businessName: String
   email: String!
-  fullName: String!
+  firstName: String!
+  lastName: String!
   password: String!
+  phoneNumber: String
+  referralCode: String
+  state: String!
+  userType: UserType!
 }
 
 type Transaction {
@@ -601,8 +603,8 @@ input UpdateJobDto {
 }
 
 input UpdateProfileInput {
-  displayName: String
-  fullName: String
+  firstName: String
+  lastName: String
   phoneE164: String
   preferredLanguage: PreferredLanguage
   status: ProfileStatus
@@ -612,6 +614,19 @@ input UploadKYCDocumentDto {
   caseId: String!
   documentType: KycDocumentType!
   uploadUrl: String!
+}
+
+type UserRole {
+  createdAt: DateTime!
+  profileId: String!
+  role: Role!
+  roleId: String!
+}
+
+enum UserType {
+  ADMIN
+  BUSINESS
+  INDIVIDUAL
 }
 
 input VerifyNINDto {

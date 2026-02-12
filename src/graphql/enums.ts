@@ -16,6 +16,7 @@ export enum OtpMode {
 export const UserType = {
   INDIVIDUAL: PrismaUserType.individual,
   BUSINESS: PrismaUserType.business,
+  ADMIN: PrismaUserType.admin,
 } as const;
 export type UserType = (typeof UserType)[keyof typeof UserType];
 

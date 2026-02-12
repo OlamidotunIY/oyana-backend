@@ -8,7 +8,7 @@ export class Permission {
   @Field()
   key: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   description: string | null;
 
   @Field()

@@ -9,7 +9,7 @@ export class Role {
   @Field()
   key: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   name: string | null;
 
   @Field()

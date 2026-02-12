@@ -29,7 +29,6 @@ export class AuthService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly userService: UserService,
   ) {}
@@ -55,8 +54,6 @@ export class AuthService {
         );
       }
     }
-
-    const fullName = `${input.firstName} ${input.lastName}`;
 
     const { data, error } = await supabase.auth.signUp({
       email: input.email,
@@ -257,18 +254,18 @@ return {
   private setCookies(response: ExpressResponse, accessToken: string, refreshToken: string): void {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
-    response.cookie('accessToken', accessToken, {
+    response.cookie('oyana-accessToken', accessToken, {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
-      maxAge: 3600000, // 1 hour
+      maxAge: 7776000000, // 90 days
     });
 
-    response.cookie('refreshToken', refreshToken, {
+    response.cookie('oyana-refreshToken', refreshToken, {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
-      maxAge: 604800000, // 7 days
+      maxAge: 31536000000, // 1 year
     });
   }
 }

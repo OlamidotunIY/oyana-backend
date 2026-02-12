@@ -13,19 +13,19 @@ export class Profile {
   @Field(() => UserType)
   userType: UserType;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   firstName: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   lastName: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   phoneE164: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   state: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   referralCode: string | null;
 
   @Field(() => PreferredLanguage)
@@ -34,7 +34,7 @@ export class Profile {
   @Field(() => ProfileStatus)
   status: ProfileStatus;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   lastLoginAt: Date | null;
 
   @Field()
