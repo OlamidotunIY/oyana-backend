@@ -2,6 +2,7 @@ import { registerEnumType } from '@nestjs/graphql';
 import {
   ProfileStatus as PrismaProfileStatus,
   UserType as PrismaUserType,
+  State as PrismaState,
 } from '@prisma/client';
 
 // ============================================================================
@@ -30,6 +31,13 @@ export const ProfileStatus = {
   DELETED: PrismaProfileStatus.deleted,
 } as const;
 export type ProfileStatus = (typeof ProfileStatus)[keyof typeof ProfileStatus];
+
+export const State = {
+  LAGOS: PrismaState.Lagos,
+  OYO: PrismaState.Oyo,
+  ABUJA: PrismaState.Abuja,
+} as const;
+export type State = (typeof State)[keyof typeof State];
 
 // Alias for backward compatibility
 export const UserStatus = ProfileStatus;
@@ -329,6 +337,7 @@ export enum WaybillStatus {
 registerEnumType(OtpMode, { name: 'OtpMode' });
 registerEnumType(UserType, { name: 'UserType' });
 registerEnumType(ProfileStatus, { name: 'ProfileStatus' });
+registerEnumType(State, { name: 'State' });
 registerEnumType(PreferredLanguage, { name: 'PreferredLanguage' });
 registerEnumType(ProviderType, { name: 'ProviderType' });
 registerEnumType(ProviderStatus, { name: 'ProviderStatus' });

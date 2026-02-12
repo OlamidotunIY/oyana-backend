@@ -1,4 +1,4 @@
-import { UserType } from '../../graphql/enums';
+import { UserType, State } from '../../graphql/enums';
 
 export class UserSignedUpEvent {
   constructor(
@@ -7,7 +7,7 @@ export class UserSignedUpEvent {
     public readonly userType: UserType,
     public readonly firstName: string,
     public readonly lastName: string,
-    public readonly state: string,
+    public readonly state: State,
     public readonly referralCode?: string,
     public readonly phoneNumber?: string,
     public readonly businessName?: string,

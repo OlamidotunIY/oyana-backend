@@ -550,8 +550,14 @@ input SignUpInput {
   password: String!
   phoneNumber: String
   referralCode: String
-  state: String!
+  state: State!
   userType: UserType!
+}
+
+enum State {
+  ABUJA
+  LAGOS
+  OYO
 }
 
 type Transaction {

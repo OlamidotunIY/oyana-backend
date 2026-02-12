@@ -8,7 +8,7 @@ import {
   IsOptional,
   ValidateIf,
 } from 'class-validator';
-import { UserType } from '../../enums';
+import { UserType, State } from '../../enums';
 
 @InputType()
 export class SignUpInput {
@@ -36,10 +36,9 @@ export class SignUpInput {
   @IsString()
   lastName: string;
 
-  @Field()
-  @IsNotEmpty()
-  @IsString()
-  state: string;
+  @Field(() => State)
+  @IsEnum(State)
+  state: State;
 
   @Field({ nullable: true })
   @IsOptional()
