@@ -1,4 +1,8 @@
 import { registerEnumType } from '@nestjs/graphql';
+import {
+  ProfileStatus as PrismaProfileStatus,
+  UserType as PrismaUserType,
+} from '@prisma/client';
 
 // ============================================================================
 // AUTH ENUMS
@@ -9,23 +13,33 @@ export enum OtpMode {
   SIGNIN = 'signin',
 }
 
+export const UserType = {
+  INDIVIDUAL: PrismaUserType.individual,
+  BUSINESS: PrismaUserType.business,
+} as const;
+export type UserType = (typeof UserType)[keyof typeof UserType];
+
 // ============================================================================
 // CORE ENUMS
 // ============================================================================
 
-export enum ProfileStatus {
-  ACTIVE = 'active',
-  SUSPENDED = 'suspended',
-  DELETED = 'deleted',
-}
+export const ProfileStatus = {
+  ACTIVE: PrismaProfileStatus.active,
+  SUSPENDED: PrismaProfileStatus.suspended,
+  DELETED: PrismaProfileStatus.deleted,
+} as const;
+export type ProfileStatus = (typeof ProfileStatus)[keyof typeof ProfileStatus];
 
 // Alias for backward compatibility
-export { ProfileStatus as UserStatus };
+export const UserStatus = ProfileStatus;
+export type UserStatus = ProfileStatus;
 
-export enum PreferredLanguage {
-  EN = 'en',
-  ZH_HANS = 'zh-Hans',
-}
+export const PreferredLanguage = {
+  EN: 'en',
+  ZH_HANS: 'zh-Hans',
+} as const;
+export type PreferredLanguage =
+  (typeof PreferredLanguage)[keyof typeof PreferredLanguage];
 
 // ============================================================================
 // PROVIDER ENUMS
@@ -312,6 +326,7 @@ export enum WaybillStatus {
 // ============================================================================
 
 registerEnumType(OtpMode, { name: 'OtpMode' });
+registerEnumType(UserType, { name: 'UserType' });
 registerEnumType(ProfileStatus, { name: 'ProfileStatus' });
 registerEnumType(PreferredLanguage, { name: 'PreferredLanguage' });
 registerEnumType(ProviderType, { name: 'ProviderType' });

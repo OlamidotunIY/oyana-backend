@@ -13,21 +13,8 @@ export class UserResolver {
 
   @Query(() => Profile, { nullable: true })
   @UseGuards(GqlAuthGuard)
-  async me(@CurrentUser() user: User): Promise<any> {
-    const profile = await this.userService.findProfileById(user.id);
-
-    if (!profile) {
-      return null;
-    }
-
-    // Transform the Prisma result to match GraphQL schema
-    return {
-      ...profile,
-      roles: profile.userRoles.map((userRole) => ({
-        ...userRole.role,
-        permissions: userRole.role.rolePermissions.map((rp) => rp.permission),
-      })),
-    };
+  async me(@CurrentUser() user: User): Promise<Profile | null> {
+    return this.userService.findProfileById(user.id);
   }
 
   @Mutation(() => Profile)
@@ -35,16 +22,7 @@ export class UserResolver {
   async updateProfile(
     @CurrentUser() user: User,
     @Args('input') input: UpdateProfileInput,
-  ): Promise<any> {
-    const profile = await this.userService.updateProfile(user.id, input);
-
-    // Transform the Prisma result to match GraphQL schema
-    return {
-      ...profile,
-      roles: profile.userRoles.map((userRole) => ({
-        ...userRole.role,
-        permissions: userRole.role.rolePermissions.map((rp) => rp.permission),
-      })),
-    };
+  ): Promise<Profile> {
+    return this.userService.updateProfile(user.id, input);
   }
 }

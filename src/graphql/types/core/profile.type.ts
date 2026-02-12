@@ -1,29 +1,41 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { ProfileStatus, PreferredLanguage } from '../../enums';
-import { Role } from './role.type';
+import { ProfileStatus, PreferredLanguage, UserType } from '../../enums';
+import { UserRole } from './user-role.type';
 
 @ObjectType()
 export class Profile {
   @Field(() => ID)
-  id: string; // Same as auth.users.id
+  id: string;
+
+  @Field()
+  email: string;
+
+  @Field(() => UserType)
+  userType: UserType;
 
   @Field({ nullable: true })
-  fullName?: string;
+  firstName: string | null;
 
   @Field({ nullable: true })
-  displayName?: string;
+  lastName: string | null;
 
   @Field({ nullable: true })
-  phoneE164?: string;
+  phoneE164: string | null;
+
+  @Field({ nullable: true })
+  state: string | null;
+
+  @Field({ nullable: true })
+  referralCode: string | null;
 
   @Field(() => PreferredLanguage)
-  preferredLanguage: PreferredLanguage;
+  preferredLanguage: string;
 
   @Field(() => ProfileStatus)
   status: ProfileStatus;
 
   @Field({ nullable: true })
-  lastLoginAt?: Date;
+  lastLoginAt: Date | null;
 
   @Field()
   createdAt: Date;
@@ -31,6 +43,6 @@ export class Profile {
   @Field()
   updatedAt: Date;
 
-  @Field(() => [Role])
-  roles: Role[];
+  @Field(() => [UserRole])
+  userRoles: UserRole[];
 }

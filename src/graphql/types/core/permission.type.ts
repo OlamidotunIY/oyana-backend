@@ -9,7 +9,7 @@ export class Permission {
   key: string;
 
   @Field({ nullable: true })
-  description?: string;
+  description: string | null;
 
   @Field()
   createdAt: Date;
