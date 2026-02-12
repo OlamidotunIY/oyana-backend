@@ -23,6 +23,21 @@ input AssignJobDto {
   providerId: String!
 }
 
+type AuthResponse {
+  accessToken: String!
+  expiresIn: Float!
+  refreshToken: String!
+  tokenType: String!
+  user: AuthUser!
+}
+
+type AuthUser {
+  email: String!
+  emailConfirmed: Boolean!
+  fullName: String
+  id: String!
+}
+
 input AwardBidDto {
   bidId: String!
   jobId: String!
@@ -51,6 +66,12 @@ scalar BigInt
 input CancelJobDto {
   cancelReason: String!
   jobId: String!
+}
+
+input CompleteSignupInput {
+  fullName: String!
+  password: String!
+  phoneE164: String
 }
 
 input CreateBidDto {
@@ -172,6 +193,10 @@ enum DispatchOfferStatus {
   EXPIRED
   SENT
   VIEWED
+}
+
+input ForgotPasswordInput {
+  email: String!
 }
 
 """
@@ -339,11 +364,17 @@ enum LocationType {
   PICKUP
 }
 
+type MessageResponse {
+  message: String!
+  success: Boolean!
+}
+
 type Mutation {
   addJobItem(input: AddJobItemDto!): JobItem!
   awardBid(input: AwardBidDto!): BidAward!
   cancelAssignment(id: String!): JobAssignment!
   cancelJob(input: CancelJobDto!): Job!
+  completeSignup(input: CompleteSignupInput!): AuthResponse!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
   createJob(input: CreateJobDto!): Job!
   createJobAssignment(input: AssignJobDto!): JobAssignment!
@@ -352,12 +383,18 @@ type Mutation {
   createLocation(input: CreateLocationDto!): JobLocation!
   createWalletAccount(input: CreateWalletAccountDto!): WalletAccount!
   createWalletTransaction(input: CreateTransactionDto!): Transaction!
+  forgotPassword(input: ForgotPasswordInput!): MessageResponse!
   initiateNinVerification(input: VerifyNINDto!): NINVerification!
   initiatePayment(input: CreatePaymentIntentDto!): PaymentIntent!
   initiateRefund(input: RequestRefundDto!): Refund!
+  refreshToken(refreshToken: String!): AuthResponse!
+  requestOtp(input: RequestOtpInput!): MessageResponse!
+  resetPassword(input: ResetPasswordInput!): MessageResponse!
   respondToDispatchOffer(input: UpdateDispatchOfferDto!): DispatchOffer!
   reviewKycCase(approved: Boolean!, id: String!): KYCCase!
   sendDispatchOffer(input: CreateDispatchOfferDto!): DispatchOffer!
+  signIn(input: SignInInput!): AuthResponse!
+  signUp(input: SignUpInput!): AuthResponse!
   submitKycCase(id: String!): KYCCase!
   updateJob(id: String!, input: UpdateJobDto!): Job!
   updateJobAssignment(id: String!, input: AssignJobDto!): JobAssignment!
@@ -365,6 +402,7 @@ type Mutation {
   updatePaymentIntent(id: String!): PaymentIntent!
   updateProfile(input: UpdateProfileInput!): Profile!
   uploadKycDocument(input: UploadKYCDocumentDto!): KYCDocument!
+  verifyOtp(input: VerifyOtpInput!): AuthResponse!
   withdrawBid(id: String!): JobBid!
 }
 
@@ -478,11 +516,20 @@ enum RefundStatus {
   SUCCEEDED
 }
 
+input RequestOtpInput {
+  email: String!
+  mode: String!
+}
+
 input RequestRefundDto {
   currency: String!
   reason: String!
   refundAmountMinor: BigInt!
   transactionId: String!
+}
+
+input ResetPasswordInput {
+  newPassword: String!
 }
 
 type Role {
@@ -492,6 +539,17 @@ type Role {
   name: String
   permissions: [Permission!]!
   updatedAt: DateTime!
+}
+
+input SignInInput {
+  email: String!
+  password: String!
+}
+
+input SignUpInput {
+  email: String!
+  fullName: String!
+  password: String!
 }
 
 type Transaction {
@@ -564,6 +622,11 @@ input VerifyNINDto {
   middleName: String
   ninNumber: String!
   profileId: String!
+}
+
+input VerifyOtpInput {
+  email: String!
+  token: String!
 }
 
 type WalletAccount {

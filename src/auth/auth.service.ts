@@ -3,6 +3,7 @@ import {
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
+import { User } from '@supabase/supabase-js';
 import { SupabaseService } from '../auth/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -110,7 +111,7 @@ export class AuthService {
     // Check if email exists in auth.users
     const { data: existingUsers } = await supabase.auth.admin.listUsers();
     const userExists = existingUsers?.users?.some(
-      (user) => user.email === input.email,
+      (user: User) => user.email === input.email,
     );
 
     if (input.mode === OtpMode.SIGNUP && userExists) {
