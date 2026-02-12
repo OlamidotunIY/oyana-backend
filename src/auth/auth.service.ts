@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { User } from '@supabase/supabase-js';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SupabaseService } from '../auth/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -15,9 +16,13 @@ import {
   ResetPasswordInput,
   CompleteSignupInput,
   OtpMode,
+  UserType,
 } from '../graphql/dto/auth';
 import { AuthResponse, MessageResponse } from '../graphql/types/auth';
 import { PrismaService } from '../database/prisma.service';
+import { UserSignedUpEvent } from './events/user-signed-up.event';
+import { UserService } from '../user/user.service';
+import { Response as ExpressResponse } from 'express';
 
 @Injectable()
 export class AuthService {
@@ -25,57 +30,70 @@ export class AuthService {
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly userService: UserService,
   ) {}
 
-  async signUp(input: SignUpInput): Promise<AuthResponse> {
+  async signUp(input: SignUpInput): Promise<MessageResponse> {
     const supabase = this.supabaseService.getClient();
+
+    // Validate business-specific fields
+    if (input.userType === UserType.BUSINESS) {
+      if (!input.phoneNumber) {
+        throw new BadRequestException(
+          'Phone number is required for business signup',
+        );
+      }
+      if (!input.businessName) {
+        throw new BadRequestException(
+          'Business name is required for business signup',
+        );
+      }
+      if (!input.businessAddress) {
+        throw new BadRequestException(
+          'Business address is required for business signup',
+        );
+      }
+    }
+
+    const fullName = `${input.firstName} ${input.lastName}`;
 
     const { data, error } = await supabase.auth.signUp({
       email: input.email,
       password: input.password,
-      options: {
-        data: {
-          full_name: input.fullName,
-          signup_role: 'customer',
-        },
-      },
     });
 
     if (error) {
       throw new BadRequestException(error.message);
     }
 
-    if (!data.session || !data.user) {
-      // Email confirmation required
-      return {
-        accessToken: '',
-        refreshToken: '',
-        expiresIn: 0,
-        tokenType: 'bearer',
-        user: {
-          id: data.user?.id || '',
-          email: input.email,
-          fullName: input.fullName,
-          emailConfirmed: false,
-        },
-      };
+    if (!data.user) {
+      throw new BadRequestException('Failed to create user');
     }
 
-    return {
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      expiresIn: data.session.expires_in || 3600,
-      tokenType: 'bearer',
-      user: {
-        id: data.user.id,
-        email: data.user.email!,
-        fullName: data.user.user_metadata?.full_name || input.fullName,
-        emailConfirmed: !!data.user.email_confirmed_at,
-      },
+    // Emit user signed up event
+    const signupEvent = new UserSignedUpEvent(
+      data.user.id,
+      input.email,
+      input.userType,
+      input.firstName,
+      input.lastName,
+      input.state,
+      input.referralCode,
+      input.phoneNumber,
+      input.businessName,
+      input.businessAddress,
+    );
+
+    this.eventEmitter.emit('user.signed-up', signupEvent);
+
+return {
+      message: 'Signup successful. Please check your email to verify your account.',
+      success: true,
     };
   }
 
-  async signIn(input: SignInInput): Promise<AuthResponse> {
+  async signIn(input: SignInInput, response: ExpressResponse): Promise<AuthResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -91,17 +109,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const profile = await this.userService.getProfileByEmail(data.user.email!);
+
+    if (!profile) {
+      throw new UnauthorizedException('Profile not found');
+    }
+
+    this.setCookies(response, data.session.access_token, data.session.refresh_token);
+
     return {
       accessToken: data.session.access_token,
       refreshToken: data.session.refresh_token,
-      expiresIn: data.session.expires_in || 3600,
-      tokenType: 'bearer',
-      user: {
-        id: data.user.id,
-        email: data.user.email!,
-        fullName: data.user.user_metadata?.full_name,
-        emailConfirmed: !!data.user.email_confirmed_at,
-      },
+      user: profile,
     };
   }
 
@@ -142,7 +161,7 @@ export class AuthService {
     };
   }
 
-  async verifyOtp(input: VerifyOtpInput): Promise<AuthResponse> {
+  async verifyOtp(input: VerifyOtpInput, response: ExpressResponse): Promise<AuthResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase.auth.verifyOtp({
@@ -159,92 +178,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid OTP');
     }
 
+    const profile = await this.userService.getProfileByEmail(data.user.email!);
+
+    if (!profile) {
+      throw new UnauthorizedException('Profile not found');
+    }
+
+    this.setCookies(response, data.session.access_token, data.session.refresh_token);
+
     return {
       accessToken: data.session.access_token,
       refreshToken: data.session.refresh_token,
-      expiresIn: data.session.expires_in || 3600,
-      tokenType: 'bearer',
-      user: {
-        id: data.user.id,
-        email: data.user.email!,
-        fullName: data.user.user_metadata?.full_name,
-        emailConfirmed: !!data.user.email_confirmed_at,
-      },
-    };
-  }
-
-  async completeSignup(
-    input: CompleteSignupInput,
-    accessToken: string,
-  ): Promise<AuthResponse> {
-    const supabase = this.supabaseService.getClient();
-
-    // Get the current user from the access token
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser(accessToken);
-
-    if (userError || !user) {
-      throw new UnauthorizedException('Invalid access token');
-    }
-
-    // Update password in Supabase Auth
-    const { error: passwordError } = await supabase.auth.admin.updateUserById(
-      user.id,
-      {
-        password: input.password,
-        user_metadata: {
-          full_name: input.fullName,
-        },
-      },
-    );
-
-    if (passwordError) {
-      throw new BadRequestException(
-        `Failed to set password: ${passwordError.message}`,
-      );
-    }
-
-    // Upsert profile in database
-    await this.prisma.profile.upsert({
-      where: { id: user.id },
-      create: {
-        id: user.id,
-        fullName: input.fullName,
-        phoneE164: input.phoneE164,
-        displayName: input.fullName,
-      },
-      update: {
-        fullName: input.fullName,
-        phoneE164: input.phoneE164,
-        displayName: input.fullName,
-      },
-    });
-
-    // Get updated session
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.refreshSession({
-      refresh_token: accessToken,
-    });
-
-    if (sessionError || !session) {
-      throw new UnauthorizedException('Failed to refresh session');
-    }
-
-    return {
-      accessToken: session.access_token,
-      refreshToken: session.refresh_token,
-      expiresIn: session.expires_in || 3600,
-      tokenType: 'bearer',
-      user: {
-        id: user.id,
-        email: user.email!,
-        fullName: input.fullName,
-        emailConfirmed: !!user.email_confirmed_at,
-      },
+      user: profile,
     };
   }
 
@@ -283,7 +228,7 @@ export class AuthService {
     };
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResponse> {
+  async refreshToken(refreshToken: string, response: ExpressResponse): Promise<AuthResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase.auth.refreshSession({
@@ -294,17 +239,36 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
+    const profile = await this.userService.getProfileByEmail(data.user!.email!);
+
+    if (!profile) {
+      throw new UnauthorizedException('Profile not found');
+    }
+
+    this.setCookies(response, data.session.access_token, data.session.refresh_token);
+
     return {
       accessToken: data.session.access_token,
       refreshToken: data.session.refresh_token,
-      expiresIn: data.session.expires_in || 3600,
-      tokenType: 'bearer',
-      user: {
-        id: data.user!.id,
-        email: data.user!.email!,
-        fullName: data.user!.user_metadata?.full_name,
-        emailConfirmed: !!data.user!.email_confirmed_at,
-      },
+      user: profile,
     };
+  }
+
+  private setCookies(response: ExpressResponse, accessToken: string, refreshToken: string): void {
+    const isProduction = this.configService.get('NODE_ENV') === 'production';
+
+    response.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 3600000, // 1 hour
+    });
+
+    response.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 604800000, // 7 days
+    });
   }
 }

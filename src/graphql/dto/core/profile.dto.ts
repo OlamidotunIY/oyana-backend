@@ -19,16 +19,16 @@ export class CreateProfileInput {
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
-  @MinLength(2, { message: 'Full name must be at least 2 characters long' })
-  @MaxLength(100, { message: 'Full name must not exceed 100 characters' })
-  fullName?: string;
+  @MinLength(2, { message: 'First name must be at least 2 characters long' })
+  @MaxLength(50, { message: 'First name must not exceed 50 characters' })
+  firstName?: string;
 
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
-  @MinLength(2, { message: 'Display name must be at least 2 characters long' })
-  @MaxLength(50, { message: 'Display name must not exceed 50 characters' })
-  displayName?: string;
+  @MinLength(2, { message: 'Last name must be at least 2 characters long' })
+  @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
+  lastName?: string;
 
   @Field({ nullable: true })
   @IsOptional()
@@ -51,16 +51,16 @@ export class UpdateProfileInput {
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
-  @MinLength(2, { message: 'Full name must be at least 2 characters long' })
-  @MaxLength(100, { message: 'Full name must not exceed 100 characters' })
-  fullName?: string;
+  @MinLength(2, { message: 'First name must be at least 2 characters long' })
+  @MaxLength(50, { message: 'First name must not exceed 50 characters' })
+  firstName?: string;
 
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
-  @MinLength(2, { message: 'Display name must be at least 2 characters long' })
-  @MaxLength(50, { message: 'Display name must not exceed 50 characters' })
-  displayName?: string;
+  @MinLength(2, { message: 'Last name must be at least 2 characters long' })
+  @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
+  lastName?: string;
 
   @Field({ nullable: true })
   @IsOptional()

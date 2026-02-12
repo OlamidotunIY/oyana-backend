@@ -4,9 +4,13 @@
 
 model Profile {
     id                String        @id @db.Uuid // Same as auth.users.id
-    fullName          String?       @map("full_name")
-    displayName       String?       @map("display_name")
+    email             String        @unique
+    userType          UserType      @map("user_type")
+    firstName         String?       @map("first_name")
+    lastName          String?       @map("last_name")
     phoneE164         String?       @unique @map("phone_e164")
+    state             String?
+    referralCode      String?       @map("referral_code")
     preferredLanguage String        @default("en") @map("preferred_language")
     status            ProfileStatus @default(active)
     lastLoginAt       DateTime?     @map("last_login_at") @db.Timestamptz(6)
@@ -109,4 +113,9 @@ enum ProfileStatus {
     active
     suspended
     deleted
+}
+
+enum UserType {
+    individual
+    business
 }

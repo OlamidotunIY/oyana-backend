@@ -4,10 +4,11 @@
 
 model Provider {
     id                      String   @id @default(uuid()) @db.Uuid
-    type                    String
+    businessName            String   @map("business_name")
+    businessAddress         String?  @map("business_address")
     legalName               String   @map("legal_name")
     displayName             String?  @map("display_name")
-    contactProfileId        String?  @map("contact_profile_id") @db.Uuid
+    contactProfileId        String?  @unique @map("contact_profile_id") @db.Uuid
     status                  String   @default("pending")
     minWalletThresholdMinor BigInt   @default(0) @map("min_wallet_threshold_minor")
     ratingAvg               Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)

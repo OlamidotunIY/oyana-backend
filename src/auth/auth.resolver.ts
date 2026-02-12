@@ -1,4 +1,5 @@
 import { Resolver, Mutation, Args, Context } from '@nestjs/graphql';
+import { Response as ExpressResponse } from 'express';
 import { AuthService } from './auth.service';
 import {
   SignUpInput,
@@ -15,14 +16,17 @@ import { AuthResponse, MessageResponse } from '../graphql/types/auth';
 export class AuthResolver {
   constructor(private readonly authService: AuthService) {}
 
-  @Mutation(() => AuthResponse)
-  async signUp(@Args('input') input: SignUpInput): Promise<AuthResponse> {
+  @Mutation(() => MessageResponse)
+  async signUp(@Args('input') input: SignUpInput): Promise<MessageResponse> {
     return this.authService.signUp(input);
   }
 
   @Mutation(() => AuthResponse)
-  async signIn(@Args('input') input: SignInInput): Promise<AuthResponse> {
-    return this.authService.signIn(input);
+  async signIn(
+    @Args('input') input: SignInInput,
+    @Context() context: { res: ExpressResponse },
+  ): Promise<AuthResponse> {
+    return this.authService.signIn(input, context.res);
   }
 
   @Mutation(() => MessageResponse)
@@ -33,21 +37,11 @@ export class AuthResolver {
   }
 
   @Mutation(() => AuthResponse)
-  async verifyOtp(@Args('input') input: VerifyOtpInput): Promise<AuthResponse> {
-    return this.authService.verifyOtp(input);
-  }
-
-  @Mutation(() => AuthResponse)
-  async completeSignup(
-    @Args('input') input: CompleteSignupInput,
-    @Context() context: any,
+  async verifyOtp(
+    @Args('input') input: VerifyOtpInput,
+    @Context() context: { res: ExpressResponse },
   ): Promise<AuthResponse> {
-    const authHeader = context.req?.headers?.authorization;
-    if (!authHeader) {
-      throw new Error('Authorization header required');
-    }
-    const token = authHeader.replace('Bearer ', '');
-    return this.authService.completeSignup(input, token);
+    return this.authService.verifyOtp(input, context.res);
   }
 
   @Mutation(() => MessageResponse)
@@ -73,7 +67,8 @@ export class AuthResolver {
   @Mutation(() => AuthResponse)
   async refreshToken(
     @Args('refreshToken') refreshToken: string,
+    @Context() context: { res: ExpressResponse },
   ): Promise<AuthResponse> {
-    return this.authService.refreshToken(refreshToken);
+    return this.authService.refreshToken(refreshToken, context.res);
   }
 }

@@ -1,4 +1,5 @@
 import { Field, ObjectType } from '@nestjs/graphql';
+import { Profile } from '../core';
 
 @ObjectType()
 export class AuthUser {
@@ -24,13 +25,7 @@ export class AuthResponse {
   refreshToken: string;
 
   @Field()
-  expiresIn: number;
-
-  @Field()
-  tokenType: string;
-
-  @Field()
-  user: AuthUser;
+  user: Profile;
 }
 
 @ObjectType()

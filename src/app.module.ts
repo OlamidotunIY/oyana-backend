@@ -7,6 +7,7 @@ import { DispatchModule } from './dispatch/dispatch.module';
 import { MarketPlaceModule } from './market-place/market-place.module';
 import { KycModule } from './kyc/kyc.module';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { GqlConfig } from './config/graphql-ws';
 import { SupabaseModule } from './auth/supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
@@ -19,6 +20,7 @@ import { BigIntScalar } from './graphql/scalars';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    EventEmitterModule.forRoot(),
     DatabaseModule,
     SupabaseModule,
     AuthModule,
