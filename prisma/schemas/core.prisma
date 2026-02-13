@@ -3,21 +3,21 @@
 // ============================================================================
 
 model AdminSession {
-    id        String   @id @default(uuid()) @db.Uuid
-    profileId String   @map("profile_id") @db.Uuid
-    ip        String?  @db.Inet
-    userAgent String?  @map("user_agent")
-    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String   @id @default(uuid()) @db.Uuid
+  profileId String   @map("profile_id") @db.Uuid
+  ip        String?  @db.Inet
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-    // Relations
-    profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  // Relations
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-    @@index([profileId])
-    @@map("admin_sessions")
+  @@index([profileId])
+  @@map("admin_sessions")
 }
 
 enum State {
-    Lagos
-    Oyo
-    Abuja
+  Lagos
+  Oyo
+  Abuja
 }

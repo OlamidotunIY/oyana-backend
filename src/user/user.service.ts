@@ -1,11 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateProfileInput } from '../graphql/dto/core/profile.dto';
+import { PreferredLanguage } from '../graphql/enums';
 import { Profile } from '../graphql/types/core';
 
 @Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) {}
+
+  private normalizePreferredLanguage(
+    value: string | null | undefined,
+  ): Profile['preferredLanguage'] {
+    return value === PreferredLanguage.ZH_HANS
+      ? PreferredLanguage.ZH_HANS
+      : PreferredLanguage.EN;
+  }
+
+  private toGraphqlProfile(
+    profile: Omit<Profile, 'preferredLanguage'> & { preferredLanguage: string },
+  ): Profile {
+    return {
+      ...profile,
+      preferredLanguage: this.normalizePreferredLanguage(profile.preferredLanguage),
+    };
+  }
 
   async getProfileByEmail(email: string): Promise<Profile | null> {
     const profile = await this.prisma.runWithRetry('UserService.getProfileByEmail', () =>
@@ -18,15 +36,21 @@ export class UserService {
       return null;
     }
 
-    return profile;
+    return this.toGraphqlProfile(profile);
   }
 
   async findProfileById(profileId: string): Promise<Profile | null> {
-    return this.prisma.runWithRetry('UserService.findProfileById', () =>
+    const profile = await this.prisma.runWithRetry('UserService.findProfileById', () =>
       this.prisma.profile.findUnique({
         where: { id: profileId },
       }),
     );
+
+    if (!profile) {
+      return null;
+    }
+
+    return this.toGraphqlProfile(profile);
   }
 
   async updateProfile(
@@ -59,7 +83,7 @@ export class UserService {
     }
 
     // Use upsert to create profile if it doesn't exist
-    return this.prisma.runWithRetry('UserService.updateProfile', () =>
+    const profile = await this.prisma.runWithRetry('UserService.updateProfile', () =>
       this.prisma.profile.upsert({
         where: { id: profileId },
         update: updateData,
@@ -69,5 +93,7 @@ export class UserService {
         },
       }),
     );
+
+    return this.toGraphqlProfile(profile);
   }
 }

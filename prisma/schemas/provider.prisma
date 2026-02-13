@@ -3,135 +3,135 @@
 // ============================================================================
 
 model Provider {
-    id                      String   @id @default(uuid()) @db.Uuid
-    businessName            String   @map("business_name")
-    businessAddress         String?  @map("business_address")
-    legalName               String   @map("legal_name")
-    displayName             String?  @map("display_name")
-    contactProfileId        String?  @unique @map("contact_profile_id") @db.Uuid
-    status                  String   @default("pending")
-    minWalletThresholdMinor BigInt   @default(0) @map("min_wallet_threshold_minor")
-    ratingAvg               Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
-    ratingCount             Int      @default(0) @map("rating_count")
-    priorityScore           Int      @default(0) @map("priority_score")
-    createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                      String   @id @default(uuid()) @db.Uuid
+  businessName            String   @map("business_name")
+  businessAddress         String?  @map("business_address")
+  legalName               String   @map("legal_name")
+  displayName             String?  @map("display_name")
+  contactProfileId        String?  @unique @map("contact_profile_id") @db.Uuid
+  status                  String   @default("pending")
+  minWalletThresholdMinor BigInt   @default(0) @map("min_wallet_threshold_minor")
+  ratingAvg               Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount             Int      @default(0) @map("rating_count")
+  priorityScore           Int      @default(0) @map("priority_score")
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-    // Relations
-    contactProfile      Profile?            @relation("ProviderContact", fields: [contactProfileId], references: [id])
-    members             ProviderMember[]
-    vehicles            Vehicle[]
-    kycCases            ProviderKycCase[]
-    ninVerifications    NinVerification[]
-    dispatchOffers      DispatchOffer[]
-    shipmentAssignments ShipmentAssignment[]
-    shipmentBids        ShipmentBid[]
-    ratings             Rating[]
-    penalties           ProviderPenalty[]
-    walletAccounts      WalletAccount[]     @relation("ProviderWallet")
-    slaRules            SlaRule[]
+  // Relations
+  contactProfile      Profile?             @relation("ProviderContact", fields: [contactProfileId], references: [id])
+  members             ProviderMember[]
+  vehicles            Vehicle[]
+  kycCases            ProviderKycCase[]
+  ninVerifications    NinVerification[]
+  dispatchOffers      DispatchOffer[]
+  shipmentAssignments ShipmentAssignment[]
+  shipmentBids        ShipmentBid[]
+  ratings             Rating[]
+  penalties           ProviderPenalty[]
+  walletAccounts      WalletAccount[]      @relation("ProviderWallet")
+  slaRules            SlaRule[]
 
-    @@index([status])
-    @@index([priorityScore(sort: Desc), ratingAvg(sort: Desc)])
-    @@map("providers")
+  @@index([status])
+  @@index([priorityScore(sort: Desc), ratingAvg(sort: Desc)])
+  @@map("providers")
 }
 
 model ProviderMember {
-    providerId String   @map("provider_id") @db.Uuid
-    profileId  String   @map("profile_id") @db.Uuid
-    role       String
-    status     String   @default("active")
-    createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  providerId String   @map("provider_id") @db.Uuid
+  profileId  String   @map("profile_id") @db.Uuid
+  role       String
+  status     String   @default("active")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-    // Relations
-    provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-    profile  Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  // Relations
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  profile  Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-    @@id([providerId, profileId])
-    @@map("provider_members")
+  @@id([providerId, profileId])
+  @@map("provider_members")
 }
 
 model Vehicle {
-    id                String          @id @default(uuid()) @db.Uuid
-    providerId        String          @map("provider_id") @db.Uuid
-    category          VehicleCategory
-    plateNumber       String?         @map("plate_number")
-    make              String?
-    model             String?
-    color             String?
-    capacityKg        Int?            @map("capacity_kg")
-    capacityVolumeCm3 BigInt?         @map("capacity_volume_cm3")
-    status            String          @default("active")
-    createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String          @id @default(uuid()) @db.Uuid
+  providerId        String          @map("provider_id") @db.Uuid
+  category          VehicleCategory
+  plateNumber       String?         @map("plate_number")
+  make              String?
+  model             String?
+  color             String?
+  capacityKg        Int?            @map("capacity_kg")
+  capacityVolumeCm3 BigInt?         @map("capacity_volume_cm3")
+  status            String          @default("active")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-    // Relations
-    provider            Provider             @relation(fields: [providerId], references: [id], onDelete: Cascade)
-    dispatchOffers      DispatchOffer[]
-    shipmentAssignments ShipmentAssignment[]
+  // Relations
+  provider            Provider             @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  dispatchOffers      DispatchOffer[]
+  shipmentAssignments ShipmentAssignment[]
 
-    @@unique([plateNumber], name: "unique_plate_number")
-    @@index([providerId, category, status])
-    @@map("vehicles")
+  @@unique([plateNumber], name: "unique_plate_number")
+  @@index([providerId, category, status])
+  @@map("vehicles")
 }
 
 model ProviderKycCase {
-    id              String    @id @default(uuid()) @db.Uuid
-    providerId      String    @map("provider_id") @db.Uuid
-    status          String
-    submittedAt     DateTime? @map("submitted_at") @db.Timestamptz(6)
-    reviewedBy      String?   @map("reviewed_by") @db.Uuid
-    reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz(6)
-    rejectionReason String?   @map("rejection_reason")
-    createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String    @id @default(uuid()) @db.Uuid
+  providerId      String    @map("provider_id") @db.Uuid
+  status          String
+  submittedAt     DateTime? @map("submitted_at") @db.Timestamptz(6)
+  reviewedBy      String?   @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  rejectionReason String?   @map("rejection_reason")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-    // Relations
-    provider  Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
-    reviewer  Profile?      @relation("KycReviewer", fields: [reviewedBy], references: [id])
-    documents KycDocument[]
+  // Relations
+  provider  Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  reviewer  Profile?      @relation("KycReviewer", fields: [reviewedBy], references: [id])
+  documents KycDocument[]
 
-    @@index([providerId, status])
-    @@map("provider_kyc_cases")
+  @@index([providerId, status])
+  @@map("provider_kyc_cases")
 }
 
 model KycDocument {
-    id            String   @id @default(uuid()) @db.Uuid
-    kycCaseId     String   @map("kyc_case_id") @db.Uuid
-    docType       String   @map("doc_type")
-    storageBucket String   @map("storage_bucket")
-    storagePath   String   @map("storage_path")
-    mimeType      String?  @map("mime_type")
-    status        String   @default("uploaded")
-    uploadedBy    String?  @map("uploaded_by") @db.Uuid
-    createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id            String   @id @default(uuid()) @db.Uuid
+  kycCaseId     String   @map("kyc_case_id") @db.Uuid
+  docType       String   @map("doc_type")
+  storageBucket String   @map("storage_bucket")
+  storagePath   String   @map("storage_path")
+  mimeType      String?  @map("mime_type")
+  status        String   @default("uploaded")
+  uploadedBy    String?  @map("uploaded_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-    // Relations
-    kycCase  ProviderKycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
-    uploader Profile?        @relation(fields: [uploadedBy], references: [id])
+  // Relations
+  kycCase  ProviderKycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
+  uploader Profile?        @relation(fields: [uploadedBy], references: [id])
 
-    @@unique([storageBucket, storagePath])
-    @@index([kycCaseId, docType])
-    @@map("kyc_documents")
+  @@unique([storageBucket, storagePath])
+  @@index([kycCaseId, docType])
+  @@map("kyc_documents")
 }
 
 model NinVerification {
-    id              String    @id @default(uuid()) @db.Uuid
-    providerId      String    @map("provider_id") @db.Uuid
-    ninHash         String    @map("nin_hash")
-    status          String
-    vendor          String
-    vendorReference String?   @map("vendor_reference")
-    requestedAt     DateTime? @map("requested_at") @db.Timestamptz(6)
-    verifiedAt      DateTime? @map("verified_at") @db.Timestamptz(6)
-    rawResponse     Json?     @map("raw_response")
-    createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String    @id @default(uuid()) @db.Uuid
+  providerId      String    @map("provider_id") @db.Uuid
+  ninHash         String    @map("nin_hash")
+  status          String
+  vendor          String
+  vendorReference String?   @map("vendor_reference")
+  requestedAt     DateTime? @map("requested_at") @db.Timestamptz(6)
+  verifiedAt      DateTime? @map("verified_at") @db.Timestamptz(6)
+  rawResponse     Json?     @map("raw_response")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-    // Relations
-    provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  // Relations
+  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
-    @@index([providerId, status])
-    @@map("nin_verifications")
+  @@index([providerId, status])
+  @@map("nin_verifications")
 }

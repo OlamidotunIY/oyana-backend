@@ -1,23 +1,4 @@
 import { registerEnumType } from '@nestjs/graphql';
-import {
-  BidStatus as PrismaBidStatus,
-  DispatchBatchStatus as PrismaDispatchBatchStatus,
-  DispatchOfferStatus as PrismaDispatchOfferStatus,
-  PodUploadType as PrismaPodUploadType,
-  ProfileStatus as PrismaProfileStatus,
-  ShipmentActorRole as PrismaShipmentActorRole,
-  ShipmentAssignmentStatus as PrismaShipmentAssignmentStatus,
-  ShipmentEventType as PrismaShipmentEventType,
-  ShipmentMilestoneStatus as PrismaShipmentMilestoneStatus,
-  ShipmentMilestoneType as PrismaShipmentMilestoneType,
-  ShipmentMode as PrismaShipmentMode,
-  ShipmentScheduleType as PrismaShipmentScheduleType,
-  ShipmentStatus as PrismaShipmentStatus,
-  State as PrismaState,
-  UserType as PrismaUserType,
-  VehicleCategory as PrismaVehicleCategory,
-  WaybillStatus as PrismaWaybillStatus,
-} from '@prisma/client';
 
 // ============================================================================
 // AUTH ENUMS
@@ -29,9 +10,9 @@ export enum OtpMode {
 }
 
 export const UserType = {
-  INDIVIDUAL: PrismaUserType.individual,
-  BUSINESS: PrismaUserType.business,
-  ADMIN: PrismaUserType.admin,
+  INDIVIDUAL: 'individual',
+  BUSINESS: 'business',
+  ADMIN: 'admin',
 } as const;
 export type UserType = (typeof UserType)[keyof typeof UserType];
 
@@ -40,16 +21,16 @@ export type UserType = (typeof UserType)[keyof typeof UserType];
 // ============================================================================
 
 export const ProfileStatus = {
-  ACTIVE: PrismaProfileStatus.active,
-  SUSPENDED: PrismaProfileStatus.suspended,
-  DELETED: PrismaProfileStatus.deleted,
+  ACTIVE: 'active',
+  SUSPENDED: 'suspended',
+  DELETED: 'deleted',
 } as const;
 export type ProfileStatus = (typeof ProfileStatus)[keyof typeof ProfileStatus];
 
 export const State = {
-  LAGOS: PrismaState.Lagos,
-  OYO: PrismaState.Oyo,
-  ABUJA: PrismaState.Abuja,
+  LAGOS: 'Lagos',
+  OYO: 'Oyo',
+  ABUJA: 'Abuja',
 } as const;
 export type State = (typeof State)[keyof typeof State];
 
@@ -87,9 +68,9 @@ export enum ProviderMemberRole {
 }
 
 export const VehicleCategory = {
-  BIKE: PrismaVehicleCategory.bike,
-  VAN: PrismaVehicleCategory.van,
-  TRUCK: PrismaVehicleCategory.truck,
+  BIKE: 'bike',
+  VAN: 'van',
+  TRUCK: 'truck',
 } as const;
 export type VehicleCategory =
   (typeof VehicleCategory)[keyof typeof VehicleCategory];
@@ -148,53 +129,53 @@ export { NinVerificationStatus as NINVerificationStatus };
 // ============================================================================
 
 export const ShipmentMode = {
-  DISPATCH: PrismaShipmentMode.dispatch,
-  MARKETPLACE: PrismaShipmentMode.marketplace,
+  DISPATCH: 'dispatch',
+  MARKETPLACE: 'marketplace',
 } as const;
 export type ShipmentMode = (typeof ShipmentMode)[keyof typeof ShipmentMode];
 
 export const ShipmentScheduleType = {
-  INSTANT: PrismaShipmentScheduleType.instant,
-  SCHEDULED: PrismaShipmentScheduleType.scheduled,
+  INSTANT: 'instant',
+  SCHEDULED: 'scheduled',
 } as const;
 export type ShipmentScheduleType =
   (typeof ShipmentScheduleType)[keyof typeof ShipmentScheduleType];
 
 export const ShipmentStatus = {
-  DRAFT: PrismaShipmentStatus.draft,
-  CREATED: PrismaShipmentStatus.created,
-  BROADCASTING: PrismaShipmentStatus.broadcasting,
-  ASSIGNED: PrismaShipmentStatus.assigned,
-  EN_ROUTE_PICKUP: PrismaShipmentStatus.en_route_pickup,
-  PICKED_UP: PrismaShipmentStatus.picked_up,
-  EN_ROUTE_DROPOFF: PrismaShipmentStatus.en_route_dropoff,
-  DELIVERED: PrismaShipmentStatus.delivered,
-  COMPLETED: PrismaShipmentStatus.completed,
-  CANCELLED: PrismaShipmentStatus.cancelled,
-  EXPIRED: PrismaShipmentStatus.expired,
+  DRAFT: 'draft',
+  CREATED: 'created',
+  BROADCASTING: 'broadcasting',
+  ASSIGNED: 'assigned',
+  EN_ROUTE_PICKUP: 'en_route_pickup',
+  PICKED_UP: 'picked_up',
+  EN_ROUTE_DROPOFF: 'en_route_dropoff',
+  DELIVERED: 'delivered',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
 } as const;
 export type ShipmentStatus =
   (typeof ShipmentStatus)[keyof typeof ShipmentStatus];
 
 export const ShipmentEventType = {
-  CREATED: PrismaShipmentEventType.created,
-  BROADCASTED: PrismaShipmentEventType.broadcasted,
-  BID_PLACED: PrismaShipmentEventType.bid_placed,
-  ASSIGNED: PrismaShipmentEventType.assigned,
-  ACCEPTED: PrismaShipmentEventType.accepted,
-  CANCELLED: PrismaShipmentEventType.cancelled,
-  PICKED_UP: PrismaShipmentEventType.picked_up,
-  DELIVERED: PrismaShipmentEventType.delivered,
-  COMPLETED: PrismaShipmentEventType.completed,
+  CREATED: 'created',
+  BROADCASTED: 'broadcasted',
+  BID_PLACED: 'bid_placed',
+  ASSIGNED: 'assigned',
+  ACCEPTED: 'accepted',
+  CANCELLED: 'cancelled',
+  PICKED_UP: 'picked_up',
+  DELIVERED: 'delivered',
+  COMPLETED: 'completed',
 } as const;
 export type ShipmentEventType =
   (typeof ShipmentEventType)[keyof typeof ShipmentEventType];
 
 export const ShipmentActorRole = {
-  CUSTOMER: PrismaShipmentActorRole.customer,
-  PROVIDER: PrismaShipmentActorRole.provider,
-  ADMIN: PrismaShipmentActorRole.admin,
-  SYSTEM: PrismaShipmentActorRole.system,
+  CUSTOMER: 'customer',
+  PROVIDER: 'provider',
+  ADMIN: 'admin',
+  SYSTEM: 'system',
 } as const;
 export type ShipmentActorRole =
   (typeof ShipmentActorRole)[keyof typeof ShipmentActorRole];
@@ -204,30 +185,30 @@ export type ShipmentActorRole =
 // ============================================================================
 
 export const DispatchBatchStatus = {
-  OPEN: PrismaDispatchBatchStatus.open,
-  CLOSED: PrismaDispatchBatchStatus.closed,
-  ASSIGNED: PrismaDispatchBatchStatus.assigned,
-  EXPIRED: PrismaDispatchBatchStatus.expired,
-  CANCELLED: PrismaDispatchBatchStatus.cancelled,
+  OPEN: 'open',
+  CLOSED: 'closed',
+  ASSIGNED: 'assigned',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled',
 } as const;
 export type DispatchBatchStatus =
   (typeof DispatchBatchStatus)[keyof typeof DispatchBatchStatus];
 
 export const DispatchOfferStatus = {
-  SENT: PrismaDispatchOfferStatus.sent,
-  VIEWED: PrismaDispatchOfferStatus.viewed,
-  ACCEPTED: PrismaDispatchOfferStatus.accepted,
-  DECLINED: PrismaDispatchOfferStatus.declined,
-  EXPIRED: PrismaDispatchOfferStatus.expired,
-  CANCELLED: PrismaDispatchOfferStatus.cancelled,
+  SENT: 'sent',
+  VIEWED: 'viewed',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled',
 } as const;
 export type DispatchOfferStatus =
   (typeof DispatchOfferStatus)[keyof typeof DispatchOfferStatus];
 
 export const ShipmentAssignmentStatus = {
-  ACTIVE: PrismaShipmentAssignmentStatus.active,
-  COMPLETED: PrismaShipmentAssignmentStatus.completed,
-  CANCELLED: PrismaShipmentAssignmentStatus.cancelled,
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
 } as const;
 export type ShipmentAssignmentStatus =
   (typeof ShipmentAssignmentStatus)[keyof typeof ShipmentAssignmentStatus];
@@ -237,10 +218,10 @@ export type ShipmentAssignmentStatus =
 // ============================================================================
 
 export const BidStatus = {
-  ACTIVE: PrismaBidStatus.active,
-  WITHDRAWN: PrismaBidStatus.withdrawn,
-  REJECTED: PrismaBidStatus.rejected,
-  ACCEPTED: PrismaBidStatus.accepted,
+  ACTIVE: 'active',
+  WITHDRAWN: 'withdrawn',
+  REJECTED: 'rejected',
+  ACCEPTED: 'accepted',
 } as const;
 export type BidStatus = (typeof BidStatus)[keyof typeof BidStatus];
 
@@ -322,20 +303,20 @@ export enum PenaltyType {
 // ============================================================================
 
 export const ShipmentMilestoneType = {
-  ACCEPTED: PrismaShipmentMilestoneType.accepted,
-  ARRIVED_PICKUP: PrismaShipmentMilestoneType.arrived_pickup,
-  PICKED_UP: PrismaShipmentMilestoneType.picked_up,
-  ARRIVED_DROPOFF: PrismaShipmentMilestoneType.arrived_dropoff,
-  DELIVERED: PrismaShipmentMilestoneType.delivered,
-  COMPLETED: PrismaShipmentMilestoneType.completed,
+  ACCEPTED: 'accepted',
+  ARRIVED_PICKUP: 'arrived_pickup',
+  PICKED_UP: 'picked_up',
+  ARRIVED_DROPOFF: 'arrived_dropoff',
+  DELIVERED: 'delivered',
+  COMPLETED: 'completed',
 } as const;
 export type ShipmentMilestoneType =
   (typeof ShipmentMilestoneType)[keyof typeof ShipmentMilestoneType];
 
 export const ShipmentMilestoneStatus = {
-  PENDING: PrismaShipmentMilestoneStatus.pending,
-  REACHED: PrismaShipmentMilestoneStatus.reached,
-  VERIFIED: PrismaShipmentMilestoneStatus.verified,
+  PENDING: 'pending',
+  REACHED: 'reached',
+  VERIFIED: 'verified',
 } as const;
 export type ShipmentMilestoneStatus =
   (typeof ShipmentMilestoneStatus)[keyof typeof ShipmentMilestoneStatus];
@@ -348,16 +329,16 @@ export enum OTPPurpose {
 }
 
 export const PodUploadType = {
-  PHOTO: PrismaPodUploadType.photo,
-  SIGNATURE: PrismaPodUploadType.signature,
-  DOCUMENT: PrismaPodUploadType.document,
+  PHOTO: 'photo',
+  SIGNATURE: 'signature',
+  DOCUMENT: 'document',
 } as const;
 export type PodUploadType = (typeof PodUploadType)[keyof typeof PodUploadType];
 
 export const WaybillStatus = {
-  UPLOADED: PrismaWaybillStatus.uploaded,
-  APPROVED: PrismaWaybillStatus.approved,
-  REJECTED: PrismaWaybillStatus.rejected,
+  UPLOADED: 'uploaded',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
 } as const;
 export type WaybillStatus = (typeof WaybillStatus)[keyof typeof WaybillStatus];
 

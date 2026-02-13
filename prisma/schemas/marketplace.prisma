@@ -3,46 +3,46 @@
 // ============================================================================
 
 enum BidStatus {
-    active
-    withdrawn
-    rejected
-    accepted
+  active
+  withdrawn
+  rejected
+  accepted
 }
 
 model ShipmentBid {
-    id          String    @id @default(uuid()) @db.Uuid
-    shipmentId  String    @map("shipment_id") @db.Uuid
-    providerId  String    @map("provider_id") @db.Uuid
-    amountMinor BigInt    @map("amount_minor")
-    currency    String    @default("NGN") @db.Char(3)
-    message     String?
-    status      BidStatus @default(active)
-    createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id          String    @id @default(uuid()) @db.Uuid
+  shipmentId  String    @map("shipment_id") @db.Uuid
+  providerId  String    @map("provider_id") @db.Uuid
+  amountMinor BigInt    @map("amount_minor")
+  currency    String    @default("NGN") @db.Char(3)
+  message     String?
+  status      BidStatus @default(active)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-    // Relations
-    shipment Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-    provider Provider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
-    award    ShipmentBidAward?
+  // Relations
+  shipment Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  provider Provider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  award    ShipmentBidAward?
 
-    @@unique([shipmentId, providerId])
-    @@index([shipmentId, amountMinor(sort: Asc)])
-    @@index([providerId, createdAt(sort: Desc)])
-    @@map("shipment_bids")
+  @@unique([shipmentId, providerId])
+  @@index([shipmentId, amountMinor(sort: Asc)])
+  @@index([providerId, createdAt(sort: Desc)])
+  @@map("shipment_bids")
 }
 
 model ShipmentBidAward {
-    id                 String   @id @default(uuid()) @db.Uuid
-    shipmentId         String   @unique @map("shipment_id") @db.Uuid
-    bidId              String   @unique @map("bid_id") @db.Uuid
-    awardedByProfileId String   @map("awarded_by_profile_id") @db.Uuid
-    awardedAt          DateTime @default(now()) @map("awarded_at") @db.Timestamptz(6)
-    notes              String?
+  id                 String   @id @default(uuid()) @db.Uuid
+  shipmentId         String   @unique @map("shipment_id") @db.Uuid
+  bidId              String   @unique @map("bid_id") @db.Uuid
+  awardedByProfileId String   @map("awarded_by_profile_id") @db.Uuid
+  awardedAt          DateTime @default(now()) @map("awarded_at") @db.Timestamptz(6)
+  notes              String?
 
-    // Relations
-    shipment  Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
-    bid       ShipmentBid @relation(fields: [bidId], references: [id], onDelete: Cascade)
-    awardedBy Profile     @relation(fields: [awardedByProfileId], references: [id])
+  // Relations
+  shipment  Shipment    @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  bid       ShipmentBid @relation(fields: [bidId], references: [id], onDelete: Cascade)
+  awardedBy Profile     @relation(fields: [awardedByProfileId], references: [id])
 
-    @@map("shipment_bid_awards")
+  @@map("shipment_bid_awards")
 }

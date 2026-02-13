@@ -3,9 +3,9 @@
 # ------------------------------------------------------
 
 input AddShipmentItemDto {
-  shipmentId: String!
   name: String!
   quantity: Float!
+  shipmentId: String!
   weightKg: Float
 }
 
@@ -26,19 +26,10 @@ type AuthResponse {
 }
 
 input AwardShipmentBidDto {
-  bidId: String!
-  shipmentId: String!
-  notes: String
   awardedByProfileId: String!
-}
-
-type ShipmentBidAward {
-  awardedAt: DateTime!
   bidId: String!
-  id: ID!
-  shipmentId: String!
   notes: String
-  awardedByProfileId: String!
+  shipmentId: String!
 }
 
 enum BidStatus {
@@ -56,14 +47,6 @@ input CancelShipmentDto {
   shipmentId: String!
 }
 
-input CreateShipmentBidDto {
-  amountMinor: BigInt!
-  currency: String
-  shipmentId: String!
-  message: String
-  providerId: String!
-}
-
 input CreateDispatchBatchDto {
   expiresAt: DateTime
   shipmentId: String!
@@ -79,6 +62,21 @@ input CreateDispatchOfferDto {
   vehicleId: String
 }
 
+input CreatePaymentIntentDto {
+  amountMinor: BigInt!
+  currency: String!
+  provider: String
+  walletAccountId: String!
+}
+
+input CreateShipmentBidDto {
+  amountMinor: BigInt!
+  currency: String
+  message: String
+  providerId: String!
+  shipmentId: String!
+}
+
 input CreateShipmentDto {
   commissionAmountMinor: BigInt
   commissionRateBps: Float
@@ -90,14 +88,27 @@ input CreateShipmentDto {
   packageValueMinor: BigInt
   pickupAddressId: String!
   pricingCurrency: String
-  requiresEscrow: Boolean
   quotedPriceMinor: BigInt
+  requiresEscrow: Boolean
   scheduleType: ShipmentScheduleType
   scheduledAt: DateTime
   specialInstructions: String
   status: ShipmentStatus
   trackingCode: String
   vehicleCategory: VehicleCategory!
+}
+
+input CreateTransactionDto {
+  amountMinor: BigInt!
+  currency: String!
+  direction: TransactionDirection!
+  metadata: JSON
+  paymentIntentId: String
+  reference: String!
+  shipmentId: String
+  status: String
+  transactionType: TransactionType!
+  walletAccountId: String!
 }
 
 input CreateUserAddressDto {
@@ -111,26 +122,6 @@ input CreateUserAddressDto {
   postalCode: String!
   profileId: String!
   state: State!
-}
-
-input CreatePaymentIntentDto {
-  amountMinor: BigInt!
-  currency: String!
-  provider: String
-  walletAccountId: String!
-}
-
-input CreateTransactionDto {
-  amountMinor: BigInt!
-  currency: String!
-  direction: TransactionDirection!
-  metadata: JSON
-  reference: String!
-  shipmentId: String
-  paymentIntentId: String
-  status: String
-  transactionType: TransactionType!
-  walletAccountId: String!
 }
 
 input CreateWalletAccountDto {
@@ -199,115 +190,6 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://
 """
 scalar JSON @specifiedBy(url: "http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf")
 
-type Shipment {
-  cancellationReason: String
-  cancelledAt: DateTime
-  cancelledByProfileId: String
-  commissionAmountMinor: BigInt!
-  commissionRateBps: Float!
-  createdAt: DateTime!
-  customerProfileId: String!
-  dropoffAddressId: String!
-  finalPriceMinor: BigInt
-  id: ID!
-  mode: ShipmentMode!
-  packageDescription: String
-  packageValueMinor: BigInt
-  pickupAddressId: String!
-  pricingCurrency: String!
-  requiresEscrow: Boolean!
-  quotedPriceMinor: BigInt
-  scheduleType: ShipmentScheduleType!
-  scheduledAt: DateTime
-  specialInstructions: String
-  status: ShipmentStatus!
-  trackingCode: String!
-  updatedAt: DateTime!
-  vehicleCategory: VehicleCategory!
-}
-
-type ShipmentAssignment {
-  agreedPriceMinor: BigInt
-  assignedAt: DateTime
-  cancellationReason: String
-  cancelledAt: DateTime
-  completedAt: DateTime
-  createdAt: DateTime!
-  currency: String
-  dispatchOfferId: String
-  driverProfileId: String
-  id: ID!
-  providerId: String!
-  shipmentId: String!
-  status: ShipmentAssignmentStatus!
-  updatedAt: DateTime!
-  vehicleId: String
-}
-
-enum ShipmentAssignmentStatus {
-  ACTIVE
-  CANCELLED
-  COMPLETED
-}
-
-type ShipmentBid {
-  amountMinor: BigInt!
-  createdAt: DateTime!
-  currency: String!
-  id: ID!
-  shipmentId: String!
-  message: String
-  providerId: String!
-  status: BidStatus!
-  updatedAt: DateTime!
-}
-
-type ShipmentItem {
-  createdAt: DateTime!
-  id: ID!
-  shipmentId: String!
-  name: String!
-  quantity: Float!
-  weightKg: Float
-}
-
-type UserAddress {
-  address: String!
-  city: String!
-  countryCode: String!
-  id: ID!
-  label: String
-  lat: Float
-  lng: Float
-  postalCode: String!
-  profileId: String!
-  state: State!
-}
-
-enum ShipmentMode {
-  DISPATCH
-  MARKETPLACE
-}
-
-enum ShipmentScheduleType {
-  INSTANT
-  SCHEDULED
-}
-
-enum ShipmentStatus {
-  ASSIGNED
-  BROADCASTING
-  CANCELLED
-  COMPLETED
-  CREATED
-  DELIVERED
-  DRAFT
-  EN_ROUTE_DROPOFF
-  EN_ROUTE_PICKUP
-  EXPIRED
-  PICKED_UP
-}
-
 type KYCCase {
   caseType: KYCCaseType!
   createdAt: DateTime!
@@ -366,13 +248,13 @@ type MessageResponse {
 type Mutation {
   addShipmentItem(input: AddShipmentItemDto!): ShipmentItem!
   awardShipmentBid(input: AwardShipmentBidDto!): ShipmentBidAward!
-  cancelShipmentAssignment(id: String!): ShipmentAssignment!
   cancelShipment(input: CancelShipmentDto!): Shipment!
+  cancelShipmentAssignment(id: String!): ShipmentAssignment!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
+  createKycCase(providerId: String!): KYCCase!
   createShipment(input: CreateShipmentDto!): Shipment!
   createShipmentAssignment(input: AssignShipmentDto!): ShipmentAssignment!
   createShipmentBid(input: CreateShipmentBidDto!): ShipmentBid!
-  createKycCase(providerId: String!): KYCCase!
   createUserAddress(input: CreateUserAddressDto!): UserAddress!
   createWalletAccount(input: CreateWalletAccountDto!): WalletAccount!
   createWalletTransaction(input: CreateTransactionDto!): Transaction!
@@ -389,11 +271,11 @@ type Mutation {
   signIn(input: SignInInput!): AuthResponse!
   signUp(input: SignUpInput!): MessageResponse!
   submitKycCase(id: String!): KYCCase!
+  updatePaymentIntent(id: String!): PaymentIntent!
+  updateProfile(input: UpdateProfileInput!): Profile!
   updateShipment(id: String!, input: UpdateShipmentDto!): Shipment!
   updateShipmentAssignment(id: String!, input: AssignShipmentDto!): ShipmentAssignment!
   updateShipmentBid(id: String!, input: UpdateShipmentBidDto!): ShipmentBid!
-  updatePaymentIntent(id: String!): PaymentIntent!
-  updateProfile(input: UpdateProfileInput!): Profile!
   uploadKycDocument(input: UploadKYCDocumentDto!): KYCDocument!
   verifyOtp(input: VerifyOtpInput!): AuthResponse!
   withdrawBid(id: String!): ShipmentBid!
@@ -482,26 +364,26 @@ enum ProfileStatus {
 
 type Query {
   dispatchBatches: [DispatchBatch!]!
-  shipment(id: String!): Shipment
-  shipmentBids(shipmentId: String!): [ShipmentBid!]!
-  shipments: [Shipment!]!
   kycCase(id: String!): KYCCase
   kycCases: [KYCCase!]!
   me: Profile
   myBids: [ShipmentBid!]!
   myDispatchOffers: [DispatchOffer!]!
   myWallet: WalletAccount
+  shipment(id: String!): Shipment
+  shipmentBids(shipmentId: String!): [ShipmentBid!]!
+  shipments: [Shipment!]!
   walletTransactions(walletAccountId: String!): [Transaction!]!
 }
 
 type Refund {
+  amountMinor: BigInt!
   approvedAt: DateTime
   approvedByProfileId: String
   createdAt: DateTime!
   currency: String!
   id: ID!
   initiatedByProfileId: String!
-  amountMinor: BigInt!
   processedAt: DateTime
   reason: String
   shipmentId: String!
@@ -550,6 +432,111 @@ type RolePermission {
   roleId: String!
 }
 
+type Shipment {
+  cancellationReason: String
+  cancelledAt: DateTime
+  cancelledByProfileId: String
+  commissionAmountMinor: BigInt!
+  commissionRateBps: Float!
+  createdAt: DateTime!
+  customerProfileId: String!
+  dropoffAddressId: String!
+  finalPriceMinor: BigInt
+  id: ID!
+  mode: ShipmentMode!
+  packageDescription: String
+  packageValueMinor: BigInt
+  pickupAddressId: String!
+  pricingCurrency: String!
+  quotedPriceMinor: BigInt
+  requiresEscrow: Boolean!
+  scheduleType: ShipmentScheduleType!
+  scheduledAt: DateTime
+  specialInstructions: String
+  status: ShipmentStatus!
+  trackingCode: String!
+  updatedAt: DateTime!
+  vehicleCategory: VehicleCategory!
+}
+
+type ShipmentAssignment {
+  agreedPriceMinor: BigInt
+  assignedAt: DateTime
+  cancellationReason: String
+  cancelledAt: DateTime
+  completedAt: DateTime
+  createdAt: DateTime!
+  currency: String
+  dispatchOfferId: String
+  driverProfileId: String
+  id: ID!
+  providerId: String!
+  shipmentId: String!
+  status: ShipmentAssignmentStatus!
+  updatedAt: DateTime!
+  vehicleId: String
+}
+
+enum ShipmentAssignmentStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+type ShipmentBid {
+  amountMinor: BigInt!
+  createdAt: DateTime!
+  currency: String!
+  id: ID!
+  message: String
+  providerId: String!
+  shipmentId: String!
+  status: BidStatus!
+  updatedAt: DateTime!
+}
+
+type ShipmentBidAward {
+  awardedAt: DateTime!
+  awardedByProfileId: String!
+  bidId: String!
+  id: ID!
+  notes: String
+  shipmentId: String!
+}
+
+type ShipmentItem {
+  createdAt: DateTime!
+  id: ID!
+  name: String!
+  quantity: Float!
+  shipmentId: String!
+  weightKg: Float
+}
+
+enum ShipmentMode {
+  DISPATCH
+  MARKETPLACE
+}
+
+enum ShipmentScheduleType {
+  INSTANT
+  SCHEDULED
+}
+
+enum ShipmentStatus {
+  ASSIGNED
+  BROADCASTING
+  CANCELLED
+  COMPLETED
+  CREATED
+  DELIVERED
+  DRAFT
+  EN_ROUTE_DROPOFF
+  EN_ROUTE_PICKUP
+  EXPIRED
+  PICKED_UP
+}
+
 input SignInInput {
   email: String!
   password: String!
@@ -581,13 +568,18 @@ type Transaction {
   direction: TransactionDirection!
   id: ID!
   metadata: JSON
+  paymentIntentId: String
   reference: String!
   shipmentId: String
-  paymentIntentId: String
   status: TransactionStatus!
   transactionType: TransactionType!
   updatedAt: DateTime!
   walletAccountId: String!
+}
+
+enum TransactionDirection {
+  CREDIT
+  DEBIT
 }
 
 enum TransactionStatus {
@@ -597,18 +589,27 @@ enum TransactionStatus {
   REVERSED
 }
 
-enum TransactionDirection {
-  CREDIT
-  DEBIT
-}
-
 enum TransactionType {
   ADJUSTMENT
   COMMISSION
-  SHIPMENT_PAYMENT
   PROVIDER_PAYOUT
   REFUND
+  SHIPMENT_PAYMENT
   TOPUP
+}
+
+input UpdateDispatchOfferDto {
+  providerEtaMinutes: Float
+  respondedAt: DateTime
+  status: DispatchOfferStatus!
+}
+
+input UpdateProfileInput {
+  firstName: String
+  lastName: String
+  phoneE164: String
+  preferredLanguage: PreferredLanguage
+  status: ProfileStatus
 }
 
 input UpdateShipmentBidDto {
@@ -616,12 +617,6 @@ input UpdateShipmentBidDto {
   currency: String
   message: String
   status: BidStatus
-}
-
-input UpdateDispatchOfferDto {
-  providerEtaMinutes: Float
-  respondedAt: DateTime
-  status: DispatchOfferStatus!
 }
 
 input UpdateShipmentDto {
@@ -638,8 +633,8 @@ input UpdateShipmentDto {
   packageValueMinor: BigInt
   pickupAddressId: String
   pricingCurrency: String
-  requiresEscrow: Boolean
   quotedPriceMinor: BigInt
+  requiresEscrow: Boolean
   scheduleType: ShipmentScheduleType
   scheduledAt: DateTime
   specialInstructions: String
@@ -648,18 +643,25 @@ input UpdateShipmentDto {
   vehicleCategory: VehicleCategory
 }
 
-input UpdateProfileInput {
-  firstName: String
-  lastName: String
-  phoneE164: String
-  preferredLanguage: PreferredLanguage
-  status: ProfileStatus
-}
-
 input UploadKYCDocumentDto {
   caseId: String!
   documentType: KycDocumentType!
   uploadUrl: String!
+}
+
+type UserAddress {
+  address: String!
+  city: String!
+  countryCode: String!
+  createdAt: DateTime!
+  id: ID!
+  label: String
+  lat: Float
+  lng: Float
+  postalCode: String!
+  profileId: String!
+  state: State!
+  updatedAt: DateTime!
 }
 
 enum UserType {
