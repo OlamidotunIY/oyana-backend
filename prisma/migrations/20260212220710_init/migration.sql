@@ -1,11 +1,22 @@
 -- CreateEnum
 CREATE TYPE "ProfileStatus" AS ENUM ('active', 'suspended', 'deleted');
 
+-- CreateEnum
+CREATE TYPE "UserType" AS ENUM ('individual', 'business', 'admin');
+
+-- CreateEnum
+CREATE TYPE "State" AS ENUM ('Lagos', 'Oyo', 'Abuja');
+
 -- CreateTable
 CREATE TABLE "profiles" (
     "id" UUID NOT NULL,
-    "display_name" TEXT,
+    "email" TEXT NOT NULL,
+    "user_type" "UserType" NOT NULL,
+    "first_name" TEXT,
+    "last_name" TEXT,
     "phone_e164" TEXT,
+    "state" "State" NOT NULL,
+    "referral_code" TEXT,
     "preferred_language" TEXT NOT NULL DEFAULT 'en',
     "status" "ProfileStatus" NOT NULL DEFAULT 'active',
     "last_login_at" TIMESTAMPTZ(6),
@@ -13,46 +24,6 @@ CREATE TABLE "profiles" (
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
     CONSTRAINT "profiles_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "roles" (
-    "id" UUID NOT NULL,
-    "key" TEXT NOT NULL,
-    "name" TEXT,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL,
-
-    CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "permissions" (
-    "id" UUID NOT NULL,
-    "key" TEXT NOT NULL,
-    "description" TEXT,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL,
-
-    CONSTRAINT "permissions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "role_permissions" (
-    "role_id" UUID NOT NULL,
-    "permission_id" UUID NOT NULL,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("role_id","permission_id")
-);
-
--- CreateTable
-CREATE TABLE "user_roles" (
-    "profile_id" UUID NOT NULL,
-    "role_id" UUID NOT NULL,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "user_roles_pkey" PRIMARY KEY ("profile_id","role_id")
 );
 
 -- CreateTable
@@ -268,7 +239,8 @@ CREATE TABLE "waybills" (
 -- CreateTable
 CREATE TABLE "providers" (
     "id" UUID NOT NULL,
-    "type" TEXT NOT NULL,
+    "business_name" TEXT NOT NULL,
+    "business_address" TEXT,
     "legal_name" TEXT NOT NULL,
     "display_name" TEXT,
     "contact_profile_id" UUID,
@@ -472,25 +444,10 @@ CREATE TABLE "refunds" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "profiles_email_key" ON "profiles"("email");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "profiles_phone_e164_key" ON "profiles"("phone_e164");
-
--- CreateIndex
-CREATE UNIQUE INDEX "roles_key_key" ON "roles"("key");
-
--- CreateIndex
-CREATE UNIQUE INDEX "permissions_key_key" ON "permissions"("key");
-
--- CreateIndex
-CREATE INDEX "role_permissions_role_id_idx" ON "role_permissions"("role_id");
-
--- CreateIndex
-CREATE INDEX "role_permissions_permission_id_idx" ON "role_permissions"("permission_id");
-
--- CreateIndex
-CREATE INDEX "user_roles_profile_id_idx" ON "user_roles"("profile_id");
-
--- CreateIndex
-CREATE INDEX "user_roles_role_id_idx" ON "user_roles"("role_id");
 
 -- CreateIndex
 CREATE INDEX "admin_sessions_profile_id_idx" ON "admin_sessions"("profile_id");
@@ -568,6 +525,9 @@ CREATE INDEX "pod_uploads_job_id_created_at_idx" ON "pod_uploads"("job_id", "cre
 CREATE INDEX "waybills_job_id_idx" ON "waybills"("job_id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "providers_contact_profile_id_key" ON "providers"("contact_profile_id");
+
+-- CreateIndex
 CREATE INDEX "providers_status_idx" ON "providers"("status");
 
 -- CreateIndex
@@ -629,18 +589,6 @@ CREATE INDEX "payment_intents_status_idx" ON "payment_intents"("status");
 
 -- CreateIndex
 CREATE INDEX "refunds_job_id_idx" ON "refunds"("job_id");
-
--- AddForeignKey
-ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "role_permissions" ADD CONSTRAINT "role_permissions_permission_id_fkey" FOREIGN KEY ("permission_id") REFERENCES "permissions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "admin_sessions" ADD CONSTRAINT "admin_sessions_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;

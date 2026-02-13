@@ -42,7 +42,4 @@ export class Profile {
 
   @Field()
   updatedAt: Date;
-
-  @Field(() => [UserRole])
-  userRoles: UserRole[];
 }

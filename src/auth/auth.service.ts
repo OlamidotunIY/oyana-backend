@@ -84,13 +84,17 @@ export class AuthService {
 
     this.eventEmitter.emit('user.signed-up', signupEvent);
 
-return {
-      message: 'Signup successful. Please check your email to verify your account.',
+    return {
+      message:
+        'Signup successful. Please check your email to verify your account.',
       success: true,
     };
   }
 
-  async signIn(input: SignInInput, response: ExpressResponse): Promise<AuthResponse> {
+  async signIn(
+    input: SignInInput,
+    response: ExpressResponse,
+  ): Promise<AuthResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -112,7 +116,11 @@ return {
       throw new UnauthorizedException('Profile not found');
     }
 
-    this.setCookies(response, data.session.access_token, data.session.refresh_token);
+    this.setCookies(
+      response,
+      data.session.access_token,
+      data.session.refresh_token,
+    );
 
     return {
       accessToken: data.session.access_token,
@@ -158,7 +166,10 @@ return {
     };
   }
 
-  async verifyOtp(input: VerifyOtpInput, response: ExpressResponse): Promise<AuthResponse> {
+  async verifyOtp(
+    input: VerifyOtpInput,
+    response: ExpressResponse,
+  ): Promise<AuthResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase.auth.verifyOtp({
@@ -181,7 +192,11 @@ return {
       throw new UnauthorizedException('Profile not found');
     }
 
-    this.setCookies(response, data.session.access_token, data.session.refresh_token);
+    this.setCookies(
+      response,
+      data.session.access_token,
+      data.session.refresh_token,
+    );
 
     return {
       accessToken: data.session.access_token,
@@ -225,7 +240,10 @@ return {
     };
   }
 
-  async refreshToken(refreshToken: string, response: ExpressResponse): Promise<AuthResponse> {
+  async refreshToken(
+    refreshToken: string,
+    response: ExpressResponse,
+  ): Promise<AuthResponse> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase.auth.refreshSession({
@@ -242,7 +260,11 @@ return {
       throw new UnauthorizedException('Profile not found');
     }
 
-    this.setCookies(response, data.session.access_token, data.session.refresh_token);
+    this.setCookies(
+      response,
+      data.session.access_token,
+      data.session.refresh_token,
+    );
 
     return {
       accessToken: data.session.access_token,
@@ -251,13 +273,18 @@ return {
     };
   }
 
-  private setCookies(response: ExpressResponse, accessToken: string, refreshToken: string): void {
+  private setCookies(
+    response: ExpressResponse,
+    accessToken: string,
+    refreshToken: string,
+  ): void {
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
     response.cookie('oyana-accessToken', accessToken, {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
+      path: '/',
       maxAge: 7776000000, // 90 days
     });
 
@@ -265,6 +292,7 @@ return {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'lax',
+      path: '/',
       maxAge: 31536000000, // 1 year
     });
   }

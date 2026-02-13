@@ -1,5 +1,5 @@
 // ============================================================================
-// CORE DOMAIN: Roles, Permissions, User Profiles, Admin Sessions
+// CORE DOMAIN: User Profiles, Admin Sessions
 // ============================================================================
 
 model Profile {
@@ -18,7 +18,6 @@ model Profile {
     updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
-    userRoles            UserRole[]
     customerJobs         Job[]             @relation("CustomerJobs")
     providerMembers      ProviderMember[]
     contactForProviders  Provider[]        @relation("ProviderContact")
@@ -36,63 +35,6 @@ model Profile {
     waybillReviews       Waybill[]
 
     @@map("profiles")
-}
-
-model Role {
-    id        String   @id @default(uuid()) @db.Uuid
-    key       String   @unique
-    name      String?
-    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-    // Relations
-    userRoles       UserRole[]
-    rolePermissions RolePermission[]
-
-    @@map("roles")
-}
-
-model Permission {
-    id          String   @id @default(uuid()) @db.Uuid
-    key         String   @unique
-    description String?
-    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-    // Relations
-    rolePermissions RolePermission[]
-
-    @@map("permissions")
-}
-
-model RolePermission {
-    roleId       String   @map("role_id") @db.Uuid
-    permissionId String   @map("permission_id") @db.Uuid
-    createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-    // Relations
-    role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-    permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-    @@id([roleId, permissionId])
-    @@index([roleId])
-    @@index([permissionId])
-    @@map("role_permissions")
-}
-
-model UserRole {
-    profileId String   @map("profile_id") @db.Uuid
-    roleId    String   @map("role_id") @db.Uuid
-    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-    // Relations
-    profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-    role    Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-    @@id([profileId, roleId])
-    @@index([profileId])
-    @@index([roleId])
-    @@map("user_roles")
 }
 
 model AdminSession {

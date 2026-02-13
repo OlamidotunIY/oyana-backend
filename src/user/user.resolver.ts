@@ -14,6 +14,7 @@ export class UserResolver {
   @Query(() => Profile, { nullable: true })
   @UseGuards(GqlAuthGuard)
   async me(@CurrentUser() user: User): Promise<Profile | null> {
+    console.log('Fetching profile for user:', user);
     return this.userService.findProfileById(user.id);
   }
 

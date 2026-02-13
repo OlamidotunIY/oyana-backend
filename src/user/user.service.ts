@@ -3,22 +3,6 @@ import { PrismaService } from '../database/prisma.service';
 import { UpdateProfileInput } from '../graphql/dto/core/profile.dto';
 import { Profile } from '../graphql/types/core';
 
-const profileWithRolesInclude = {
-  userRoles: {
-    include: {
-      role: {
-        include: {
-          rolePermissions: {
-            include: {
-              permission: true,
-            },
-          },
-        },
-      },
-    },
-  },
-} as const;
-
 @Injectable()
 export class UserService {
   constructor(private prisma: PrismaService) {}
@@ -26,7 +10,6 @@ export class UserService {
   async getProfileByEmail(email: string): Promise<Profile | null> {
     const profile = await this.prisma.profile.findUnique({
       where: { email },
-      include: profileWithRolesInclude,
     });
 
     if (!profile) {
@@ -39,7 +22,6 @@ export class UserService {
   async findProfileById(profileId: string): Promise<Profile | null> {
     return this.prisma.profile.findUnique({
       where: { id: profileId },
-      include: profileWithRolesInclude,
     });
   }
 
@@ -80,7 +62,6 @@ export class UserService {
         id: profileId,
         ...updateData,
       },
-      include: profileWithRolesInclude,
     });
   }
 }

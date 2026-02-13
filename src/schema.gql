@@ -460,7 +460,6 @@ type Profile {
   state: String
   status: ProfileStatus!
   updatedAt: DateTime!
-  userRoles: [UserRole!]!
   userType: UserType!
 }
 
@@ -620,13 +619,6 @@ input UploadKYCDocumentDto {
   caseId: String!
   documentType: KycDocumentType!
   uploadUrl: String!
-}
-
-type UserRole {
-  createdAt: DateTime!
-  profileId: String!
-  role: Role!
-  roleId: String!
 }
 
 enum UserType {

@@ -1,52 +1,60 @@
-import { PrismaClient } from "@prisma/client";
+import { config } from 'dotenv';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
+// Load environment variables
+config();
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({
+    connectionString: process.env.DIRECT_URL!,
+  }),
+});
+
 
 /**
- * Seed roles
+ * Seed profiles for existing Supabase users
  */
-async function seedRoles() {
-  console.log('📝 Seeding roles...');
+async function seedProfilesForExistingUsers() {
+  console.log('📝 Seeding profiles for existing Supabase users...');
 
-  const roles = [
-    { key: 'admin', name: 'Admin' },
-    { key: 'provider', name: 'Provider' },
-    { key: 'user', name: 'User' },
-  ];
+  // Query existing Supabase auth users
+  const authUsers = await prisma.$queryRaw<
+    Array<{ id: string; email: string; created_at: Date }>
+  >`SELECT id, email, created_at FROM auth.users ORDER BY created_at ASC`;
 
-  for (const role of roles) {
-    await prisma.role.upsert({
-      where: { key: role.key },
-      update: {},
-      create: role,
+  console.log(`  Found ${authUsers.length} existing auth users`);
+
+  for (const authUser of authUsers) {
+    // Check if profile already exists
+    const existingProfile = await prisma.profile.findUnique({
+      where: { id: authUser.id },
     });
-    console.log(`  ✅ Role "${role.name}" seeded`);
+
+    if (existingProfile) {
+      console.log(`  ⏭️  Profile already exists for ${authUser.email}`);
+      continue;
+    }
+
+    // Extract first name from email (before @)
+    const emailUsername = authUser.email.split('@')[0];
+    const firstName =
+      emailUsername.charAt(0).toUpperCase() + emailUsername.slice(1);
+
+    // Create profile with default values
+    await prisma.profile.create({
+      data: {
+        id: authUser.id,
+        email: authUser.email,
+        userType: 'individual', // Default to individual
+        firstName: firstName,
+        lastName: 'User', // Default last name
+        state: 'Lagos', // Default state
+      },
+    });
+
+    console.log(`  ✅ Profile created for ${authUser.email}`);
   }
-}
-
-/**
- * Seed permissions
- * Uncomment and modify when you're ready to seed permissions
- */
-async function seedPermissions() {
-  console.log('📝 Seeding permissions...');
-
-  // Example permissions structure
-  // const permissions = [
-  //   { key: 'manage_users', name: 'Manage Users', description: 'Can create, edit, and delete users' },
-  //   { key: 'manage_deliveries', name: 'Manage Deliveries', description: 'Can manage all deliveries' },
-  //   { key: 'view_analytics', name: 'View Analytics', description: 'Can view analytics dashboard' },
-  // ];
-
-  // for (const permission of permissions) {
-  //   await prisma.permission.upsert({
-  //     where: { key: permission.key },
-  //     update: {},
-  //     create: permission,
-  //   });
-  //   console.log(`  ✅ Permission "${permission.name}" seeded`);
-  // }
 }
 
 /**
@@ -54,8 +62,7 @@ async function seedPermissions() {
  */
 async function main() {
   console.log('🌱 Starting database seed...\n');
-
-  await seedRoles();
+  await seedProfilesForExistingUsers();
   // await seedPermissions(); // Uncomment when ready
 
   console.log('\n✨ Seeding completed!');

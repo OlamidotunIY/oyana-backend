@@ -37,15 +37,19 @@ export class SupabaseService {
 
     const token = authHeader.replace('Bearer ', '');
 
-    const {
-      data: { user },
-      error,
-    } = await this.supabase.auth.getUser(token);
+    try {
+      const {
+        data: { user },
+        error,
+      } = await this.supabase.auth.getUser(token);
 
-    if (error || !user) {
+      if (error || !user) {
+        return null;
+      }
+
+      return user;
+    } catch (err) {
       return null;
     }
-
-    return user;
   }
 }
