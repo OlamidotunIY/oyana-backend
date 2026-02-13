@@ -8,9 +8,11 @@ export class UserService {
   constructor(private prisma: PrismaService) {}
 
   async getProfileByEmail(email: string): Promise<Profile | null> {
-    const profile = await this.prisma.profile.findUnique({
-      where: { email },
-    });
+    const profile = await this.prisma.runWithRetry('UserService.getProfileByEmail', () =>
+      this.prisma.profile.findUnique({
+        where: { email },
+      }),
+    );
 
     if (!profile) {
       return null;
@@ -20,9 +22,11 @@ export class UserService {
   }
 
   async findProfileById(profileId: string): Promise<Profile | null> {
-    return this.prisma.profile.findUnique({
-      where: { id: profileId },
-    });
+    return this.prisma.runWithRetry('UserService.findProfileById', () =>
+      this.prisma.profile.findUnique({
+        where: { id: profileId },
+      }),
+    );
   }
 
   async updateProfile(
@@ -55,13 +59,15 @@ export class UserService {
     }
 
     // Use upsert to create profile if it doesn't exist
-    return this.prisma.profile.upsert({
-      where: { id: profileId },
-      update: updateData,
-      create: {
-        id: profileId,
-        ...updateData,
-      },
-    });
+    return this.prisma.runWithRetry('UserService.updateProfile', () =>
+      this.prisma.profile.upsert({
+        where: { id: profileId },
+        update: updateData,
+        create: {
+          id: profileId,
+          ...updateData,
+        },
+      }),
+    );
   }
 }
