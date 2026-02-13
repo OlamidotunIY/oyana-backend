@@ -372,7 +372,7 @@ type Query {
   myWallet: WalletAccount
   shipment(id: String!): Shipment
   shipmentBids(shipmentId: String!): [ShipmentBid!]!
-  shipments: [Shipment!]!
+  shipments(filter: ShipmentQueryFilter): [Shipment!]!
   walletTransactions(walletAccountId: String!): [Transaction!]!
 }
 
@@ -516,6 +516,12 @@ type ShipmentItem {
 enum ShipmentMode {
   DISPATCH
   MARKETPLACE
+}
+
+enum ShipmentQueryFilter {
+  ACTIVE
+  HISTORY
+  SCHEDULED
 }
 
 enum ShipmentScheduleType {

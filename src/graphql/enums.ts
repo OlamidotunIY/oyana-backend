@@ -157,6 +157,14 @@ export const ShipmentStatus = {
 export type ShipmentStatus =
   (typeof ShipmentStatus)[keyof typeof ShipmentStatus];
 
+export const ShipmentQueryFilter = {
+  ACTIVE: 'active',
+  SCHEDULED: 'scheduled',
+  HISTORY: 'history',
+} as const;
+export type ShipmentQueryFilter =
+  (typeof ShipmentQueryFilter)[keyof typeof ShipmentQueryFilter];
+
 export const ShipmentEventType = {
   CREATED: 'created',
   BROADCASTED: 'broadcasted',
@@ -364,6 +372,7 @@ registerEnumType(NinVerificationStatus, { name: 'NinVerificationStatus' });
 registerEnumType(ShipmentMode, { name: 'ShipmentMode' });
 registerEnumType(ShipmentScheduleType, { name: 'ShipmentScheduleType' });
 registerEnumType(ShipmentStatus, { name: 'ShipmentStatus' });
+registerEnumType(ShipmentQueryFilter, { name: 'ShipmentQueryFilter' });
 registerEnumType(ShipmentEventType, { name: 'ShipmentEventType' });
 registerEnumType(ShipmentActorRole, { name: 'ShipmentActorRole' });
 registerEnumType(DispatchBatchStatus, { name: 'DispatchBatchStatus' });
