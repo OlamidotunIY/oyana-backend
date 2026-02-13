@@ -1,32 +1,19 @@
-import { InputType, Field, Int, Float } from '@nestjs/graphql';
-import { RatingTargetType } from '../../enums';
+import { InputType, Field, Int } from '@nestjs/graphql';
 
 @InputType()
 export class CreateRatingDto {
   @Field()
-  jobId: string;
+  shipmentId: string;
 
   @Field()
   ratedByProfileId: string;
 
-  @Field(() => RatingTargetType)
-  targetType: RatingTargetType;
-
   @Field()
-  targetId: string;
+  providerId: string;
 
   @Field(() => Int)
-  stars: number;
+  score: number;
 
   @Field({ nullable: true })
   comment?: string;
-
-  @Field(() => Float, { nullable: true })
-  punctualityScore?: number;
-
-  @Field(() => Float, { nullable: true })
-  professionalismScore?: number;
-
-  @Field(() => Float, { nullable: true })
-  communicationScore?: number;
 }

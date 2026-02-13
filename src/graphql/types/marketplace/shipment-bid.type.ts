@@ -3,33 +3,27 @@ import { BidStatus } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
 
 @ObjectType()
-export class JobBid {
+export class ShipmentBid {
   @Field(() => ID)
   id: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
 
   @Field()
   providerId: string;
 
   @Field(() => GraphQLBigInt)
-  bidAmountMinor: bigint;
+  amountMinor: bigint;
 
   @Field()
   currency: string;
 
+  @Field({ nullable: true })
+  message?: string;
+
   @Field(() => BidStatus)
   status: BidStatus;
-
-  @Field({ nullable: true })
-  proposedPickupTime?: Date;
-
-  @Field({ nullable: true })
-  proposedDeliveryTime?: Date;
-
-  @Field({ nullable: true })
-  coverLetter?: string;
 
   @Field()
   createdAt: Date;

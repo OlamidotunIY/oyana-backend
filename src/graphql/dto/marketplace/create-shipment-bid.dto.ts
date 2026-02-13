@@ -2,19 +2,19 @@ import { InputType, Field } from '@nestjs/graphql';
 import { GraphQLBigInt } from '../../scalars';
 
 @InputType()
-export class AssignJobDto {
+export class CreateShipmentBidDto {
   @Field()
-  jobId: string;
+  shipmentId: string;
 
   @Field()
   providerId: string;
 
-  @Field({ nullable: true })
-  dispatchOfferId?: string;
-
   @Field(() => GraphQLBigInt)
-  agreedPriceMinor: bigint;
+  amountMinor: bigint;
 
-  @Field()
-  currency: string;
+  @Field({ nullable: true })
+  currency?: string;
+
+  @Field({ nullable: true })
+  message?: string;
 }

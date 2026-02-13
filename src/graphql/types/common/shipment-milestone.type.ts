@@ -1,32 +1,29 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { JobEventType } from '../../enums';
+import { ShipmentMilestoneType, ShipmentMilestoneStatus } from '../../enums';
 import { GraphQLJSON } from 'graphql-scalars';
 
 @ObjectType()
-export class JobEvent {
+export class ShipmentMilestone {
   @Field(() => ID)
   id: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
 
-  @Field(() => JobEventType)
-  eventType: JobEventType;
+  @Field(() => ShipmentMilestoneType)
+  milestoneType: ShipmentMilestoneType;
 
-  @Field()
-  eventTimestamp: Date;
-
-  @Field({ nullable: true })
-  latitude?: number;
+  @Field(() => ShipmentMilestoneStatus)
+  status: ShipmentMilestoneStatus;
 
   @Field({ nullable: true })
-  longitude?: number;
+  occurredAt?: Date;
 
   @Field({ nullable: true })
-  notes?: string;
+  lat?: number;
 
   @Field({ nullable: true })
-  triggeredByProfileId?: string;
+  lng?: number;
 
   @Field(() => GraphQLJSON, { nullable: true })
   metadata?: any;

@@ -10,8 +10,14 @@ export class Refund {
   @Field()
   transactionId: string;
 
+  @Field()
+  shipmentId: string;
+
+  @Field()
+  initiatedByProfileId: string;
+
   @Field(() => GraphQLBigInt)
-  refundAmountMinor: bigint;
+  amountMinor: bigint;
 
   @Field()
   currency: string;
@@ -19,11 +25,11 @@ export class Refund {
   @Field(() => RefundStatus)
   status: RefundStatus;
 
-  @Field()
-  reason: string;
+  @Field({ nullable: true })
+  reason?: string;
 
   @Field({ nullable: true })
-  approvedBy?: string;
+  approvedByProfileId?: string;
 
   @Field({ nullable: true })
   approvedAt?: Date;

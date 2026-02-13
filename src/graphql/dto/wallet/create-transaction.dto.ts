@@ -1,11 +1,15 @@
 import { InputType, Field } from '@nestjs/graphql';
-import { TransactionType } from '../../enums';
+import { TransactionDirection, TransactionType } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
+import { GraphQLJSON } from 'graphql-scalars';
 
 @InputType()
 export class CreateTransactionDto {
   @Field()
   walletAccountId: string;
+
+  @Field(() => TransactionDirection)
+  direction: TransactionDirection;
 
   @Field(() => TransactionType)
   transactionType: TransactionType;
@@ -16,15 +20,18 @@ export class CreateTransactionDto {
   @Field()
   currency: string;
 
-  @Field({ nullable: true })
-  referenceId?: string;
+  @Field()
+  reference: string;
 
   @Field({ nullable: true })
-  description?: string;
+  status?: string;
 
   @Field({ nullable: true })
-  jobId?: string;
+  shipmentId?: string;
 
   @Field({ nullable: true })
   paymentIntentId?: string;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  metadata?: any;
 }

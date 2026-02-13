@@ -3,11 +3,11 @@ import { DispatchService } from './dispatch.service';
 import {
   DispatchBatch,
   DispatchOffer,
-  JobAssignment,
+  ShipmentAssignment,
   CreateDispatchBatchDto,
   CreateDispatchOfferDto,
   UpdateDispatchOfferDto,
-  AssignJobDto,
+  AssignShipmentDto,
 } from '../graphql';
 
 @Resolver(() => DispatchBatch)
@@ -50,25 +50,27 @@ export class DispatchResolver {
     throw new Error('Not implemented');
   }
 
-  @Mutation(() => JobAssignment)
-  async createJobAssignment(
-    @Args('input') input: AssignJobDto,
-  ): Promise<JobAssignment> {
+  @Mutation(() => ShipmentAssignment)
+  async createShipmentAssignment(
+    @Args('input') input: AssignShipmentDto,
+  ): Promise<ShipmentAssignment> {
     // TODO: Implement
     throw new Error('Not implemented');
   }
 
-  @Mutation(() => JobAssignment)
-  async updateJobAssignment(
+  @Mutation(() => ShipmentAssignment)
+  async updateShipmentAssignment(
     @Args('id') id: string,
-    @Args('input') input: AssignJobDto,
-  ): Promise<JobAssignment> {
+    @Args('input') input: AssignShipmentDto,
+  ): Promise<ShipmentAssignment> {
     // TODO: Implement
     throw new Error('Not implemented');
   }
 
-  @Mutation(() => JobAssignment)
-  async cancelAssignment(@Args('id') id: string): Promise<JobAssignment> {
+  @Mutation(() => ShipmentAssignment)
+  async cancelShipmentAssignment(
+    @Args('id') id: string,
+  ): Promise<ShipmentAssignment> {
     // TODO: Implement
     throw new Error('Not implemented');
   }

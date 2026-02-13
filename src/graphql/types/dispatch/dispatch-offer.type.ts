@@ -1,6 +1,6 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { DispatchOfferStatus } from '../../enums';
-import { GraphQLBigInt } from '../../scalars';
+import { GraphQLJSON } from 'graphql-scalars';
 
 @ObjectType()
 export class DispatchOffer {
@@ -14,25 +14,28 @@ export class DispatchOffer {
   providerId: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
 
-  @Field(() => GraphQLBigInt)
-  offeredPriceMinor: bigint;
-
-  @Field()
-  currency: string;
+  @Field({ nullable: true })
+  vehicleId?: string;
 
   @Field(() => DispatchOfferStatus)
   status: DispatchOfferStatus;
 
   @Field({ nullable: true })
-  acceptedAt?: Date;
+  sentAt?: Date;
 
   @Field({ nullable: true })
-  declinedAt?: Date;
+  respondedAt?: Date;
 
   @Field({ nullable: true })
-  expiredAt?: Date;
+  expiresAt?: Date;
+
+  @Field({ nullable: true })
+  providerEtaMinutes?: number;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  metadata?: any;
 
   @Field()
   createdAt: Date;

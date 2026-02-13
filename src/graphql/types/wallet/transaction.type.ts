@@ -1,6 +1,11 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { TransactionType, TransactionStatus } from '../../enums';
+import {
+  TransactionDirection,
+  TransactionStatus,
+  TransactionType,
+} from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
+import { GraphQLJSON } from 'graphql-scalars';
 
 @ObjectType()
 export class Transaction {
@@ -9,6 +14,9 @@ export class Transaction {
 
   @Field()
   walletAccountId: string;
+
+  @Field(() => TransactionDirection)
+  direction: TransactionDirection;
 
   @Field(() => TransactionType)
   transactionType: TransactionType;
@@ -22,17 +30,17 @@ export class Transaction {
   @Field(() => TransactionStatus)
   status: TransactionStatus;
 
-  @Field({ nullable: true })
-  referenceId?: string;
+  @Field()
+  reference: string;
 
   @Field({ nullable: true })
-  description?: string;
-
-  @Field({ nullable: true })
-  jobId?: string;
+  shipmentId?: string;
 
   @Field({ nullable: true })
   paymentIntentId?: string;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  metadata?: any;
 
   @Field()
   createdAt: Date;

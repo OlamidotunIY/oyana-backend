@@ -1,10 +1,10 @@
 import { InputType, Field } from '@nestjs/graphql';
 
 @InputType()
-export class CancelJobDto {
+export class CancelShipmentDto {
   @Field()
-  jobId: string;
+  shipmentId: string;
 
   @Field()
-  cancelReason: string;
+  cancellationReason: string;
 }

@@ -2,41 +2,6 @@
 // CORE DOMAIN: User Profiles, Admin Sessions
 // ============================================================================
 
-model Profile {
-    id                String        @id @db.Uuid // Same as auth.users.id
-    email             String        @unique
-    userType          UserType      @map("user_type")
-    firstName         String?       @map("first_name")
-    lastName          String?       @map("last_name")
-    phoneE164         String?       @unique @map("phone_e164")
-    state             State
-    referralCode      String?       @map("referral_code")
-    preferredLanguage String        @default("en") @map("preferred_language")
-    status            ProfileStatus @default(active)
-    lastLoginAt       DateTime?     @map("last_login_at") @db.Timestamptz(6)
-    createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-    // Relations
-    customerJobs         Job[]             @relation("CustomerJobs")
-    providerMembers      ProviderMember[]
-    contactForProviders  Provider[]        @relation("ProviderContact")
-    adminSessions        AdminSession[]
-    jobEventActors       JobEvent[]
-    cancelledJobs        Job[]             @relation("JobCanceller")
-    walletAccounts       WalletAccount[]   @relation("ProfileWallet")
-    ratingsMade          Rating[]
-    bidAwards            BidAward[]
-    kycReviews           ProviderKycCase[] @relation("KycReviewer")
-    documentUploads      KycDocument[]
-    podUploads           PodUpload[]
-    jobAssignmentsDriver JobAssignment[]
-    refundsInitiated     Refund[]
-    waybillReviews       Waybill[]
-
-    @@map("profiles")
-}
-
 model AdminSession {
     id        String   @id @default(uuid()) @db.Uuid
     profileId String   @map("profile_id") @db.Uuid
@@ -49,18 +14,6 @@ model AdminSession {
 
     @@index([profileId])
     @@map("admin_sessions")
-}
-
-enum ProfileStatus {
-    active
-    suspended
-    deleted
-}
-
-enum UserType {
-    individual
-    business
-    admin
 }
 
 enum State {

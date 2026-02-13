@@ -1,4 +1,5 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
+import { WaybillStatus } from '../../enums';
 
 @ObjectType()
 export class Waybill {
@@ -6,19 +7,22 @@ export class Waybill {
   id: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
 
   @Field()
-  waybillNumber: string;
-
-  @Field({ nullable: true })
-  qrCodeUrl?: string;
-
-  @Field({ nullable: true })
-  barcodeUrl?: string;
+  storageBucket: string;
 
   @Field()
-  generatedAt: Date;
+  storagePath: string;
+
+  @Field(() => WaybillStatus)
+  status: WaybillStatus;
+
+  @Field({ nullable: true })
+  reviewedByProfileId?: string;
+
+  @Field({ nullable: true })
+  reviewedAt?: Date;
 
   @Field()
   createdAt: Date;

@@ -6,8 +6,14 @@ export class RequestRefundDto {
   @Field()
   transactionId: string;
 
+  @Field()
+  shipmentId: string;
+
+  @Field()
+  initiatedByProfileId: string;
+
   @Field(() => GraphQLBigInt)
-  refundAmountMinor: bigint;
+  amountMinor: bigint;
 
   @Field()
   currency: string;

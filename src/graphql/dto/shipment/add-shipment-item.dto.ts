@@ -1,10 +1,16 @@
 import { InputType, Field } from '@nestjs/graphql';
 
 @InputType()
-export class CreateDispatchBatchDto {
+export class AddShipmentItemDto {
   @Field()
   shipmentId: string;
 
+  @Field()
+  name: string;
+
+  @Field()
+  quantity: number;
+
   @Field({ nullable: true })
-  expiresAt?: Date;
+  weightKg?: number;
 }

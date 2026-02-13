@@ -1,6 +1,5 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { DispatchBatchStatus } from '../../enums';
-import { GraphQLBigInt } from '../../scalars';
 
 @ObjectType()
 export class DispatchBatch {
@@ -8,22 +7,19 @@ export class DispatchBatch {
   id: string;
 
   @Field()
-  createdByProfileId: string;
-
-  @Field()
-  regionId: string;
+  shipmentId: string;
 
   @Field(() => DispatchBatchStatus)
   status: DispatchBatchStatus;
 
   @Field({ nullable: true })
-  completedAt?: Date;
+  openedAt?: Date;
 
-  @Field(() => GraphQLBigInt)
-  totalValueMinor: bigint;
+  @Field({ nullable: true })
+  closedAt?: Date;
 
-  @Field()
-  currency: string;
+  @Field({ nullable: true })
+  expiresAt?: Date;
 
   @Field()
   createdAt: Date;

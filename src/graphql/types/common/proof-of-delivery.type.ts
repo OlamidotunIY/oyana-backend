@@ -1,4 +1,5 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
+import { PodUploadType } from '../../enums';
 
 @ObjectType()
 export class ProofOfDelivery {
@@ -6,28 +7,16 @@ export class ProofOfDelivery {
   id: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
+
+  @Field(() => PodUploadType)
+  uploadType: PodUploadType;
 
   @Field()
-  recipientName: string;
-
-  @Field({ nullable: true })
-  recipientSignatureUrl?: string;
-
-  @Field({ nullable: true })
-  photoUrl?: string;
-
-  @Field({ nullable: true })
-  notes?: string;
+  storageBucket: string;
 
   @Field()
-  latitude: number;
-
-  @Field()
-  longitude: number;
-
-  @Field()
-  capturedAt: Date;
+  storagePath: string;
 
   @Field()
   uploadedByProfileId: string;

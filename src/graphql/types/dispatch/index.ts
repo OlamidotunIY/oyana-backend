@@ -1,3 +1,3 @@
 export * from './dispatch-batch.type';
 export * from './dispatch-offer.type';
-export * from './job-assignment.type';
+export * from './shipment-assignment.type';

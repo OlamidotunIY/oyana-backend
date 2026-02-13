@@ -18,18 +18,18 @@ model Provider {
     updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
-    contactProfile   Profile?          @relation("ProviderContact", fields: [contactProfileId], references: [id])
-    members          ProviderMember[]
-    vehicles         Vehicle[]
-    kycCases         ProviderKycCase[]
-    ninVerifications NinVerification[]
-    dispatchOffers   DispatchOffer[]
-    jobAssignments   JobAssignment[]
-    jobBids          JobBid[]
-    ratings          Rating[]
-    penalties        ProviderPenalty[]
-    walletAccounts   WalletAccount[]   @relation("ProviderWallet")
-    slaRules         SlaRule[]
+    contactProfile      Profile?            @relation("ProviderContact", fields: [contactProfileId], references: [id])
+    members             ProviderMember[]
+    vehicles            Vehicle[]
+    kycCases            ProviderKycCase[]
+    ninVerifications    NinVerification[]
+    dispatchOffers      DispatchOffer[]
+    shipmentAssignments ShipmentAssignment[]
+    shipmentBids        ShipmentBid[]
+    ratings             Rating[]
+    penalties           ProviderPenalty[]
+    walletAccounts      WalletAccount[]     @relation("ProviderWallet")
+    slaRules            SlaRule[]
 
     @@index([status])
     @@index([priorityScore(sort: Desc), ratingAvg(sort: Desc)])
@@ -52,22 +52,23 @@ model ProviderMember {
 }
 
 model Vehicle {
-    id                String   @id @default(uuid()) @db.Uuid
-    providerId        String   @map("provider_id") @db.Uuid
-    category          String
-    plateNumber       String?  @map("plate_number")
+    id                String          @id @default(uuid()) @db.Uuid
+    providerId        String          @map("provider_id") @db.Uuid
+    category          VehicleCategory
+    plateNumber       String?         @map("plate_number")
     make              String?
     model             String?
     color             String?
-    capacityKg        Int?     @map("capacity_kg")
-    capacityVolumeCm3 BigInt?  @map("capacity_volume_cm3")
-    status            String   @default("active")
-    createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    capacityKg        Int?            @map("capacity_kg")
+    capacityVolumeCm3 BigInt?         @map("capacity_volume_cm3")
+    status            String          @default("active")
+    createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
-    provider       Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
-    dispatchOffers DispatchOffer[]
-    jobAssignments JobAssignment[]
+    provider            Provider             @relation(fields: [providerId], references: [id], onDelete: Cascade)
+    dispatchOffers      DispatchOffer[]
+    shipmentAssignments ShipmentAssignment[]
 
     @@unique([plateNumber], name: "unique_plate_number")
     @@index([providerId, category, status])
@@ -83,6 +84,7 @@ model ProviderKycCase {
     reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz(6)
     rejectionReason String?   @map("rejection_reason")
     createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
     provider  Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
@@ -103,6 +105,7 @@ model KycDocument {
     status        String   @default("uploaded")
     uploadedBy    String?  @map("uploaded_by") @db.Uuid
     createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
     kycCase  ProviderKycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
@@ -124,6 +127,7 @@ model NinVerification {
     verifiedAt      DateTime? @map("verified_at") @db.Timestamptz(6)
     rawResponse     Json?     @map("raw_response")
     createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
     provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)

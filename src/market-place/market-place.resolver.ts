@@ -1,52 +1,54 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { MarketPlaceService } from './market-place.service';
 import {
-  JobBid,
-  BidAward,
-  CreateBidDto,
-  UpdateBidDto,
-  AwardBidDto,
+  ShipmentBid,
+  ShipmentBidAward,
+  CreateShipmentBidDto,
+  UpdateShipmentBidDto,
+  AwardShipmentBidDto,
 } from '../graphql';
 
-@Resolver(() => JobBid)
+@Resolver(() => ShipmentBid)
 export class MarketPlaceResolver {
   constructor(private readonly marketPlaceService: MarketPlaceService) {}
 
-  @Query(() => [JobBid])
-  async jobBids(@Args('jobId') jobId: string): Promise<JobBid[]> {
+  @Query(() => [ShipmentBid])
+  async shipmentBids(@Args('shipmentId') shipmentId: string): Promise<ShipmentBid[]> {
     // TODO: Implement
     return [];
   }
 
-  @Query(() => [JobBid])
-  async myBids(): Promise<JobBid[]> {
+  @Query(() => [ShipmentBid])
+  async myBids(): Promise<ShipmentBid[]> {
     // TODO: Implement
     return [];
   }
 
-  @Mutation(() => JobBid)
-  async createJobBid(@Args('input') input: CreateBidDto): Promise<JobBid> {
+  @Mutation(() => ShipmentBid)
+  async createShipmentBid(@Args('input') input: CreateShipmentBidDto): Promise<ShipmentBid> {
     // TODO: Implement
     throw new Error('Not implemented');
   }
 
-  @Mutation(() => JobBid)
-  async updateJobBid(
+  @Mutation(() => ShipmentBid)
+  async updateShipmentBid(
     @Args('id') id: string,
-    @Args('input') input: UpdateBidDto,
-  ): Promise<JobBid> {
+    @Args('input') input: UpdateShipmentBidDto,
+  ): Promise<ShipmentBid> {
     // TODO: Implement
     throw new Error('Not implemented');
   }
 
-  @Mutation(() => JobBid)
-  async withdrawBid(@Args('id') id: string): Promise<JobBid> {
+  @Mutation(() => ShipmentBid)
+  async withdrawBid(@Args('id') id: string): Promise<ShipmentBid> {
     // TODO: Implement
     throw new Error('Not implemented');
   }
 
-  @Mutation(() => BidAward)
-  async awardBid(@Args('input') input: AwardBidDto): Promise<BidAward> {
+  @Mutation(() => ShipmentBidAward)
+  async awardShipmentBid(
+    @Args('input') input: AwardShipmentBidDto,
+  ): Promise<ShipmentBidAward> {
     // TODO: Implement
     throw new Error('Not implemented');
   }

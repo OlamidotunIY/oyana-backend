@@ -1,5 +1,5 @@
 import { InputType, Field } from '@nestjs/graphql';
-import { GraphQLBigInt } from '../../scalars';
+import { GraphQLJSON } from 'graphql-scalars';
 
 @InputType()
 export class CreateDispatchOfferDto {
@@ -10,11 +10,17 @@ export class CreateDispatchOfferDto {
   providerId: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
 
-  @Field(() => GraphQLBigInt)
-  offeredPriceMinor: bigint;
+  @Field({ nullable: true })
+  vehicleId?: string;
 
-  @Field()
-  currency: string;
+  @Field({ nullable: true })
+  expiresAt?: Date;
+
+  @Field({ nullable: true })
+  providerEtaMinutes?: number;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  metadata?: any;
 }

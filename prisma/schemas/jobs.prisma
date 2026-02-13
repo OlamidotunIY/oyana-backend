@@ -1,64 +1,96 @@
 // ============================================================================
-// JOBS DOMAIN: Jobs, Locations, Job Items, Job Events
+// SHIPMENTS DOMAIN: Shipments, Shipment Items, Shipment Events
 // ============================================================================
 
-model Location {
-    id           String   @id @default(uuid()) @db.Uuid
-    label        String?
-    addressLine1 String   @map("address_line1")
-    addressLine2 String?  @map("address_line2")
-    city         String?
-    state        String?
-    countryCode  String   @default("NG") @map("country_code") @db.Char(2)
-    lat          Float?
-    lng          Float?
-    createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-
-    // Relations
-    pickupJobs  Job[] @relation("PickupLocation")
-    dropoffJobs Job[] @relation("DropoffLocation")
-
-    @@index([lat, lng])
-    @@map("locations")
+enum ShipmentMode {
+    dispatch
+    marketplace
 }
 
-model Job {
-    id                    String    @id @default(uuid()) @db.Uuid
-    publicCode            String    @unique @map("public_code")
-    customerProfileId     String    @map("customer_profile_id") @db.Uuid
-    mode                  String
-    vehicleCategory       String    @map("vehicle_category")
-    status                String
-    pickupLocationId      String    @map("pickup_location_id") @db.Uuid
-    dropoffLocationId     String    @map("dropoff_location_id") @db.Uuid
-    scheduledAt           DateTime? @map("scheduled_at") @db.Timestamptz(6)
-    packageDescription    String?   @map("package_description")
-    packageValueMinor     BigInt?   @default(0) @map("package_value_minor")
-    specialInstructions   String?   @map("special_instructions")
-    pricingCurrency       String    @default("NGN") @map("pricing_currency") @db.Char(3)
-    quotedPriceMinor      BigInt?   @map("quoted_price_minor")
-    finalPriceMinor       BigInt?   @map("final_price_minor")
-    commissionRateBps     Int       @default(0) @map("commission_rate_bps")
-    commissionAmountMinor BigInt    @default(0) @map("commission_amount_minor")
-    createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-    updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-    cancelledAt           DateTime? @map("cancelled_at") @db.Timestamptz(6)
-    cancelledByProfileId  String?   @map("cancelled_by_profile_id") @db.Uuid
-    cancellationReason    String?   @map("cancellation_reason")
+enum VehicleCategory {
+    bike
+    van
+    truck
+}
+
+enum ShipmentScheduleType {
+    instant
+    scheduled
+}
+
+enum ShipmentStatus {
+    draft
+    created
+    broadcasting
+    assigned
+    en_route_pickup
+    picked_up
+    en_route_dropoff
+    delivered
+    completed
+    cancelled
+    expired
+}
+
+enum ShipmentEventType {
+    created
+    broadcasted
+    bid_placed
+    assigned
+    accepted
+    cancelled
+    picked_up
+    delivered
+    completed
+}
+
+enum ShipmentActorRole {
+    customer
+    provider
+    admin
+    system
+}
+
+model Shipment {
+    id                    String               @id @default(uuid()) @db.Uuid
+    trackingCode          String               @unique @map("tracking_code")
+    customerProfileId     String               @map("customer_profile_id") @db.Uuid
+    mode                  ShipmentMode
+    vehicleCategory       VehicleCategory      @map("vehicle_category")
+    scheduleType          ShipmentScheduleType @default(instant) @map("schedule_type")
+    status                ShipmentStatus
+    pickupAddressId       String               @map("pickup_address_id") @db.Uuid
+    dropoffAddressId      String               @map("dropoff_address_id") @db.Uuid
+    scheduledAt           DateTime?            @map("scheduled_at") @db.Timestamptz(6)
+    packageDescription    String?              @map("package_description")
+    packageValueMinor     BigInt?              @default(0) @map("package_value_minor")
+    specialInstructions   String?              @map("special_instructions")
+    requiresEscrow        Boolean              @default(false) @map("requires_escrow")
+    pricingCurrency       String               @default("NGN") @map("pricing_currency") @db.Char(3)
+    quotedPriceMinor      BigInt?              @map("quoted_price_minor")
+    finalPriceMinor       BigInt?              @map("final_price_minor")
+    commissionRateBps     Int                  @default(0) @map("commission_rate_bps")
+    commissionAmountMinor BigInt               @default(0) @map("commission_amount_minor")
+    createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt             DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+    cancelledAt           DateTime?            @map("cancelled_at") @db.Timestamptz(6)
+    cancelledByProfileId  String?              @map("cancelled_by_profile_id") @db.Uuid
+    cancellationReason    String?              @map("cancellation_reason")
 
     // Relations
-    customer           Profile             @relation("CustomerJobs", fields: [customerProfileId], references: [id])
-    pickupLocation     Location            @relation("PickupLocation", fields: [pickupLocationId], references: [id])
-    dropoffLocation    Location            @relation("DropoffLocation", fields: [dropoffLocationId], references: [id])
-    cancelledBy        Profile?            @relation("JobCanceller", fields: [cancelledByProfileId], references: [id])
-    items              JobItem[]
-    events             JobEvent[]
+    customer           Profile             @relation("CustomerShipments", fields: [customerProfileId], references: [id])
+    pickupAddress      UserAddress         @relation("PickupAddress", fields: [pickupAddressId], references: [id])
+    dropoffAddress     UserAddress         @relation("DropoffAddress", fields: [dropoffAddressId], references: [id])
+    cancelledBy        Profile?            @relation("ShipmentCanceller", fields: [cancelledByProfileId], references: [id])
+    items              ShipmentItem[]
+    events             ShipmentEvent[]
     dispatchBatch      DispatchBatch?
-    assignment         JobAssignment?
-    bids               JobBid[]
-    bidAward           BidAward?
-    financials         JobFinancials?
-    milestones         JobMilestone[]
+    dispatchOffers     DispatchOffer[]      @relation("ShipmentDispatchOffers")
+    assignment         ShipmentAssignment?
+    bids               ShipmentBid[]
+    bidAward           ShipmentBidAward?
+    financials         ShipmentFinancials?
+    milestones         ShipmentMilestone[]
     otpChallenge       OtpChallenge?
     podUploads         PodUpload[]
     waybills           Waybill[]
@@ -69,38 +101,38 @@ model Job {
 
     @@index([customerProfileId, createdAt(sort: Desc)])
     @@index([status, vehicleCategory, mode])
-    @@map("jobs")
+    @@map("shipments")
 }
 
-model JobItem {
-    id        String   @id @default(uuid()) @db.Uuid
-    jobId     String   @map("job_id") @db.Uuid
-    name      String
-    quantity  Int
-    weightKg  Decimal? @map("weight_kg") @db.Decimal(10, 2)
-    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+model ShipmentItem {
+    id         String   @id @default(uuid()) @db.Uuid
+    shipmentId String   @map("shipment_id") @db.Uuid
+    name       String
+    quantity   Int
+    weightKg   Decimal? @map("weight_kg") @db.Decimal(10, 2)
+    createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
     // Relations
-    job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+    shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
 
-    @@index([jobId])
-    @@map("job_items")
+    @@index([shipmentId])
+    @@map("shipment_items")
 }
 
-model JobEvent {
-    id             String   @id @default(uuid()) @db.Uuid
-    jobId          String   @map("job_id") @db.Uuid
-    eventType      String   @map("event_type")
-    actorProfileId String?  @map("actor_profile_id") @db.Uuid
-    actorRole      String?  @map("actor_role")
+model ShipmentEvent {
+    id             String            @id @default(uuid()) @db.Uuid
+    shipmentId     String            @map("shipment_id") @db.Uuid
+    eventType      ShipmentEventType @map("event_type")
+    actorProfileId String?           @map("actor_profile_id") @db.Uuid
+    actorRole      ShipmentActorRole? @map("actor_role")
     metadata       Json?
-    createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
     // Relations
-    job   Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-    actor Profile? @relation(fields: [actorProfileId], references: [id])
+    shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+    actor    Profile? @relation(fields: [actorProfileId], references: [id])
 
-    @@index([jobId, createdAt])
+    @@index([shipmentId, createdAt])
     @@index([eventType, createdAt])
-    @@map("job_events")
+    @@map("shipment_events")
 }

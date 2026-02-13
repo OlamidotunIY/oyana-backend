@@ -1,6 +1,10 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { ProfileStatus, PreferredLanguage, UserType } from '../../enums';
-import { UserRole } from './user-role.type';
+import {
+  ProfileStatus,
+  PreferredLanguage,
+  State,
+  UserType,
+} from '../../enums';
 
 @ObjectType()
 export class Profile {
@@ -22,14 +26,14 @@ export class Profile {
   @Field(() => String, { nullable: true })
   phoneE164: string | null;
 
-  @Field(() => String, { nullable: true })
-  state: string | null;
+  @Field(() => State)
+  state: State;
 
   @Field(() => String, { nullable: true })
   referralCode: string | null;
 
   @Field(() => PreferredLanguage)
-  preferredLanguage: string;
+  preferredLanguage: PreferredLanguage;
 
   @Field(() => ProfileStatus)
   status: ProfileStatus;

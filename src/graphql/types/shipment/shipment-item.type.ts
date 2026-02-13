@@ -1,21 +1,21 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 
 @ObjectType()
-export class BidAward {
+export class ShipmentItem {
   @Field(() => ID)
   id: string;
 
   @Field()
-  bidId: string;
+  shipmentId: string;
 
   @Field()
-  jobId: string;
+  name: string;
 
   @Field()
-  providerId: string;
+  quantity: number;
 
-  @Field()
-  awardedAt: Date;
+  @Field({ nullable: true })
+  weightKg?: number;
 
   @Field()
   createdAt: Date;

@@ -2,65 +2,101 @@
 // DISPATCH DOMAIN: Automated Dispatch for Bike/Van
 // ============================================================================
 
+enum DispatchBatchStatus {
+    open
+    closed
+    assigned
+    expired
+    cancelled
+}
+
+enum DispatchOfferStatus {
+    sent
+    viewed
+    accepted
+    declined
+    expired
+    cancelled
+}
+
+enum ShipmentAssignmentStatus {
+    active
+    completed
+    cancelled
+}
+
 model DispatchBatch {
-    id        String    @id @default(uuid()) @db.Uuid
-    jobId     String    @unique @map("job_id") @db.Uuid
-    status    String
-    openedAt  DateTime? @map("opened_at") @db.Timestamptz(6)
-    closedAt  DateTime? @map("closed_at") @db.Timestamptz(6)
-    expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
-    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    id         String              @id @default(uuid()) @db.Uuid
+    shipmentId String              @unique @map("shipment_id") @db.Uuid
+    status     DispatchBatchStatus @default(open)
+    openedAt   DateTime?           @map("opened_at") @db.Timestamptz(6)
+    closedAt   DateTime?           @map("closed_at") @db.Timestamptz(6)
+    expiresAt  DateTime?           @map("expires_at") @db.Timestamptz(6)
+    createdAt  DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt  DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
-    job    Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
-    offers DispatchOffer[]
+    shipment Shipment        @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+    offers   DispatchOffer[]
 
     @@index([status, expiresAt])
     @@map("dispatch_batches")
 }
 
 model DispatchOffer {
-    id                 String    @id @default(uuid()) @db.Uuid
-    batchId            String    @map("batch_id") @db.Uuid
-    providerId         String    @map("provider_id") @db.Uuid
-    vehicleId          String?   @map("vehicle_id") @db.Uuid
-    status             String
-    sentAt             DateTime? @map("sent_at") @db.Timestamptz(6)
-    respondedAt        DateTime? @map("responded_at") @db.Timestamptz(6)
-    expiresAt          DateTime? @map("expires_at") @db.Timestamptz(6)
-    providerEtaMinutes Int?      @map("provider_eta_minutes")
+    id                 String             @id @default(uuid()) @db.Uuid
+    batchId            String             @map("batch_id") @db.Uuid
+    shipmentId         String             @map("shipment_id") @db.Uuid
+    providerId         String             @map("provider_id") @db.Uuid
+    vehicleId          String?            @map("vehicle_id") @db.Uuid
+    status             DispatchOfferStatus @default(sent)
+    sentAt             DateTime?          @map("sent_at") @db.Timestamptz(6)
+    respondedAt        DateTime?          @map("responded_at") @db.Timestamptz(6)
+    expiresAt          DateTime?          @map("expires_at") @db.Timestamptz(6)
+    providerEtaMinutes Int?               @map("provider_eta_minutes")
     metadata           Json?
-    createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
     batch    DispatchBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+    shipment Shipment      @relation("ShipmentDispatchOffers", fields: [shipmentId], references: [id], onDelete: Cascade)
     provider Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
     vehicle  Vehicle?      @relation(fields: [vehicleId], references: [id])
+    assignment ShipmentAssignment?
 
     @@unique([batchId, providerId])
     @@index([batchId, status])
+    @@index([shipmentId, status])
     @@index([providerId, status, expiresAt])
     @@map("dispatch_offers")
 }
 
-model JobAssignment {
-    id              String    @id @default(uuid()) @db.Uuid
-    jobId           String    @unique @map("job_id") @db.Uuid
-    providerId      String    @map("provider_id") @db.Uuid
-    vehicleId       String?   @map("vehicle_id") @db.Uuid
-    driverProfileId String?   @map("driver_profile_id") @db.Uuid
-    status          String
-    assignedAt      DateTime  @default(now()) @map("assigned_at") @db.Timestamptz(6)
-    completedAt     DateTime? @map("completed_at") @db.Timestamptz(6)
-    cancelledAt     DateTime? @map("cancelled_at") @db.Timestamptz(6)
-    cancelledReason String?   @map("cancelled_reason")
+model ShipmentAssignment {
+    id                 String                   @id @default(uuid()) @db.Uuid
+    shipmentId         String                   @unique @map("shipment_id") @db.Uuid
+    providerId         String                   @map("provider_id") @db.Uuid
+    vehicleId          String?                  @map("vehicle_id") @db.Uuid
+    driverProfileId    String?                  @map("driver_profile_id") @db.Uuid
+    dispatchOfferId    String?                  @unique @map("dispatch_offer_id") @db.Uuid
+    status             ShipmentAssignmentStatus @default(active)
+    agreedPriceMinor   BigInt?                  @map("agreed_price_minor")
+    currency           String?                  @db.Char(3)
+    assignedAt         DateTime                 @default(now()) @map("assigned_at") @db.Timestamptz(6)
+    completedAt        DateTime?                @map("completed_at") @db.Timestamptz(6)
+    cancelledAt        DateTime?                @map("cancelled_at") @db.Timestamptz(6)
+    cancellationReason String?                  @map("cancellation_reason")
+    createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 
     // Relations
-    job      Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-    provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-    vehicle  Vehicle? @relation(fields: [vehicleId], references: [id])
-    driver   Profile? @relation(fields: [driverProfileId], references: [id])
+    shipment      Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+    provider      Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
+    vehicle       Vehicle?       @relation(fields: [vehicleId], references: [id])
+    driver        Profile?       @relation(fields: [driverProfileId], references: [id])
+    dispatchOffer DispatchOffer? @relation(fields: [dispatchOfferId], references: [id])
 
     @@index([providerId, assignedAt(sort: Desc)])
-    @@map("job_assignments")
+    @@index([driverProfileId, assignedAt(sort: Desc)])
+    @@map("shipment_assignments")
 }

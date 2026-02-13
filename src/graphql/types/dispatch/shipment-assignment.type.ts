@@ -1,29 +1,35 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { JobAssignmentStatus } from '../../enums';
+import { ShipmentAssignmentStatus } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
 
 @ObjectType()
-export class JobAssignment {
+export class ShipmentAssignment {
   @Field(() => ID)
   id: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
 
   @Field()
   providerId: string;
 
   @Field({ nullable: true })
+  vehicleId?: string;
+
+  @Field({ nullable: true })
+  driverProfileId?: string;
+
+  @Field({ nullable: true })
   dispatchOfferId?: string;
 
-  @Field(() => GraphQLBigInt)
-  agreedPriceMinor: bigint;
+  @Field(() => GraphQLBigInt, { nullable: true })
+  agreedPriceMinor?: bigint;
 
-  @Field()
-  currency: string;
+  @Field({ nullable: true })
+  currency?: string;
 
-  @Field(() => JobAssignmentStatus)
-  status: JobAssignmentStatus;
+  @Field(() => ShipmentAssignmentStatus)
+  status: ShipmentAssignmentStatus;
 
   @Field({ nullable: true })
   assignedAt?: Date;
@@ -35,7 +41,7 @@ export class JobAssignment {
   cancelledAt?: Date;
 
   @Field({ nullable: true })
-  cancelReason?: string;
+  cancellationReason?: string;
 
   @Field()
   createdAt: Date;

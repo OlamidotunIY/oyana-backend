@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { WalletModule } from './wallet/wallet.module';
-import { JobsModule } from './jobs/jobs.module';
+import { ShipmentsModule } from './shipments/shipments.module';
 import { DispatchModule } from './dispatch/dispatch.module';
 import { MarketPlaceModule } from './market-place/market-place.module';
 import { KycModule } from './kyc/kyc.module';
@@ -26,7 +26,7 @@ import { BigIntScalar } from './graphql/scalars';
     AuthModule,
     GqlConfig,
     WalletModule,
-    JobsModule,
+    ShipmentsModule,
     DispatchModule,
     MarketPlaceModule,
     KycModule,

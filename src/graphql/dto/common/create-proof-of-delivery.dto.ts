@@ -1,27 +1,19 @@
 import { InputType, Field } from '@nestjs/graphql';
+import { PodUploadType } from '../../enums';
 
 @InputType()
 export class CreateProofOfDeliveryDto {
   @Field()
-  jobId: string;
+  shipmentId: string;
+
+  @Field(() => PodUploadType)
+  uploadType: PodUploadType;
 
   @Field()
-  recipientName: string;
-
-  @Field({ nullable: true })
-  recipientSignatureUrl?: string;
-
-  @Field({ nullable: true })
-  photoUrl?: string;
-
-  @Field({ nullable: true })
-  notes?: string;
+  storageBucket: string;
 
   @Field()
-  latitude: number;
-
-  @Field()
-  longitude: number;
+  storagePath: string;
 
   @Field()
   uploadedByProfileId: string;

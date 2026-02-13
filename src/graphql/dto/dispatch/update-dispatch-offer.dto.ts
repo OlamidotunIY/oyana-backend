@@ -5,4 +5,10 @@ import { DispatchOfferStatus } from '../../enums';
 export class UpdateDispatchOfferDto {
   @Field(() => DispatchOfferStatus)
   status: DispatchOfferStatus;
+
+  @Field({ nullable: true })
+  respondedAt?: Date;
+
+  @Field({ nullable: true })
+  providerEtaMinutes?: number;
 }

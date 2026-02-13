@@ -1,5 +1,4 @@
-import { ObjectType, Field, ID, Int, Float } from '@nestjs/graphql';
-import { RatingTargetType } from '../../enums';
+import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 
 @ObjectType()
 export class Rating {
@@ -7,35 +6,20 @@ export class Rating {
   id: string;
 
   @Field()
-  jobId: string;
+  shipmentId: string;
 
   @Field()
   ratedByProfileId: string;
 
-  @Field(() => RatingTargetType)
-  targetType: RatingTargetType;
-
   @Field()
-  targetId: string;
+  providerId: string;
 
   @Field(() => Int)
-  stars: number;
+  score: number;
 
   @Field({ nullable: true })
   comment?: string;
 
-  @Field(() => Float, { nullable: true })
-  punctualityScore?: number;
-
-  @Field(() => Float, { nullable: true })
-  professionalismScore?: number;
-
-  @Field(() => Float, { nullable: true })
-  communicationScore?: number;
-
   @Field()
   createdAt: Date;
-
-  @Field()
-  updatedAt: Date;
 }

@@ -1,17 +1,24 @@
 import { InputType, Field } from '@nestjs/graphql';
-import { JobMilestoneType } from '../../enums';
+import { ShipmentMilestoneType } from '../../enums';
+import { GraphQLJSON } from 'graphql-scalars';
 
 @InputType()
 export class CreateMilestoneDto {
   @Field()
-  jobId: string;
+  shipmentId: string;
 
-  @Field(() => JobMilestoneType)
-  milestoneType: JobMilestoneType;
-
-  @Field()
-  expectedTimestamp: Date;
+  @Field(() => ShipmentMilestoneType)
+  milestoneType: ShipmentMilestoneType;
 
   @Field({ nullable: true })
-  notes?: string;
+  occurredAt?: Date;
+
+  @Field({ nullable: true })
+  lat?: number;
+
+  @Field({ nullable: true })
+  lng?: number;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  metadata?: any;
 }

@@ -1,8 +1,22 @@
 import { registerEnumType } from '@nestjs/graphql';
 import {
+  BidStatus as PrismaBidStatus,
+  DispatchBatchStatus as PrismaDispatchBatchStatus,
+  DispatchOfferStatus as PrismaDispatchOfferStatus,
+  PodUploadType as PrismaPodUploadType,
   ProfileStatus as PrismaProfileStatus,
-  UserType as PrismaUserType,
+  ShipmentActorRole as PrismaShipmentActorRole,
+  ShipmentAssignmentStatus as PrismaShipmentAssignmentStatus,
+  ShipmentEventType as PrismaShipmentEventType,
+  ShipmentMilestoneStatus as PrismaShipmentMilestoneStatus,
+  ShipmentMilestoneType as PrismaShipmentMilestoneType,
+  ShipmentMode as PrismaShipmentMode,
+  ShipmentScheduleType as PrismaShipmentScheduleType,
+  ShipmentStatus as PrismaShipmentStatus,
   State as PrismaState,
+  UserType as PrismaUserType,
+  VehicleCategory as PrismaVehicleCategory,
+  WaybillStatus as PrismaWaybillStatus,
 } from '@prisma/client';
 
 // ============================================================================
@@ -39,7 +53,6 @@ export const State = {
 } as const;
 export type State = (typeof State)[keyof typeof State];
 
-// Alias for backward compatibility
 export const UserStatus = ProfileStatus;
 export type UserStatus = ProfileStatus;
 
@@ -73,11 +86,13 @@ export enum ProviderMemberRole {
   STAFF = 'staff',
 }
 
-export enum VehicleCategory {
-  BIKE = 'bike',
-  VAN = 'van',
-  TRUCK = 'truck',
-}
+export const VehicleCategory = {
+  BIKE: PrismaVehicleCategory.bike,
+  VAN: PrismaVehicleCategory.van,
+  TRUCK: PrismaVehicleCategory.truck,
+} as const;
+export type VehicleCategory =
+  (typeof VehicleCategory)[keyof typeof VehicleCategory];
 
 export { VehicleCategory as VehicleType };
 
@@ -129,91 +144,105 @@ export enum NinVerificationStatus {
 export { NinVerificationStatus as NINVerificationStatus };
 
 // ============================================================================
-// JOB ENUMS
+// SHIPMENT ENUMS
 // ============================================================================
 
-export enum LocationType {
-  PICKUP = 'pickup',
-  DROPOFF = 'dropoff',
-}
+export const ShipmentMode = {
+  DISPATCH: PrismaShipmentMode.dispatch,
+  MARKETPLACE: PrismaShipmentMode.marketplace,
+} as const;
+export type ShipmentMode = (typeof ShipmentMode)[keyof typeof ShipmentMode];
 
-export enum JobMode {
-  DISPATCH = 'dispatch',
-  MARKETPLACE = 'marketplace',
-}
+export const ShipmentScheduleType = {
+  INSTANT: PrismaShipmentScheduleType.instant,
+  SCHEDULED: PrismaShipmentScheduleType.scheduled,
+} as const;
+export type ShipmentScheduleType =
+  (typeof ShipmentScheduleType)[keyof typeof ShipmentScheduleType];
 
-export { JobMode as JobType };
+export const ShipmentStatus = {
+  DRAFT: PrismaShipmentStatus.draft,
+  CREATED: PrismaShipmentStatus.created,
+  BROADCASTING: PrismaShipmentStatus.broadcasting,
+  ASSIGNED: PrismaShipmentStatus.assigned,
+  EN_ROUTE_PICKUP: PrismaShipmentStatus.en_route_pickup,
+  PICKED_UP: PrismaShipmentStatus.picked_up,
+  EN_ROUTE_DROPOFF: PrismaShipmentStatus.en_route_dropoff,
+  DELIVERED: PrismaShipmentStatus.delivered,
+  COMPLETED: PrismaShipmentStatus.completed,
+  CANCELLED: PrismaShipmentStatus.cancelled,
+  EXPIRED: PrismaShipmentStatus.expired,
+} as const;
+export type ShipmentStatus =
+  (typeof ShipmentStatus)[keyof typeof ShipmentStatus];
 
-export enum JobStatus {
-  DRAFT = 'draft',
-  CREATED = 'created',
-  BROADCASTING = 'broadcasting',
-  ASSIGNED = 'assigned',
-  EN_ROUTE_PICKUP = 'en_route_pickup',
-  PICKED_UP = 'picked_up',
-  EN_ROUTE_DROPOFF = 'en_route_dropoff',
-  DELIVERED = 'delivered',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-  EXPIRED = 'expired',
-}
+export const ShipmentEventType = {
+  CREATED: PrismaShipmentEventType.created,
+  BROADCASTED: PrismaShipmentEventType.broadcasted,
+  BID_PLACED: PrismaShipmentEventType.bid_placed,
+  ASSIGNED: PrismaShipmentEventType.assigned,
+  ACCEPTED: PrismaShipmentEventType.accepted,
+  CANCELLED: PrismaShipmentEventType.cancelled,
+  PICKED_UP: PrismaShipmentEventType.picked_up,
+  DELIVERED: PrismaShipmentEventType.delivered,
+  COMPLETED: PrismaShipmentEventType.completed,
+} as const;
+export type ShipmentEventType =
+  (typeof ShipmentEventType)[keyof typeof ShipmentEventType];
 
-export enum JobEventType {
-  CREATED = 'created',
-  BROADCASTED = 'broadcasted',
-  BID_PLACED = 'bid_placed',
-  ASSIGNED = 'assigned',
-  ACCEPTED = 'accepted',
-  CANCELLED = 'cancelled',
-  PICKED_UP = 'picked_up',
-  DELIVERED = 'delivered',
-  COMPLETED = 'completed',
-}
-
-export enum JobActorRole {
-  CUSTOMER = 'customer',
-  PROVIDER = 'provider',
-  ADMIN = 'admin',
-  SYSTEM = 'system',
-}
+export const ShipmentActorRole = {
+  CUSTOMER: PrismaShipmentActorRole.customer,
+  PROVIDER: PrismaShipmentActorRole.provider,
+  ADMIN: PrismaShipmentActorRole.admin,
+  SYSTEM: PrismaShipmentActorRole.system,
+} as const;
+export type ShipmentActorRole =
+  (typeof ShipmentActorRole)[keyof typeof ShipmentActorRole];
 
 // ============================================================================
 // DISPATCH ENUMS
 // ============================================================================
 
-export enum DispatchBatchStatus {
-  OPEN = 'open',
-  CLOSED = 'closed',
-  ASSIGNED = 'assigned',
-  EXPIRED = 'expired',
-  CANCELLED = 'cancelled',
-}
+export const DispatchBatchStatus = {
+  OPEN: PrismaDispatchBatchStatus.open,
+  CLOSED: PrismaDispatchBatchStatus.closed,
+  ASSIGNED: PrismaDispatchBatchStatus.assigned,
+  EXPIRED: PrismaDispatchBatchStatus.expired,
+  CANCELLED: PrismaDispatchBatchStatus.cancelled,
+} as const;
+export type DispatchBatchStatus =
+  (typeof DispatchBatchStatus)[keyof typeof DispatchBatchStatus];
 
-export enum DispatchOfferStatus {
-  SENT = 'sent',
-  VIEWED = 'viewed',
-  ACCEPTED = 'accepted',
-  DECLINED = 'declined',
-  EXPIRED = 'expired',
-  CANCELLED = 'cancelled',
-}
+export const DispatchOfferStatus = {
+  SENT: PrismaDispatchOfferStatus.sent,
+  VIEWED: PrismaDispatchOfferStatus.viewed,
+  ACCEPTED: PrismaDispatchOfferStatus.accepted,
+  DECLINED: PrismaDispatchOfferStatus.declined,
+  EXPIRED: PrismaDispatchOfferStatus.expired,
+  CANCELLED: PrismaDispatchOfferStatus.cancelled,
+} as const;
+export type DispatchOfferStatus =
+  (typeof DispatchOfferStatus)[keyof typeof DispatchOfferStatus];
 
-export enum JobAssignmentStatus {
-  ACTIVE = 'active',
-  COMPLETED = 'completed',
-  CANCELLED = 'cancelled',
-}
+export const ShipmentAssignmentStatus = {
+  ACTIVE: PrismaShipmentAssignmentStatus.active,
+  COMPLETED: PrismaShipmentAssignmentStatus.completed,
+  CANCELLED: PrismaShipmentAssignmentStatus.cancelled,
+} as const;
+export type ShipmentAssignmentStatus =
+  (typeof ShipmentAssignmentStatus)[keyof typeof ShipmentAssignmentStatus];
 
 // ============================================================================
 // MARKETPLACE ENUMS
 // ============================================================================
 
-export enum BidStatus {
-  ACTIVE = 'active',
-  WITHDRAWN = 'withdrawn',
-  REJECTED = 'rejected',
-  ACCEPTED = 'accepted',
-}
+export const BidStatus = {
+  ACTIVE: PrismaBidStatus.active,
+  WITHDRAWN: PrismaBidStatus.withdrawn,
+  REJECTED: PrismaBidStatus.rejected,
+  ACCEPTED: PrismaBidStatus.accepted,
+} as const;
+export type BidStatus = (typeof BidStatus)[keyof typeof BidStatus];
 
 // ============================================================================
 // WALLET ENUMS
@@ -244,7 +273,7 @@ export enum TransactionDirection {
 
 export enum TransactionType {
   TOPUP = 'topup',
-  JOB_PAYMENT = 'job_payment',
+  SHIPMENT_PAYMENT = 'shipment_payment',
   PROVIDER_PAYOUT = 'provider_payout',
   COMMISSION = 'commission',
   REFUND = 'refund',
@@ -275,7 +304,7 @@ export enum SlaRuleScope {
   PROVIDER = 'provider',
 }
 
-export { JobStatus as SLARuleStatus };
+export { ShipmentStatus as SLARuleStatus };
 
 export enum RatingTargetType {
   PROVIDER = 'provider',
@@ -292,24 +321,24 @@ export enum PenaltyType {
 // MILESTONE ENUMS
 // ============================================================================
 
-export enum MilestoneType {
-  ACCEPTED = 'accepted',
-  ARRIVED_PICKUP = 'arrived_pickup',
-  PICKED_UP = 'picked_up',
-  ARRIVED_DROPOFF = 'arrived_dropoff',
-  DELIVERED = 'delivered',
-  COMPLETED = 'completed',
-}
+export const ShipmentMilestoneType = {
+  ACCEPTED: PrismaShipmentMilestoneType.accepted,
+  ARRIVED_PICKUP: PrismaShipmentMilestoneType.arrived_pickup,
+  PICKED_UP: PrismaShipmentMilestoneType.picked_up,
+  ARRIVED_DROPOFF: PrismaShipmentMilestoneType.arrived_dropoff,
+  DELIVERED: PrismaShipmentMilestoneType.delivered,
+  COMPLETED: PrismaShipmentMilestoneType.completed,
+} as const;
+export type ShipmentMilestoneType =
+  (typeof ShipmentMilestoneType)[keyof typeof ShipmentMilestoneType];
 
-export { MilestoneType as JobMilestoneType };
-
-export enum MilestoneStatus {
-  PENDING = 'pending',
-  REACHED = 'reached',
-  VERIFIED = 'verified',
-}
-
-export { MilestoneStatus as JobMilestoneStatus };
+export const ShipmentMilestoneStatus = {
+  PENDING: PrismaShipmentMilestoneStatus.pending,
+  REACHED: PrismaShipmentMilestoneStatus.reached,
+  VERIFIED: PrismaShipmentMilestoneStatus.verified,
+} as const;
+export type ShipmentMilestoneStatus =
+  (typeof ShipmentMilestoneStatus)[keyof typeof ShipmentMilestoneStatus];
 
 export enum OTPPurpose {
   REGISTRATION = 'registration',
@@ -318,17 +347,19 @@ export enum OTPPurpose {
   TRANSACTION_VERIFY = 'transaction_verify',
 }
 
-export enum PodUploadType {
-  PHOTO = 'photo',
-  SIGNATURE = 'signature',
-  DOCUMENT = 'document',
-}
+export const PodUploadType = {
+  PHOTO: PrismaPodUploadType.photo,
+  SIGNATURE: PrismaPodUploadType.signature,
+  DOCUMENT: PrismaPodUploadType.document,
+} as const;
+export type PodUploadType = (typeof PodUploadType)[keyof typeof PodUploadType];
 
-export enum WaybillStatus {
-  UPLOADED = 'uploaded',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-}
+export const WaybillStatus = {
+  UPLOADED: PrismaWaybillStatus.uploaded,
+  APPROVED: PrismaWaybillStatus.approved,
+  REJECTED: PrismaWaybillStatus.rejected,
+} as const;
+export type WaybillStatus = (typeof WaybillStatus)[keyof typeof WaybillStatus];
 
 // ============================================================================
 // REGISTER ENUMS FOR GRAPHQL
@@ -349,14 +380,14 @@ registerEnumType(KYCCaseType, { name: 'KYCCaseType' });
 registerEnumType(KycDocumentType, { name: 'KycDocumentType' });
 registerEnumType(KycDocumentStatus, { name: 'KycDocumentStatus' });
 registerEnumType(NinVerificationStatus, { name: 'NinVerificationStatus' });
-registerEnumType(LocationType, { name: 'LocationType' });
-registerEnumType(JobMode, { name: 'JobMode' });
-registerEnumType(JobStatus, { name: 'JobStatus' });
-registerEnumType(JobEventType, { name: 'JobEventType' });
-registerEnumType(JobActorRole, { name: 'JobActorRole' });
+registerEnumType(ShipmentMode, { name: 'ShipmentMode' });
+registerEnumType(ShipmentScheduleType, { name: 'ShipmentScheduleType' });
+registerEnumType(ShipmentStatus, { name: 'ShipmentStatus' });
+registerEnumType(ShipmentEventType, { name: 'ShipmentEventType' });
+registerEnumType(ShipmentActorRole, { name: 'ShipmentActorRole' });
 registerEnumType(DispatchBatchStatus, { name: 'DispatchBatchStatus' });
 registerEnumType(DispatchOfferStatus, { name: 'DispatchOfferStatus' });
-registerEnumType(JobAssignmentStatus, { name: 'JobAssignmentStatus' });
+registerEnumType(ShipmentAssignmentStatus, { name: 'ShipmentAssignmentStatus' });
 registerEnumType(BidStatus, { name: 'BidStatus' });
 registerEnumType(TransactionStatus, { name: 'TransactionStatus' });
 registerEnumType(WalletOwnerType, { name: 'WalletOwnerType' });
@@ -368,8 +399,8 @@ registerEnumType(RefundStatus, { name: 'RefundStatus' });
 registerEnumType(SlaRuleScope, { name: 'SlaRuleScope' });
 registerEnumType(RatingTargetType, { name: 'RatingTargetType' });
 registerEnumType(PenaltyType, { name: 'PenaltyType' });
-registerEnumType(MilestoneType, { name: 'MilestoneType' });
-registerEnumType(MilestoneStatus, { name: 'MilestoneStatus' });
+registerEnumType(ShipmentMilestoneType, { name: 'ShipmentMilestoneType' });
+registerEnumType(ShipmentMilestoneStatus, { name: 'ShipmentMilestoneStatus' });
 registerEnumType(OTPPurpose, { name: 'OTPPurpose' });
 registerEnumType(PodUploadType, { name: 'PodUploadType' });
 registerEnumType(WaybillStatus, { name: 'WaybillStatus' });

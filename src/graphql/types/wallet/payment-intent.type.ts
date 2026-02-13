@@ -12,10 +12,7 @@ export class PaymentIntent {
   walletAccountId: string;
 
   @Field()
-  paymentGateway: string;
-
-  @Field()
-  gatewayPaymentId: string;
+  provider: string;
 
   @Field(() => GraphQLBigInt)
   amountMinor: bigint;
@@ -27,10 +24,19 @@ export class PaymentIntent {
   status: PaymentIntentStatus;
 
   @Field({ nullable: true })
-  confirmedAt?: Date;
+  paystackReference?: string;
+
+  @Field({ nullable: true })
+  authorizationUrl?: string;
 
   @Field(() => GraphQLJSON, { nullable: true })
-  metadata?: any;
+  rawInitResponse?: any;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  rawWebhook?: any;
+
+  @Field({ nullable: true })
+  confirmedAt?: Date;
 
   @Field()
   createdAt: Date;

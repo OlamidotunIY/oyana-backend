@@ -1,5 +1,6 @@
-import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
-import { SLARuleStatus } from '../../enums';
+import { ObjectType, Field, ID } from '@nestjs/graphql';
+import { SlaRuleScope } from '../../enums';
+import { GraphQLJSON } from 'graphql-scalars';
 
 @ObjectType()
 export class SLARule {
@@ -7,23 +8,23 @@ export class SLARule {
   id: string;
 
   @Field()
-  ruleName: string;
+  key: string;
+
+  @Field(() => SlaRuleScope)
+  scope: SlaRuleScope;
+
+  @Field({ nullable: true })
+  vehicleCategory?: string;
+
+  @Field({ nullable: true })
+  providerId?: string;
+
+  @Field(() => GraphQLJSON)
+  value: any;
 
   @Field()
-  ruleDescription: string;
-
-  @Field(() => Int)
-  thresholdMinutes: number;
-
-  @Field()
-  regionId: string;
-
-  @Field(() => SLARuleStatus)
-  status: SLARuleStatus;
+  isActive: boolean;
 
   @Field()
   createdAt: Date;
-
-  @Field()
-  updatedAt: Date;
 }

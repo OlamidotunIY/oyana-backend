@@ -1,0 +1,71 @@
+model Profile {
+    id                String        @id @db.Uuid // Same as auth.users.id
+    email             String        @unique
+    userType          UserType      @map("user_type")
+    firstName         String?       @map("first_name")
+    lastName          String?       @map("last_name")
+    phoneE164         String?       @unique @map("phone_e164")
+    state             State
+    referralCode      String?       @map("referral_code")
+    preferredLanguage String        @default("en") @map("preferred_language")
+    status            ProfileStatus @default(active)
+    lastLoginAt       DateTime?     @map("last_login_at") @db.Timestamptz(6)
+    createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    // Relations
+    customerShipments          Shipment[]          @relation("CustomerShipments")
+    providerMembers            ProviderMember[]
+    contactForProviders        Provider[]          @relation("ProviderContact")
+    adminSessions              AdminSession[]
+    shipmentEventActors        ShipmentEvent[]
+    cancelledShipments         Shipment[]          @relation("ShipmentCanceller")
+    walletAccounts             WalletAccount[]     @relation("ProfileWallet")
+    ratingsMade                Rating[]
+    shipmentBidAwards          ShipmentBidAward[]
+    kycReviews                 ProviderKycCase[]   @relation("KycReviewer")
+    documentUploads            KycDocument[]
+    podUploads                 PodUpload[]
+    shipmentAssignmentsDriver  ShipmentAssignment[]
+    refundsInitiated           Refund[]            @relation("RefundInitiator")
+    refundsApproved            Refund[]            @relation("RefundApprover")
+    waybillReviews             Waybill[]
+    userAddresses              UserAddress[]
+
+    @@map("profiles")
+}
+
+enum ProfileStatus {
+    active
+    suspended
+    deleted
+}
+
+enum UserType {
+    individual
+    business
+    admin
+}
+
+model UserAddress {
+    id          String  @id @db.Uuid
+    profileId   String  @db.Uuid
+    address     String
+    city        String
+    state       State
+    postalCode  String
+    label       String?
+    countryCode String  @default("NG") @map("country_code") @db.Char(2)
+    lat         Float?
+    lng         Float?
+    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    // Relations
+    profile          Profile    @relation(fields: [profileId], references: [id])
+    pickupShipments  Shipment[] @relation("PickupAddress")
+    dropoffShipments Shipment[] @relation("DropoffAddress")
+
+    @@index([profileId, createdAt(sort: Desc)])
+    @@map("user_addresses")
+}
