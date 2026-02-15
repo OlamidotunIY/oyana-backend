@@ -3,11 +3,11 @@ import { State } from '../../enums';
 
 @InputType()
 export class CreateUserAddressDto {
-  @Field()
-  id: string;
+  @Field({ nullable: true })
+  id?: string;
 
-  @Field()
-  profileId: string;
+  @Field({ nullable: true })
+  profileId?: string;
 
   @Field()
   address: string;

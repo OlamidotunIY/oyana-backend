@@ -115,12 +115,12 @@ input CreateUserAddressDto {
   address: String!
   city: String!
   countryCode: String
-  id: String!
+  id: String
   label: String
   lat: Float
   lng: Float
   postalCode: String!
-  profileId: String!
+  profileId: String
   state: State!
 }
 
