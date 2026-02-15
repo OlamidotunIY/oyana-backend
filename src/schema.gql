@@ -9,6 +9,13 @@ input AddShipmentItemDto {
   weightKg: Float
 }
 
+type AddressSuggestion {
+  description: String!
+  mainText: String
+  placeId: String!
+  secondaryText: String
+}
+
 input AssignShipmentDto {
   agreedPriceMinor: BigInt
   currency: String
@@ -112,16 +119,9 @@ input CreateTransactionDto {
 }
 
 input CreateUserAddressDto {
-  address: String!
-  city: String!
   countryCode: String
-  id: String
   label: String
-  lat: Float
-  lng: Float
-  postalCode: String!
-  profileId: String
-  state: State!
+  placeId: String!
 }
 
 input CreateWalletAccountDto {
@@ -363,13 +363,17 @@ enum ProfileStatus {
 }
 
 type Query {
+  allowedShipmentCurrencies: [String!]!
+  currentAddress(lat: Float!, lng: Float!): ResolvedAddress
   dispatchBatches: [DispatchBatch!]!
   kycCase(id: String!): KYCCase
   kycCases: [KYCCase!]!
   me: Profile
   myBids: [ShipmentBid!]!
   myDispatchOffers: [DispatchOffer!]!
+  myUserAddresses: [UserAddress!]!
   myWallet: WalletAccount
+  searchAddresses(input: SearchAddressInput!): [AddressSuggestion!]!
   shipment(id: String!): Shipment
   shipmentBids(shipmentId: String!): [ShipmentBid!]!
   shipments(filter: ShipmentQueryFilter): [Shipment!]!
@@ -416,6 +420,18 @@ input ResetPasswordInput {
   newPassword: String!
 }
 
+type ResolvedAddress {
+  addressLine: String
+  city: String
+  countryCode: String
+  formattedAddress: String!
+  latitude: Float!
+  longitude: Float!
+  placeId: String
+  postalCode: String
+  stateOrProvince: String
+}
+
 type Role {
   createdAt: DateTime!
   id: ID!
@@ -430,6 +446,13 @@ type RolePermission {
   permission: Permission!
   permissionId: String!
   roleId: String!
+}
+
+input SearchAddressInput {
+  countryCode: String
+  limit: Int
+  query: String!
+  sessionToken: String
 }
 
 type Shipment {

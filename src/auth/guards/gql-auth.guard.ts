@@ -34,7 +34,17 @@ export class GqlAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid request context');
     }
 
-    // Try access token first.
+    // Try Authorization header first (Bearer token).
+    const authorizationHeader = req.headers?.authorization;
+    if (authorizationHeader?.startsWith('Bearer ')) {
+      const user = await this.supabaseService.verifySession(authorizationHeader);
+      if (user) {
+        req.user = user;
+        return true;
+      }
+    }
+
+    // Try access token cookie.
     const accessToken = req.cookies?.['oyana-accessToken'];
 
     if (accessToken) {

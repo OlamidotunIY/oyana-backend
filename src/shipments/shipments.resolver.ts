@@ -1,16 +1,18 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
+import { UseGuards } from '@nestjs/common';
+import type { User } from '@supabase/supabase-js';
 import { ShipmentsService } from './shipments.service';
 import {
   Shipment,
   ShipmentItem,
   ShipmentQueryFilter,
-  UserAddress,
   CreateShipmentDto,
   UpdateShipmentDto,
   CancelShipmentDto,
   AddShipmentItemDto,
-  CreateUserAddressDto,
 } from '../graphql';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 
 @Resolver(() => Shipment)
 export class ShipmentsResolver {
@@ -29,11 +31,21 @@ export class ShipmentsResolver {
     return this.shipmentsService.getShipmentById(id);
   }
 
+  @Query(() => [String])
+  async allowedShipmentCurrencies(): Promise<string[]> {
+    return this.shipmentsService.getAllowedShipmentCurrencies();
+  }
+
   @Mutation(() => Shipment)
+  @UseGuards(GqlAuthGuard)
   async createShipment(
+    @CurrentUser() user: User,
     @Args('input') input: CreateShipmentDto,
   ): Promise<Shipment> {
-    return this.shipmentsService.createShipment(input);
+    return this.shipmentsService.createShipment({
+      ...input,
+      customerProfileId: user.id,
+    });
   }
 
   @Mutation(() => Shipment)
@@ -56,14 +68,6 @@ export class ShipmentsResolver {
   async addShipmentItem(
     @Args('input') input: AddShipmentItemDto,
   ): Promise<ShipmentItem> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  @Mutation(() => UserAddress)
-  async createUserAddress(
-    @Args('input') input: CreateUserAddressDto,
-  ): Promise<UserAddress> {
     // TODO: Implement
     throw new Error('Not implemented');
   }

@@ -1,14 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import {
-  CreateUserAddressDto,
   CreateShipmentDto,
   Shipment,
   ShipmentQueryFilter,
   ShipmentScheduleType,
   ShipmentStatus,
-  UserAddress,
   UpdateShipmentDto,
 } from '../graphql';
 import type { Prisma, Shipment as PrismaShipment } from '@prisma/client';
@@ -54,39 +51,6 @@ export class ShipmentsService {
     }
 
     return ['NGN'];
-  }
-
-  async getMyUserAddresses(profileId: string): Promise<UserAddress[]> {
-    return this.prisma.runWithRetry('ShipmentsService.getMyUserAddresses', () =>
-      this.prisma.userAddress.findMany({
-        where: { profileId },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
-    );
-  }
-
-  async createUserAddress(
-    profileId: string,
-    input: CreateUserAddressDto,
-  ): Promise<UserAddress> {
-    return this.prisma.runWithRetry('ShipmentsService.createUserAddress', () =>
-      this.prisma.userAddress.create({
-        data: {
-          id: input.id ?? randomUUID(),
-          profileId,
-          address: input.address,
-          city: input.city,
-          state: input.state,
-          postalCode: input.postalCode,
-          label: input.label,
-          countryCode: input.countryCode?.trim().toUpperCase() || 'NG',
-          lat: input.lat,
-          lng: input.lng,
-        },
-      }),
-    );
   }
 
   async getShipments(filter?: ShipmentQueryFilter): Promise<Shipment[]> {

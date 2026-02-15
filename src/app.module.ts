@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { DatabaseModule } from './database/database.module';
 import { BigIntScalar } from './graphql/scalars';
+import { AddressModule } from './address/address.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { BigIntScalar } from './graphql/scalars';
     MarketPlaceModule,
     KycModule,
     UserModule,
+    AddressModule,
   ],
   controllers: [AppController],
   providers: [AppService, BigIntScalar],
