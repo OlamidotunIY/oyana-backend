@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js';
 import { ShipmentsService } from './shipments.service';
 import {
   Shipment,
+  ShipmentDashboard,
   ShipmentItem,
   ShipmentQueryFilter,
   CreateShipmentDto,
@@ -34,6 +35,14 @@ export class ShipmentsResolver {
   @Query(() => [String])
   async allowedShipmentCurrencies(): Promise<string[]> {
     return this.shipmentsService.getAllowedShipmentCurrencies();
+  }
+
+  @Query(() => ShipmentDashboard)
+  @UseGuards(GqlAuthGuard)
+  async myShipmentDashboard(
+    @CurrentUser() user: User,
+  ): Promise<ShipmentDashboard> {
+    return this.shipmentsService.getCustomerShipmentDashboard(user.id);
   }
 
   @Mutation(() => Shipment)

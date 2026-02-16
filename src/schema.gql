@@ -368,6 +368,7 @@ type Query {
   me: Profile
   myBids: [ShipmentBid!]!
   myDispatchOffers: [DispatchOffer!]!
+  myShipmentDashboard: ShipmentDashboard!
   myUserAddresses: [UserAddress!]!
   myWallet: WalletAccount
   searchAddresses(input: SearchAddressInput!): [AddressSuggestion!]!
@@ -522,6 +523,31 @@ type ShipmentBidAward {
   id: ID!
   notes: String
   shipmentId: String!
+}
+
+type ShipmentDashboard {
+  recentShipments: [ShipmentDashboardRecentShipment!]!
+  summary: ShipmentDashboardSummary!
+}
+
+type ShipmentDashboardRecentShipment {
+  createdAt: DateTime!
+  dropoffAddressSummary: String
+  id: String!
+  mode: ShipmentMode!
+  pickupAddressSummary: String
+  scheduledAt: DateTime
+  status: ShipmentStatus!
+  trackingCode: String!
+}
+
+type ShipmentDashboardSummary {
+  activeShipments: Int!
+  completedThisMonth: Int!
+  pendingPaymentAmountMinor: BigInt!
+  pendingPaymentCount: Int!
+  pendingPaymentCurrency: String!
+  totalShipments: Int!
 }
 
 type ShipmentItem {

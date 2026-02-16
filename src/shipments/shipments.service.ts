@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import {
   CreateShipmentDto,
   Shipment,
+  ShipmentDashboard,
   ShipmentQueryFilter,
   ShipmentScheduleType,
   ShipmentStatus,
@@ -34,6 +35,16 @@ export class ShipmentsService {
     ShipmentStatus.COMPLETED,
     ShipmentStatus.CANCELLED,
     ShipmentStatus.EXPIRED,
+  ];
+
+  private static readonly COMPLETED_STATUSES: ShipmentStatus[] = [
+    ShipmentStatus.DELIVERED,
+    ShipmentStatus.COMPLETED,
+  ];
+
+  private static readonly PENDING_PAYMENT_STATUSES: ShipmentStatus[] = [
+    ...ShipmentsService.ACTIVE_STATUSES,
+    ShipmentStatus.DELIVERED,
   ];
 
   private readonly allowedShipmentCurrencies: string[] = (
@@ -147,6 +158,136 @@ export class ShipmentsService {
     }
 
     return this.toGraphqlShipment(shipment);
+  }
+
+  async getCustomerShipmentDashboard(
+    customerProfileId: string,
+  ): Promise<ShipmentDashboard> {
+    const now = new Date();
+    const monthStart = this.getMonthStartUtc(now);
+
+    const [
+      totalShipments,
+      activeShipments,
+      completedThisMonth,
+      pendingPaymentShipments,
+      recentShipments,
+    ] = await Promise.all([
+      this.prisma.runWithRetry(
+        'ShipmentsService.getCustomerShipmentDashboard.totalShipments',
+        () =>
+          this.prisma.shipment.count({
+            where: { customerProfileId },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getCustomerShipmentDashboard.activeShipments',
+        () =>
+          this.prisma.shipment.count({
+            where: {
+              customerProfileId,
+              status: {
+                in: ShipmentsService.ACTIVE_STATUSES,
+              },
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getCustomerShipmentDashboard.completedThisMonth',
+        () =>
+          this.prisma.shipment.count({
+            where: {
+              customerProfileId,
+              status: {
+                in: ShipmentsService.COMPLETED_STATUSES,
+              },
+              updatedAt: {
+                gte: monthStart,
+              },
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getCustomerShipmentDashboard.pendingPaymentShipments',
+        () =>
+          this.prisma.shipment.findMany({
+            where: {
+              customerProfileId,
+              requiresEscrow: true,
+              status: {
+                in: ShipmentsService.PENDING_PAYMENT_STATUSES,
+              },
+            },
+            select: {
+              finalPriceMinor: true,
+              quotedPriceMinor: true,
+              pricingCurrency: true,
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getCustomerShipmentDashboard.recentShipments',
+        () =>
+          this.prisma.shipment.findMany({
+            where: { customerProfileId },
+            orderBy: {
+              createdAt: 'desc',
+            },
+            take: 6,
+            select: {
+              id: true,
+              trackingCode: true,
+              status: true,
+              mode: true,
+              scheduledAt: true,
+              createdAt: true,
+              pickupAddress: {
+                select: {
+                  address: true,
+                  city: true,
+                },
+              },
+              dropoffAddress: {
+                select: {
+                  address: true,
+                  city: true,
+                },
+              },
+            },
+          }),
+      ),
+    ]);
+
+    const pendingPaymentAmountMinor = pendingPaymentShipments.reduce<bigint>(
+      (sum, shipment) =>
+        sum + (shipment.finalPriceMinor ?? shipment.quotedPriceMinor ?? BigInt(0)),
+      BigInt(0),
+    );
+    const pendingPaymentCurrency =
+      pendingPaymentShipments[0]?.pricingCurrency ??
+      this.getAllowedShipmentCurrencies()[0] ??
+      'NGN';
+
+    return {
+      summary: {
+        totalShipments,
+        activeShipments,
+        completedThisMonth,
+        pendingPaymentCount: pendingPaymentShipments.length,
+        pendingPaymentAmountMinor,
+        pendingPaymentCurrency,
+      },
+      recentShipments: recentShipments.map((shipment) => ({
+        id: shipment.id,
+        trackingCode: shipment.trackingCode,
+        status: shipment.status as ShipmentStatus,
+        mode: shipment.mode,
+        scheduledAt: shipment.scheduledAt ?? undefined,
+        createdAt: shipment.createdAt,
+        pickupAddressSummary: this.toAddressSummary(shipment.pickupAddress),
+        dropoffAddressSummary: this.toAddressSummary(shipment.dropoffAddress),
+      })),
+    };
   }
 
   async createShipment(input: CreateShipmentDto): Promise<Shipment> {
@@ -273,5 +414,29 @@ export class ShipmentsService {
       cancelledByProfileId: shipment.cancelledByProfileId ?? undefined,
       cancellationReason: shipment.cancellationReason ?? undefined,
     };
+  }
+
+  private getMonthStartUtc(date: Date): Date {
+    return new Date(
+      Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0),
+    );
+  }
+
+  private toAddressSummary(address: {
+    address: string;
+    city: string;
+  } | null): string | undefined {
+    if (!address) {
+      return undefined;
+    }
+
+    const primary = address.address?.trim();
+    const city = address.city?.trim();
+
+    if (!primary && !city) {
+      return undefined;
+    }
+
+    return [primary, city].filter(Boolean).join(', ');
   }
 }
