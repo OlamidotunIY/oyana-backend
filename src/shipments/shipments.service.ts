@@ -144,7 +144,7 @@ export class ShipmentsService {
             mode: input.mode,
             vehicleCategory: input.vehicleCategory,
             scheduleType: input.scheduleType,
-            status: input.status ?? ShipmentStatus.CREATED,
+            status: ShipmentStatus.CREATED,
             pickupAddressId: input.pickupAddressId,
             dropoffAddressId: input.dropoffAddressId,
             scheduledAt: input.scheduledAt,

@@ -100,7 +100,6 @@ input CreateShipmentDto {
   scheduleType: ShipmentScheduleType
   scheduledAt: DateTime
   specialInstructions: String
-  status: ShipmentStatus
   trackingCode: String
   vehicleCategory: VehicleCategory!
 }

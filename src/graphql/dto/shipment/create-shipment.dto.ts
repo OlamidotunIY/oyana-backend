@@ -30,9 +30,6 @@ export class CreateShipmentDto {
   @Field()
   dropoffAddressId: string;
 
-  @Field(() => ShipmentStatus, { nullable: true })
-  status?: ShipmentStatus;
-
   @Field({ nullable: true })
   scheduledAt?: Date;
 
