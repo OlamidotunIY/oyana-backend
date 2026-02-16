@@ -85,8 +85,6 @@ input CreateShipmentBidDto {
 }
 
 input CreateShipmentDto {
-  commissionAmountMinor: BigInt
-  commissionRateBps: Float
   customerProfileId: String!
   dropoffAddressId: String!
   finalPriceMinor: BigInt

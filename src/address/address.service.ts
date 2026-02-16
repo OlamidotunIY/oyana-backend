@@ -91,10 +91,7 @@ export class AddressService {
       throw new BadRequestException('Resolved city is missing');
     }
 
-    const postalCode = resolvedAddress.postalCode?.trim();
-    if (!postalCode) {
-      throw new BadRequestException('Resolved postal code is missing');
-    }
+    const postalCode = this.resolvePostalCode(resolvedAddress);
 
     const countryCode =
       input.countryCode?.trim().toUpperCase() ||
@@ -364,6 +361,10 @@ export class AddressService {
     }
 
     return null;
+  }
+
+  private resolvePostalCode(resolvedAddress: ResolvedAddress): string {
+    return resolvedAddress.postalCode?.trim() || '';
   }
 
   private findAddressComponent(

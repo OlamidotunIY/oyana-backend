@@ -43,7 +43,17 @@ export class ShipmentsService {
     .map((currency) => currency.trim().toUpperCase())
     .filter(Boolean);
 
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly defaultCommissionRateBps: number;
+
+  constructor(private readonly prisma: PrismaService) {
+    const commissionRate = parseInt(
+      process.env.DEFAULT_SHIPMENT_COMMISSION_RATE_BPS ?? '1000',
+      10,
+    );
+    this.defaultCommissionRateBps = Number.isNaN(commissionRate)
+      ? 1000
+      : commissionRate;
+  }
 
   getAllowedShipmentCurrencies(): string[] {
     if (this.allowedShipmentCurrencies.length > 0) {
@@ -53,15 +63,21 @@ export class ShipmentsService {
     return ['NGN'];
   }
 
+  getDefaultCommissionRateBps(): number {
+    return this.defaultCommissionRateBps;
+  }
+
   async getShipments(filter?: ShipmentQueryFilter): Promise<Shipment[]> {
     const now = new Date();
-    const shipments = await this.prisma.runWithRetry('ShipmentsService.getShipments', () =>
-      this.prisma.shipment.findMany({
-        where: this.buildShipmentWhereFilter(filter, now),
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
+    const shipments = await this.prisma.runWithRetry(
+      'ShipmentsService.getShipments',
+      () =>
+        this.prisma.shipment.findMany({
+          where: this.buildShipmentWhereFilter(filter, now),
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
     );
 
     return shipments.map((shipment) => this.toGraphqlShipment(shipment));
@@ -155,8 +171,8 @@ export class ShipmentsService {
             pricingCurrency: input.pricingCurrency,
             quotedPriceMinor: input.quotedPriceMinor,
             finalPriceMinor: input.finalPriceMinor,
-            commissionRateBps: input.commissionRateBps,
-            commissionAmountMinor: input.commissionAmountMinor,
+            commissionRateBps: this.defaultCommissionRateBps,
+            commissionAmountMinor: 0,
           },
         }),
     );
@@ -164,18 +180,34 @@ export class ShipmentsService {
     return this.toGraphqlShipment(shipment);
   }
 
-  async updateShipment(id: string, input: UpdateShipmentDto): Promise<Shipment> {
+  async updateShipment(
+    id: string,
+    input: UpdateShipmentDto,
+  ): Promise<Shipment> {
     const existingShipment = await this.prisma.runWithRetry(
       'ShipmentsService.updateShipment.findUnique',
       () =>
         this.prisma.shipment.findUnique({
           where: { id },
-          select: { id: true },
+          select: { id: true, commissionRateBps: true },
         }),
     );
 
     if (!existingShipment) {
       throw new NotFoundException(`Shipment with id ${id} not found`);
+    }
+
+    // Calculate commission if final price is being set
+    let commissionAmountMinor: bigint | undefined;
+    if (input.finalPriceMinor !== undefined && input.finalPriceMinor !== null) {
+      const commissionRateBps =
+        input.commissionRateBps ??
+        existingShipment.commissionRateBps ??
+        this.defaultCommissionRateBps;
+      commissionAmountMinor = this.calculateCommission(
+        BigInt(input.finalPriceMinor),
+        commissionRateBps,
+      );
     }
 
     const shipment = await this.prisma.runWithRetry(
@@ -201,7 +233,7 @@ export class ShipmentsService {
             quotedPriceMinor: input.quotedPriceMinor,
             finalPriceMinor: input.finalPriceMinor,
             commissionRateBps: input.commissionRateBps,
-            commissionAmountMinor: input.commissionAmountMinor,
+            commissionAmountMinor,
             cancelledAt: input.cancelledAt,
             cancelledByProfileId: input.cancelledByProfileId,
             cancellationReason: input.cancellationReason,
@@ -217,6 +249,15 @@ export class ShipmentsService {
     const random = Math.random().toString(36).slice(2, 8).toUpperCase();
 
     return `SHP-${timestamp}-${random}`;
+  }
+
+  private calculateCommission(
+    priceMinor: bigint,
+    commissionRateBps: number,
+  ): bigint {
+    // Calculate commission: (price * bps) / 10000
+    // Using BigInt arithmetic to avoid precision loss
+    return (priceMinor * BigInt(commissionRateBps)) / BigInt(10000);
   }
 
   private toGraphqlShipment(shipment: PrismaShipment): Shipment {
