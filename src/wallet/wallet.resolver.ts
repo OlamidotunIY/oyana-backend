@@ -27,14 +27,8 @@ export class WalletResolver {
 
     // Try to get existing wallet
     let wallet = await this.walletService.getWalletByOwnerId(
-      'customer',
       user.id,
     );
-
-    // Auto-create wallet if it doesn't exist
-    if (!wallet) {
-      wallet = await this.walletService.createWalletForProfile(user.id);
-    }
 
     return wallet;
   }
@@ -45,19 +39,5 @@ export class WalletResolver {
     @Args('walletAccountId') walletAccountId: string,
   ): Promise<Transaction[]> {
     return this.walletService.getWalletTransactions(walletAccountId);
-  }
-
-  @Mutation(() => PaymentIntent)
-  async updatePaymentIntent(@Args('id') id: string): Promise<PaymentIntent> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  @Mutation(() => Refund)
-  async initiateRefund(
-    @Args('input') input: RequestRefundDto,
-  ): Promise<Refund> {
-    // TODO: Implement
-    throw new Error('Not implemented');
   }
 }

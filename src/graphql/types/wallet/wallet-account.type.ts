@@ -1,14 +1,11 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { WalletAccountStatus, WalletOwnerType } from '../../enums';
+import { WalletAccountStatus } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
 
 @ObjectType()
 export class WalletAccount {
   @Field(() => ID)
   id: string;
-
-  @Field(() => WalletOwnerType)
-  ownerType: WalletOwnerType;
 
   @Field({ nullable: true })
   ownerProfileId?: string;

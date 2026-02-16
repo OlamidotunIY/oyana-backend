@@ -6,29 +6,46 @@ import { WalletAccount, Transaction } from '../graphql';
 export class WalletService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getWalletByOwnerId(
-    ownerType: string,
-    ownerId: string,
-  ): Promise<WalletAccount | null> {
-    const where =
-      ownerType === 'customer'
-        ? { ownerProfileId: ownerId }
-        : { ownerProviderId: ownerId };
+  async getWalletByOwnerId(ownerId: string): Promise<WalletAccount | null> {
+    const user = await this.prisma.profile.findUnique({
+      where: {
+        id: ownerId,
+      },
+    });
 
     const wallet = await this.prisma.walletAccount.findFirst({
       where: {
-        ownerType,
-        ...where,
+        ownerType: user?.userType,
+        ownerProfileId: ownerId,
       },
     });
 
     if (!wallet) {
-      return null;
+      return await this.prisma.$transaction(async (prisma) => {
+        const newWallet = await prisma.walletAccount.create({
+          data: {
+            ownerType: user?.userType as any,
+            ownerProfileId: ownerId,
+            currency: 'NGN', // Default currency, can be changed later
+          },
+        });
+
+        return {
+          id: newWallet.id,
+          ownerProfileId: newWallet.ownerProfileId || undefined,
+          ownerProviderId: newWallet.ownerProviderId || undefined,
+          currency: newWallet.currency,
+          balanceMinor: newWallet.balanceMinor,
+          escrowMinor: newWallet.escrowMinor,
+          status: newWallet.status as any,
+          createdAt: newWallet.createdAt,
+          updatedAt: newWallet.updatedAt,
+        };
+      });
     }
 
     return {
       id: wallet.id,
-      ownerType: wallet.ownerType as any,
       ownerProfileId: wallet.ownerProfileId || undefined,
       ownerProviderId: wallet.ownerProviderId || undefined,
       currency: wallet.currency,
@@ -65,31 +82,5 @@ export class WalletService {
       createdAt: txn.createdAt,
       updatedAt: txn.updatedAt,
     }));
-  }
-
-  async createWalletForProfile(profileId: string): Promise<WalletAccount> {
-    const wallet = await this.prisma.walletAccount.create({
-      data: {
-        ownerType: 'customer',
-        ownerProfileId: profileId,
-        currency: 'NGN',
-        balanceMinor: BigInt(0),
-        escrowMinor: BigInt(0),
-        status: 'active',
-      },
-    });
-
-    return {
-      id: wallet.id,
-      ownerType: wallet.ownerType as any,
-      ownerProfileId: wallet.ownerProfileId || undefined,
-      ownerProviderId: wallet.ownerProviderId || undefined,
-      currency: wallet.currency,
-      balanceMinor: wallet.balanceMinor,
-      escrowMinor: wallet.escrowMinor,
-      status: wallet.status as any,
-      createdAt: wallet.createdAt,
-      updatedAt: wallet.updatedAt,
-    };
   }
 }

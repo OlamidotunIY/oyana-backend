@@ -4,9 +4,7 @@
 
 model WalletAccount {
   id              String   @id @default(uuid()) @db.Uuid
-  ownerType       String   @map("owner_type")
   ownerProfileId  String?  @map("owner_profile_id") @db.Uuid
-  ownerProviderId String?  @map("owner_provider_id") @db.Uuid
   currency        String   @default("NGN") @db.Char(3)
   balanceMinor    BigInt   @default(0) @map("balance_minor")
   escrowMinor     BigInt   @default(0) @map("escrow_minor")
@@ -16,12 +14,10 @@ model WalletAccount {
 
   // Relations
   ownerProfile   Profile?            @relation("ProfileWallet", fields: [ownerProfileId], references: [id])
-  ownerProvider  Provider?           @relation("ProviderWallet", fields: [ownerProviderId], references: [id])
   transactions   WalletTransaction[]
   paymentIntents PaymentIntent[]
 
-  @@index([ownerType, ownerProfileId])
-  @@index([ownerType, ownerProviderId])
+  @@index([ownerProfileId])
   @@map("wallet_accounts")
 }
 

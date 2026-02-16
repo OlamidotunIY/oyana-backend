@@ -227,7 +227,6 @@ type Mutation {
   createUserAddress(input: CreateUserAddressDto!): UserAddress!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
   initiateNinVerification(input: VerifyNINDto!): NINVerification!
-  initiateRefund(input: RequestRefundDto!): Refund!
   refreshToken(refreshToken: String!): AuthResponse!
   requestOtp(input: RequestOtpInput!): MessageResponse!
   resetPassword(input: ResetPasswordInput!): MessageResponse!
@@ -237,7 +236,6 @@ type Mutation {
   signIn(input: SignInInput!): AuthResponse!
   signUp(input: SignUpInput!): MessageResponse!
   submitKycCase(id: String!): KYCCase!
-  updatePaymentIntent(id: String!): PaymentIntent!
   updateProfile(input: UpdateProfileInput!): Profile!
   updateShipment(id: String!, input: UpdateShipmentDto!): Shipment!
   updateShipmentAssignment(id: String!, input: AssignShipmentDto!): ShipmentAssignment!
@@ -267,30 +265,6 @@ enum NinVerificationStatus {
   FAILED
   PENDING
   VERIFIED
-}
-
-type PaymentIntent {
-  amountMinor: BigInt!
-  authorizationUrl: String
-  confirmedAt: DateTime
-  createdAt: DateTime!
-  currency: String!
-  id: ID!
-  paystackReference: String
-  provider: String!
-  rawInitResponse: JSON
-  rawWebhook: JSON
-  status: PaymentIntentStatus!
-  updatedAt: DateTime!
-  walletAccountId: String!
-}
-
-enum PaymentIntentStatus {
-  CANCELLED
-  FAILED
-  INITIALIZED
-  PENDING
-  SUCCEEDED
 }
 
 type Permission {
@@ -347,40 +321,9 @@ type Query {
   walletTransactions(walletAccountId: String!): [Transaction!]!
 }
 
-type Refund {
-  amountMinor: BigInt!
-  approvedAt: DateTime
-  approvedByProfileId: String
-  createdAt: DateTime!
-  currency: String!
-  id: ID!
-  initiatedByProfileId: String!
-  processedAt: DateTime
-  reason: String
-  shipmentId: String!
-  status: RefundStatus!
-  transactionId: String!
-  updatedAt: DateTime!
-}
-
-enum RefundStatus {
-  FAILED
-  PENDING
-  SUCCEEDED
-}
-
 input RequestOtpInput {
   email: String!
   mode: String!
-}
-
-input RequestRefundDto {
-  amountMinor: BigInt!
-  currency: String!
-  initiatedByProfileId: String!
-  reason: String!
-  shipmentId: String!
-  transactionId: String!
 }
 
 input ResetPasswordInput {

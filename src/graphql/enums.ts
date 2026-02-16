@@ -244,11 +244,6 @@ export enum TransactionStatus {
   REVERSED = 'reversed',
 }
 
-export enum WalletOwnerType {
-  PROFILE = 'profile',
-  PROVIDER = 'provider',
-}
-
 export enum WalletAccountStatus {
   ACTIVE = 'active',
   SUSPENDED = 'suspended',
@@ -380,7 +375,6 @@ registerEnumType(DispatchOfferStatus, { name: 'DispatchOfferStatus' });
 registerEnumType(ShipmentAssignmentStatus, { name: 'ShipmentAssignmentStatus' });
 registerEnumType(BidStatus, { name: 'BidStatus' });
 registerEnumType(TransactionStatus, { name: 'TransactionStatus' });
-registerEnumType(WalletOwnerType, { name: 'WalletOwnerType' });
 registerEnumType(WalletAccountStatus, { name: 'WalletAccountStatus' });
 registerEnumType(TransactionDirection, { name: 'TransactionDirection' });
 registerEnumType(TransactionType, { name: 'TransactionType' });

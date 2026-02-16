@@ -23,7 +23,6 @@ model Profile {
   walletAccounts            WalletAccount[]      @relation("ProfileWallet")
   ratingsMade               Rating[]
   shipmentBidAwards         ShipmentBidAward[]
-  kycReviews                ProviderKycCase[]    @relation("KycReviewer")
   documentUploads           KycDocument[]
   podUploads                PodUpload[]
   shipmentAssignmentsDriver ShipmentAssignment[]

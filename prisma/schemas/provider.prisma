@@ -5,10 +5,7 @@
 model Provider {
   id                      String   @id @default(uuid()) @db.Uuid
   businessName            String   @map("business_name")
-  businessAddress         String?  @map("business_address")
-  legalName               String   @map("legal_name")
-  displayName             String?  @map("display_name")
-  contactProfileId        String?  @unique @map("contact_profile_id") @db.Uuid
+  profileId               String?  @unique @map("contact_profile_id") @db.Uuid
   status                  String   @default("pending")
   minWalletThresholdMinor BigInt   @default(0) @map("min_wallet_threshold_minor")
   ratingAvg               Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
@@ -18,18 +15,20 @@ model Provider {
   updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  contactProfile      Profile?             @relation("ProviderContact", fields: [contactProfileId], references: [id])
-  members             ProviderMember[]
-  vehicles            Vehicle[]
-  kycCases            ProviderKycCase[]
-  ninVerifications    NinVerification[]
-  dispatchOffers      DispatchOffer[]
-  shipmentAssignments ShipmentAssignment[]
-  shipmentBids        ShipmentBid[]
-  ratings             Rating[]
-  penalties           ProviderPenalty[]
-  walletAccounts      WalletAccount[]      @relation("ProviderWallet")
-  slaRules            SlaRule[]
+  contactProfile       Profile?              @relation("ProviderContact", fields: [profileId], references: [id])
+  members              ProviderMember[]
+  vehicles             Vehicle[]
+  kycCases             ProviderKycCase[]
+  ninVerifications     NinVerification[]
+  dispatchOffers       DispatchOffer[]
+  shipmentAssignments  ShipmentAssignment[]
+  shipmentBids         ShipmentBid[]
+  ratings              Rating[]
+  penalties            ProviderPenalty[]
+  slaRules             SlaRule[]
+  phoneVerifications   PhoneVerification[]
+  faceVerifications    FaceVerification[]
+  vehicleVerifications VehicleVerification[]
 
   @@index([status])
   @@index([priorityScore(sort: Desc), ratingAvg(sort: Desc)])
@@ -66,9 +65,10 @@ model Vehicle {
   updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  provider            Provider             @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  dispatchOffers      DispatchOffer[]
-  shipmentAssignments ShipmentAssignment[]
+  provider             Provider              @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  dispatchOffers       DispatchOffer[]
+  shipmentAssignments  ShipmentAssignment[]
+  vehicleVerifications VehicleVerification[]
 
   @@unique([plateNumber], name: "unique_plate_number")
   @@index([providerId, category, status])
@@ -76,22 +76,33 @@ model Vehicle {
 }
 
 model ProviderKycCase {
-  id              String    @id @default(uuid()) @db.Uuid
-  providerId      String    @map("provider_id") @db.Uuid
-  status          String
-  submittedAt     DateTime? @map("submitted_at") @db.Timestamptz(6)
-  reviewedBy      String?   @map("reviewed_by") @db.Uuid
-  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz(6)
-  rejectionReason String?   @map("rejection_reason")
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                      String    @id @default(uuid()) @db.Uuid
+  providerId              String    @map("provider_id") @db.Uuid
+  status                  String    @default("pending")
+  kycLevel                Int       @default(0) @map("kyc_level") // 0=none, 1=basic, 2=standard, 3=premium
+  ninVerified             Boolean   @default(false) @map("nin_verified")
+  phoneVerified           Boolean   @default(false) @map("phone_verified")
+  faceVerified            Boolean   @default(false) @map("face_verified")
+  vehicleVerified         Boolean   @default(false) @map("vehicle_verified")
+  documentsVerified       Boolean   @default(false) @map("documents_verified")
+  submittedAt             DateTime? @map("submitted_at") @db.Timestamptz(6)
+  reviewedBy              String?   @map("reviewed_by") @db.Uuid
+  reviewedAt              DateTime? @map("reviewed_at") @db.Timestamptz(6)
+  rejectionReason         String?   @map("rejection_reason")
+  lastVerificationAttempt DateTime? @map("last_verification_attempt") @db.Timestamptz(6)
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  provider  Provider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  reviewer  Profile?      @relation("KycReviewer", fields: [reviewedBy], references: [id])
-  documents KycDocument[]
+  provider             Provider              @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  documents            KycDocument[]
+  ninVerifications     NinVerification[]
+  phoneVerifications   PhoneVerification[]
+  faceVerifications    FaceVerification[]
+  vehicleVerifications VehicleVerification[]
 
   @@index([providerId, status])
+  @@index([kycLevel])
   @@map("provider_kyc_cases")
 }
 
@@ -118,20 +129,106 @@ model KycDocument {
 
 model NinVerification {
   id              String    @id @default(uuid()) @db.Uuid
+  kycCaseId       String    @map("kyc_case_id") @db.Uuid
   providerId      String    @map("provider_id") @db.Uuid
   ninHash         String    @map("nin_hash")
-  status          String
-  vendor          String
+  status          String    @default("pending")
+  vendor          String?
   vendorReference String?   @map("vendor_reference")
+  firstName       String?   @map("first_name")
+  lastName        String?   @map("last_name")
+  dateOfBirth     DateTime? @map("date_of_birth") @db.Date
   requestedAt     DateTime? @map("requested_at") @db.Timestamptz(6)
   verifiedAt      DateTime? @map("verified_at") @db.Timestamptz(6)
+  failureReason   String?   @map("failure_reason")
   rawResponse     Json?     @map("raw_response")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  provider Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  kycCase  ProviderKycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
+  provider Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
+  @@index([kycCaseId])
   @@index([providerId, status])
   @@map("nin_verifications")
+}
+
+model PhoneVerification {
+  id               String    @id @default(uuid()) @db.Uuid
+  kycCaseId        String    @map("kyc_case_id") @db.Uuid
+  providerId       String    @map("provider_id") @db.Uuid
+  phoneNumber      String    @map("phone_number")
+  status           String    @default("pending")
+  verificationCode String?   @map("verification_code")
+  codeExpiresAt    DateTime? @map("code_expires_at") @db.Timestamptz(6)
+  attempts         Int       @default(0)
+  maxAttempts      Int       @default(3) @map("max_attempts")
+  verifiedAt       DateTime? @map("verified_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  kycCase  ProviderKycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
+  provider Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([kycCaseId])
+  @@index([providerId, status])
+  @@index([phoneNumber])
+  @@map("phone_verifications")
+}
+
+model FaceVerification {
+  id              String    @id @default(uuid()) @db.Uuid
+  kycCaseId       String    @map("kyc_case_id") @db.Uuid
+  providerId      String    @map("provider_id") @db.Uuid
+  status          String    @default("pending")
+  vendor          String?
+  vendorReference String?   @map("vendor_reference")
+  faceImageUrl    String?   @map("face_image_url")
+  livenessScore   Decimal?  @map("liveness_score") @db.Decimal(5, 2)
+  matchScore      Decimal?  @map("match_score") @db.Decimal(5, 2)
+  verifiedAt      DateTime? @map("verified_at") @db.Timestamptz(6)
+  failureReason   String?   @map("failure_reason")
+  rawResponse     Json?     @map("raw_response")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  kycCase  ProviderKycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
+  provider Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([kycCaseId])
+  @@index([providerId, status])
+  @@map("face_verifications")
+}
+
+model VehicleVerification {
+  id                     String    @id @default(uuid()) @db.Uuid
+  kycCaseId              String    @map("kyc_case_id") @db.Uuid
+  providerId             String    @map("provider_id") @db.Uuid
+  vehicleId              String?   @map("vehicle_id") @db.Uuid
+  plateNumber            String    @map("plate_number")
+  status                 String    @default("pending")
+  vendor                 String?
+  vendorReference        String?   @map("vendor_reference")
+  registrationVerified   Boolean   @default(false) @map("registration_verified")
+  insuranceVerified      Boolean   @default(false) @map("insurance_verified")
+  roadworthinessVerified Boolean   @default(false) @map("roadworthiness_verified")
+  verifiedAt             DateTime? @map("verified_at") @db.Timestamptz(6)
+  expiresAt              DateTime? @map("expires_at") @db.Timestamptz(6)
+  failureReason          String?   @map("failure_reason")
+  rawResponse            Json?     @map("raw_response")
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  kycCase  ProviderKycCase @relation(fields: [kycCaseId], references: [id], onDelete: Cascade)
+  provider Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([kycCaseId])
+  @@index([providerId, status])
+  @@index([plateNumber])
+  @@map("vehicle_verifications")
 }
