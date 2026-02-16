@@ -69,13 +69,6 @@ input CreateDispatchOfferDto {
   vehicleId: String
 }
 
-input CreatePaymentIntentDto {
-  amountMinor: BigInt!
-  currency: String!
-  provider: String
-  walletAccountId: String!
-}
-
 input CreateShipmentBidDto {
   amountMinor: BigInt!
   currency: String
@@ -102,31 +95,10 @@ input CreateShipmentDto {
   vehicleCategory: VehicleCategory!
 }
 
-input CreateTransactionDto {
-  amountMinor: BigInt!
-  currency: String!
-  direction: TransactionDirection!
-  metadata: JSON
-  paymentIntentId: String
-  reference: String!
-  shipmentId: String
-  status: String
-  transactionType: TransactionType!
-  walletAccountId: String!
-}
-
 input CreateUserAddressDto {
   countryCode: String
   label: String
   placeId: String!
-}
-
-input CreateWalletAccountDto {
-  currency: String!
-  initializeEscrow: Boolean
-  ownerProfileId: String
-  ownerProviderId: String
-  ownerType: WalletOwnerType!
 }
 
 """
@@ -253,11 +225,8 @@ type Mutation {
   createShipmentAssignment(input: AssignShipmentDto!): ShipmentAssignment!
   createShipmentBid(input: CreateShipmentBidDto!): ShipmentBid!
   createUserAddress(input: CreateUserAddressDto!): UserAddress!
-  createWalletAccount(input: CreateWalletAccountDto!): WalletAccount!
-  createWalletTransaction(input: CreateTransactionDto!): Transaction!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
   initiateNinVerification(input: VerifyNINDto!): NINVerification!
-  initiatePayment(input: CreatePaymentIntentDto!): PaymentIntent!
   initiateRefund(input: RequestRefundDto!): Refund!
   refreshToken(refreshToken: String!): AuthResponse!
   requestOtp(input: RequestOtpInput!): MessageResponse!

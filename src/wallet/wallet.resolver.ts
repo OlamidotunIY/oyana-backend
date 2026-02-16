@@ -1,4 +1,5 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
+import { UseGuards } from '@nestjs/common';
 import { WalletService } from './wallet.service';
 import {
   WalletAccount,
@@ -10,47 +11,40 @@ import {
   CreatePaymentIntentDto,
   RequestRefundDto,
 } from '../graphql';
+import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Resolver(() => WalletAccount)
 export class WalletResolver {
   constructor(private readonly walletService: WalletService) {}
 
   @Query(() => WalletAccount, { nullable: true })
-  async myWallet(): Promise<WalletAccount | null> {
-    // TODO: Implement
-    return null;
+  @UseGuards(GqlAuthGuard)
+  async myWallet(@CurrentUser() user: any): Promise<WalletAccount | null> {
+    if (!user?.id) {
+      return null;
+    }
+
+    // Try to get existing wallet
+    let wallet = await this.walletService.getWalletByOwnerId(
+      'customer',
+      user.id,
+    );
+
+    // Auto-create wallet if it doesn't exist
+    if (!wallet) {
+      wallet = await this.walletService.createWalletForProfile(user.id);
+    }
+
+    return wallet;
   }
 
   @Query(() => [Transaction])
+  @UseGuards(GqlAuthGuard)
   async walletTransactions(
     @Args('walletAccountId') walletAccountId: string,
   ): Promise<Transaction[]> {
-    // TODO: Implement
-    return [];
-  }
-
-  @Mutation(() => WalletAccount)
-  async createWalletAccount(
-    @Args('input') input: CreateWalletAccountDto,
-  ): Promise<WalletAccount> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  @Mutation(() => Transaction)
-  async createWalletTransaction(
-    @Args('input') input: CreateTransactionDto,
-  ): Promise<Transaction> {
-    // TODO: Implement
-    throw new Error('Not implemented');
-  }
-
-  @Mutation(() => PaymentIntent)
-  async initiatePayment(
-    @Args('input') input: CreatePaymentIntentDto,
-  ): Promise<PaymentIntent> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    return this.walletService.getWalletTransactions(walletAccountId);
   }
 
   @Mutation(() => PaymentIntent)
