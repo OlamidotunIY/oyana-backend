@@ -1,14 +1,22 @@
 import { InputType, Field } from '@nestjs/graphql';
-import { KYCDocumentType } from '../../enums';
 
 @InputType()
 export class UploadKYCDocumentDto {
   @Field()
-  caseId: string;
-
-  @Field(() => KYCDocumentType)
-  documentType: KYCDocumentType;
+  kycCaseId: string;
 
   @Field()
-  uploadUrl: string;
+  docType: string;
+
+  @Field()
+  storageBucket: string;
+
+  @Field()
+  storagePath: string;
+
+  @Field({ nullable: true })
+  mimeType?: string;
+
+  @Field({ nullable: true })
+  uploadedBy?: string;
 }

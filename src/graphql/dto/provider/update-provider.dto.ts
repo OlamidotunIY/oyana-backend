@@ -1,19 +1,20 @@
 import { InputType, Field, Int, Float } from '@nestjs/graphql';
 import { ProviderStatus } from '../../enums';
+import { GraphQLBigInt } from '../../scalars';
 
 @InputType()
 export class UpdateProviderDto {
   @Field({ nullable: true })
-  displayName?: string;
+  businessName?: string;
 
   @Field({ nullable: true })
-  contactProfileId?: string;
+  profileId?: string;
 
   @Field(() => ProviderStatus, { nullable: true })
   status?: ProviderStatus;
 
-  @Field({ nullable: true })
-  minWalletThresholdMinor?: string;
+  @Field(() => GraphQLBigInt, { nullable: true })
+  minWalletThresholdMinor?: bigint;
 
   @Field(() => Float, { nullable: true })
   ratingAvg?: number;

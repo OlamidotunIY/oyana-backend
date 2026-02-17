@@ -1,5 +1,4 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { KYCDocumentType, KYCDocumentStatus } from '../../enums';
 
 @ObjectType()
 export class KYCDocument {
@@ -7,19 +6,25 @@ export class KYCDocument {
   id: string;
 
   @Field()
-  caseId: string;
-
-  @Field(() => KYCDocumentType)
-  documentType: KYCDocumentType;
+  kycCaseId: string;
 
   @Field()
-  uploadUrl: string;
+  docType: string;
 
-  @Field(() => KYCDocumentStatus)
-  status: KYCDocumentStatus;
+  @Field()
+  storageBucket: string;
+
+  @Field()
+  storagePath: string;
 
   @Field({ nullable: true })
-  verifiedAt?: Date;
+  mimeType?: string;
+
+  @Field()
+  status: string;
+
+  @Field({ nullable: true })
+  uploadedBy?: string;
 
   @Field()
   createdAt: Date;

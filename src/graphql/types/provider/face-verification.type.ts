@@ -1,9 +1,8 @@
-import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { NINVerificationStatus } from '../../enums';
+import { ObjectType, Field, ID, Float } from '@nestjs/graphql';
 import { GraphQLJSON } from 'graphql-scalars';
 
 @ObjectType()
-export class NINVerification {
+export class FaceVerification {
   @Field(() => ID)
   id: string;
 
@@ -14,16 +13,7 @@ export class NINVerification {
   providerId: string;
 
   @Field()
-  ninHash: string;
-
-  @Field({ nullable: true })
-  firstName?: string;
-
-  @Field({ nullable: true })
-  lastName?: string;
-
-  @Field({ nullable: true })
-  dateOfBirth?: Date;
+  status: string;
 
   @Field({ nullable: true })
   vendor?: string;
@@ -31,11 +21,14 @@ export class NINVerification {
   @Field({ nullable: true })
   vendorReference?: string;
 
-  @Field(() => NINVerificationStatus)
-  status: NINVerificationStatus;
-
   @Field({ nullable: true })
-  requestedAt?: Date;
+  faceImageUrl?: string;
+
+  @Field(() => Float, { nullable: true })
+  livenessScore?: number;
+
+  @Field(() => Float, { nullable: true })
+  matchScore?: number;
 
   @Field({ nullable: true })
   verifiedAt?: Date;

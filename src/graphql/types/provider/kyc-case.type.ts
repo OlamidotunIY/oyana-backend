@@ -1,5 +1,5 @@
-import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { KYCCaseType, KYCCaseStatus } from '../../enums';
+import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
+import { KYCCaseStatus } from '../../enums';
 
 @ObjectType()
 export class KYCCase {
@@ -9,11 +9,29 @@ export class KYCCase {
   @Field()
   providerId: string;
 
-  @Field(() => KYCCaseType)
-  caseType: KYCCaseType;
-
   @Field(() => KYCCaseStatus)
   status: KYCCaseStatus;
+
+  @Field(() => Int)
+  kycLevel: number;
+
+  @Field()
+  ninVerified: boolean;
+
+  @Field()
+  phoneVerified: boolean;
+
+  @Field()
+  faceVerified: boolean;
+
+  @Field()
+  vehicleVerified: boolean;
+
+  @Field()
+  documentsVerified: boolean;
+
+  @Field({ nullable: true })
+  submittedAt?: Date;
 
   @Field({ nullable: true })
   rejectionReason?: string;
@@ -23,6 +41,9 @@ export class KYCCase {
 
   @Field({ nullable: true })
   reviewedAt?: Date;
+
+  @Field({ nullable: true })
+  lastVerificationAttempt?: Date;
 
   @Field()
   createdAt: Date;

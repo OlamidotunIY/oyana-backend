@@ -4,12 +4,6 @@ import { WalletService } from './wallet.service';
 import {
   WalletAccount,
   Transaction,
-  PaymentIntent,
-  Refund,
-  CreateWalletAccountDto,
-  CreateTransactionDto,
-  CreatePaymentIntentDto,
-  RequestRefundDto,
 } from '../graphql';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';

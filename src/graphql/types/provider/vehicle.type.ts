@@ -1,5 +1,6 @@
-import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { VehicleType, VehicleStatus } from '../../enums';
+import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
+import { VehicleCategory, VehicleStatus } from '../../enums';
+import { GraphQLBigInt } from '../../scalars';
 
 @ObjectType()
 export class Vehicle {
@@ -9,11 +10,11 @@ export class Vehicle {
   @Field()
   providerId: string;
 
-  @Field()
-  registrationNumber: string;
+  @Field(() => VehicleCategory)
+  category: VehicleCategory;
 
-  @Field(() => VehicleType)
-  vehicleType: VehicleType;
+  @Field({ nullable: true })
+  plateNumber?: string;
 
   @Field({ nullable: true })
   make?: string;
@@ -22,10 +23,13 @@ export class Vehicle {
   model?: string;
 
   @Field({ nullable: true })
-  year?: number;
-
-  @Field({ nullable: true })
   color?: string;
+
+  @Field(() => Int, { nullable: true })
+  capacityKg?: number;
+
+  @Field(() => GraphQLBigInt, { nullable: true })
+  capacityVolumeCm3?: bigint;
 
   @Field(() => VehicleStatus)
   status: VehicleStatus;

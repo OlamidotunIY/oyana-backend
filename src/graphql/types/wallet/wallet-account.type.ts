@@ -10,9 +10,6 @@ export class WalletAccount {
   @Field({ nullable: true })
   ownerProfileId?: string;
 
-  @Field({ nullable: true })
-  ownerProviderId?: string;
-
   @Field()
   currency: string;
 

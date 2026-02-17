@@ -1,28 +1,23 @@
 import { ObjectType, Field, ID, Int, Float } from '@nestjs/graphql';
-import { ProviderType, ProviderStatus } from '../../enums';
+import { GraphQLBigInt } from '../../scalars';
+import { ProviderStatus } from '../../enums';
 
 @ObjectType()
 export class Provider {
   @Field(() => ID)
   id: string;
 
-  @Field(() => ProviderType)
-  type: ProviderType;
-
   @Field()
-  legalName: string;
+  businessName: string;
 
   @Field({ nullable: true })
-  displayName?: string;
-
-  @Field({ nullable: true })
-  contactProfileId?: string;
+  profileId?: string;
 
   @Field(() => ProviderStatus)
   status: ProviderStatus;
 
-  @Field()
-  minWalletThresholdMinor: string;
+  @Field(() => GraphQLBigInt)
+  minWalletThresholdMinor: bigint;
 
   @Field(() => Float)
   ratingAvg: number;

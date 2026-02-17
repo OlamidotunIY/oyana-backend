@@ -1,16 +1,17 @@
-import { InputType, Field } from '@nestjs/graphql';
-import { VehicleType } from '../../enums';
+import { InputType, Field, Int } from '@nestjs/graphql';
+import { VehicleCategory } from '../../enums';
+import { GraphQLBigInt } from '../../scalars';
 
 @InputType()
 export class CreateVehicleDto {
   @Field()
   providerId: string;
 
-  @Field()
-  registrationNumber: string;
+  @Field(() => VehicleCategory)
+  category: VehicleCategory;
 
-  @Field(() => VehicleType)
-  vehicleType: VehicleType;
+  @Field({ nullable: true })
+  plateNumber?: string;
 
   @Field({ nullable: true })
   make?: string;
@@ -19,8 +20,11 @@ export class CreateVehicleDto {
   model?: string;
 
   @Field({ nullable: true })
-  year?: number;
-
-  @Field({ nullable: true })
   color?: string;
+
+  @Field(() => Int, { nullable: true })
+  capacityKg?: number;
+
+  @Field(() => GraphQLBigInt, { nullable: true })
+  capacityVolumeCm3?: bigint;
 }

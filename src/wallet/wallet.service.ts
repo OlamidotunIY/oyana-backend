@@ -15,7 +15,6 @@ export class WalletService {
 
     const wallet = await this.prisma.walletAccount.findFirst({
       where: {
-        ownerType: user?.userType,
         ownerProfileId: ownerId,
       },
     });
@@ -24,7 +23,6 @@ export class WalletService {
       return await this.prisma.$transaction(async (prisma) => {
         const newWallet = await prisma.walletAccount.create({
           data: {
-            ownerType: user?.userType as any,
             ownerProfileId: ownerId,
             currency: 'NGN', // Default currency, can be changed later
           },
@@ -33,7 +31,6 @@ export class WalletService {
         return {
           id: newWallet.id,
           ownerProfileId: newWallet.ownerProfileId || undefined,
-          ownerProviderId: newWallet.ownerProviderId || undefined,
           currency: newWallet.currency,
           balanceMinor: newWallet.balanceMinor,
           escrowMinor: newWallet.escrowMinor,
@@ -47,7 +44,6 @@ export class WalletService {
     return {
       id: wallet.id,
       ownerProfileId: wallet.ownerProfileId || undefined,
-      ownerProviderId: wallet.ownerProviderId || undefined,
       currency: wallet.currency,
       balanceMinor: wallet.balanceMinor,
       escrowMinor: wallet.escrowMinor,

@@ -1,20 +1,14 @@
 import { InputType, Field } from '@nestjs/graphql';
-import { ProviderType } from '../../enums';
+import { GraphQLBigInt } from '../../scalars';
 
 @InputType()
 export class CreateProviderDto {
-  @Field(() => ProviderType)
-  type: ProviderType;
-
   @Field()
-  legalName: string;
+  businessName: string;
 
   @Field({ nullable: true })
-  displayName?: string;
+  profileId?: string;
 
-  @Field({ nullable: true })
-  contactProfileId?: string;
-
-  @Field()
-  minWalletThresholdMinor: string;
+  @Field(() => GraphQLBigInt, { nullable: true })
+  minWalletThresholdMinor?: bigint;
 }

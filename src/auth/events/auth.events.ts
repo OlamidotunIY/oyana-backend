@@ -46,10 +46,7 @@ export class AuthEventsListener {
         const provider = await this.prisma.provider.create({
           data: {
             businessName: event.businessName,
-            businessAddress: event.businessAddress,
-            legalName: event.businessName,
-            displayName: event.businessName,
-            contactProfileId: event.userId,
+            profileId: event.userId,
             status: 'pending',
           },
         });

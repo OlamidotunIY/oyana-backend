@@ -3,23 +3,20 @@ import { InputType, Field } from '@nestjs/graphql';
 @InputType()
 export class VerifyNINDto {
   @Field()
-  profileId: string;
+  kycCaseId: string;
 
   @Field()
-  ninNumber: string;
+  providerId: string;
 
   @Field()
-  firstName: string;
-
-  @Field()
-  lastName: string;
+  ninHash: string;
 
   @Field({ nullable: true })
-  middleName?: string;
-
-  @Field()
-  dateOfBirth: Date;
+  firstName?: string;
 
   @Field({ nullable: true })
-  gender?: string;
+  lastName?: string;
+
+  @Field({ nullable: true })
+  dateOfBirth?: Date;
 }

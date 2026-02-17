@@ -1,9 +1,8 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { NINVerificationStatus } from '../../enums';
 import { GraphQLJSON } from 'graphql-scalars';
 
 @ObjectType()
-export class NINVerification {
+export class VehicleVerification {
   @Field(() => ID)
   id: string;
 
@@ -13,17 +12,14 @@ export class NINVerification {
   @Field()
   providerId: string;
 
+  @Field({ nullable: true })
+  vehicleId?: string;
+
   @Field()
-  ninHash: string;
+  plateNumber: string;
 
-  @Field({ nullable: true })
-  firstName?: string;
-
-  @Field({ nullable: true })
-  lastName?: string;
-
-  @Field({ nullable: true })
-  dateOfBirth?: Date;
+  @Field()
+  status: string;
 
   @Field({ nullable: true })
   vendor?: string;
@@ -31,14 +27,20 @@ export class NINVerification {
   @Field({ nullable: true })
   vendorReference?: string;
 
-  @Field(() => NINVerificationStatus)
-  status: NINVerificationStatus;
+  @Field()
+  registrationVerified: boolean;
 
-  @Field({ nullable: true })
-  requestedAt?: Date;
+  @Field()
+  insuranceVerified: boolean;
+
+  @Field()
+  roadworthinessVerified: boolean;
 
   @Field({ nullable: true })
   verifiedAt?: Date;
+
+  @Field({ nullable: true })
+  expiresAt?: Date;
 
   @Field({ nullable: true })
   failureReason?: string;
