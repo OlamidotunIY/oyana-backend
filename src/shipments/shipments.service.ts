@@ -2,12 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {
   CreateShipmentDto,
+  KYCCase,
+  KYCCaseStatus,
+  ProviderDashboardQuary,
   Shipment,
   ShipmentDashboard,
   ShipmentQueryFilter,
   ShipmentScheduleType,
   ShipmentStatus,
   UpdateShipmentDto,
+  WalletAccount,
 } from '../graphql';
 import type { Prisma, Shipment as PrismaShipment } from '@prisma/client';
 
@@ -141,6 +145,23 @@ export class ShipmentsService {
           },
         },
       ],
+    };
+  }
+
+  private buildProviderShipmentWhereFilter(
+    providerId: string,
+    filter: ShipmentQueryFilter | undefined,
+    now: Date,
+  ): Prisma.ShipmentWhereInput {
+    const baseFilter = this.buildShipmentWhereFilter(filter, now);
+
+    return {
+      assignment: {
+        is: {
+          providerId,
+        },
+      },
+      ...(baseFilter ?? {}),
     };
   }
 
@@ -290,6 +311,239 @@ export class ShipmentsService {
     };
   }
 
+  async getProviderDashboardQuary(
+    profileId: string,
+  ): Promise<ProviderDashboardQuary> {
+    const now = new Date();
+    const monthStart = this.getMonthStartUtc(now);
+    const providerId = await this.resolveProviderIdForProfile(profileId);
+    const wallet = await this.getOrCreateWalletAccount(profileId);
+
+    if (!providerId) {
+      return {
+        myShipmentDashboard: {
+          summary: {
+            totalShipments: 0,
+            activeShipments: 0,
+            completedThisMonth: 0,
+            pendingPaymentCount: 0,
+            pendingPaymentAmountMinor: BigInt(0),
+            pendingPaymentCurrency:
+              wallet?.currency ??
+              this.getAllowedShipmentCurrencies()[0] ??
+              'NGN',
+          },
+          recentShipments: [],
+        },
+        myWallet: wallet,
+        kycCases: [],
+        activeAssignments: [],
+        completedShipments: [],
+      };
+    }
+
+    const [
+      totalShipments,
+      activeShipments,
+      completedThisMonth,
+      pendingPaymentShipments,
+      recentShipments,
+      activeAssignments,
+      completedShipments,
+      kycCases,
+    ] = await Promise.all([
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.totalShipments',
+        () =>
+          this.prisma.shipment.count({
+            where: {
+              assignment: {
+                is: {
+                  providerId,
+                },
+              },
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.activeShipments',
+        () =>
+          this.prisma.shipment.count({
+            where: {
+              assignment: {
+                is: {
+                  providerId,
+                },
+              },
+              status: {
+                in: ShipmentsService.ACTIVE_STATUSES,
+              },
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.completedThisMonth',
+        () =>
+          this.prisma.shipment.count({
+            where: {
+              assignment: {
+                is: {
+                  providerId,
+                },
+              },
+              status: {
+                in: ShipmentsService.COMPLETED_STATUSES,
+              },
+              updatedAt: {
+                gte: monthStart,
+              },
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.pendingPaymentShipments',
+        () =>
+          this.prisma.shipment.findMany({
+            where: {
+              assignment: {
+                is: {
+                  providerId,
+                },
+              },
+              requiresEscrow: true,
+              status: {
+                in: ShipmentsService.PENDING_PAYMENT_STATUSES,
+              },
+            },
+            select: {
+              finalPriceMinor: true,
+              quotedPriceMinor: true,
+              pricingCurrency: true,
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.recentShipments',
+        () =>
+          this.prisma.shipment.findMany({
+            where: {
+              assignment: {
+                is: {
+                  providerId,
+                },
+              },
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+            take: 6,
+            select: {
+              id: true,
+              trackingCode: true,
+              status: true,
+              mode: true,
+              scheduledAt: true,
+              createdAt: true,
+              pickupAddress: {
+                select: {
+                  address: true,
+                  city: true,
+                },
+              },
+              dropoffAddress: {
+                select: {
+                  address: true,
+                  city: true,
+                },
+              },
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.activeAssignments',
+        () =>
+          this.prisma.shipment.findMany({
+            where: this.buildProviderShipmentWhereFilter(
+              providerId,
+              ShipmentQueryFilter.ACTIVE,
+              now,
+            ),
+            orderBy: {
+              createdAt: 'desc',
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.completedShipments',
+        () =>
+          this.prisma.shipment.findMany({
+            where: this.buildProviderShipmentWhereFilter(
+              providerId,
+              ShipmentQueryFilter.HISTORY,
+              now,
+            ),
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.kycCases',
+        () =>
+          this.prisma.providerKycCase.findMany({
+            where: {
+              providerId,
+            },
+            orderBy: {
+              updatedAt: 'desc',
+            },
+          }),
+      ),
+    ]);
+
+    const pendingPaymentAmountMinor = pendingPaymentShipments.reduce<bigint>(
+      (sum, shipment) =>
+        sum + (shipment.finalPriceMinor ?? shipment.quotedPriceMinor ?? BigInt(0)),
+      BigInt(0),
+    );
+    const pendingPaymentCurrency =
+      pendingPaymentShipments[0]?.pricingCurrency ??
+      wallet?.currency ??
+      this.getAllowedShipmentCurrencies()[0] ??
+      'NGN';
+
+    return {
+      myShipmentDashboard: {
+        summary: {
+          totalShipments,
+          activeShipments,
+          completedThisMonth,
+          pendingPaymentCount: pendingPaymentShipments.length,
+          pendingPaymentAmountMinor,
+          pendingPaymentCurrency,
+        },
+        recentShipments: recentShipments.map((shipment) => ({
+          id: shipment.id,
+          trackingCode: shipment.trackingCode,
+          status: shipment.status as ShipmentStatus,
+          mode: shipment.mode,
+          scheduledAt: shipment.scheduledAt ?? undefined,
+          createdAt: shipment.createdAt,
+          pickupAddressSummary: this.toAddressSummary(shipment.pickupAddress),
+          dropoffAddressSummary: this.toAddressSummary(shipment.dropoffAddress),
+        })),
+      },
+      myWallet: wallet,
+      kycCases: kycCases.map((kycCase) => this.toGraphqlKycCase(kycCase)),
+      activeAssignments: activeAssignments.map((shipment) =>
+        this.toGraphqlShipment(shipment),
+      ),
+      completedShipments: completedShipments.map((shipment) =>
+        this.toGraphqlShipment(shipment),
+      ),
+    };
+  }
+
   async createShipment(input: CreateShipmentDto): Promise<Shipment> {
     const shipment = await this.prisma.runWithRetry(
       'ShipmentsService.createShipment',
@@ -383,6 +637,172 @@ export class ShipmentsService {
     );
 
     return this.toGraphqlShipment(shipment);
+  }
+
+  private async resolveProviderIdForProfile(
+    profileId: string,
+  ): Promise<string | null> {
+    const provider = await this.prisma.runWithRetry(
+      'ShipmentsService.resolveProviderIdForProfile.provider',
+      () =>
+        this.prisma.provider.findFirst({
+          where: {
+            profileId,
+          },
+          select: {
+            id: true,
+          },
+        }),
+    );
+
+    if (provider?.id) {
+      return provider.id;
+    }
+
+    const providerMember = await this.prisma.runWithRetry(
+      'ShipmentsService.resolveProviderIdForProfile.providerMember',
+      () =>
+        this.prisma.providerMember.findFirst({
+          where: {
+            profileId,
+            status: 'active',
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          select: {
+            providerId: true,
+          },
+        }),
+    );
+
+    return providerMember?.providerId ?? null;
+  }
+
+  private async getOrCreateWalletAccount(
+    profileId: string,
+  ): Promise<WalletAccount | null> {
+    const wallet = await this.prisma.runWithRetry(
+      'ShipmentsService.getOrCreateWalletAccount.findWallet',
+      () =>
+        this.prisma.walletAccount.findFirst({
+          where: {
+            ownerProfileId: profileId,
+          },
+        }),
+    );
+
+    if (wallet) {
+      return this.toGraphqlWalletAccount(wallet);
+    }
+
+    const profile = await this.prisma.runWithRetry(
+      'ShipmentsService.getOrCreateWalletAccount.findProfile',
+      () =>
+        this.prisma.profile.findUnique({
+          where: {
+            id: profileId,
+          },
+          select: {
+            id: true,
+          },
+        }),
+    );
+
+    if (!profile) {
+      return null;
+    }
+
+    const createdWallet = await this.prisma.runWithRetry(
+      'ShipmentsService.getOrCreateWalletAccount.createWallet',
+      () =>
+        this.prisma.walletAccount.create({
+          data: {
+            ownerProfileId: profileId,
+            currency: this.getAllowedShipmentCurrencies()[0] ?? 'NGN',
+          },
+        }),
+    );
+
+    return this.toGraphqlWalletAccount(createdWallet);
+  }
+
+  private toGraphqlWalletAccount(wallet: {
+    id: string;
+    ownerProfileId: string | null;
+    currency: string;
+    balanceMinor: bigint;
+    escrowMinor: bigint;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }): WalletAccount {
+    return {
+      id: wallet.id,
+      ownerProfileId: wallet.ownerProfileId ?? undefined,
+      currency: wallet.currency,
+      balanceMinor: wallet.balanceMinor,
+      escrowMinor: wallet.escrowMinor,
+      status: wallet.status as WalletAccount['status'],
+      createdAt: wallet.createdAt,
+      updatedAt: wallet.updatedAt,
+    };
+  }
+
+  private normalizeKycCaseStatus(status: string): KYCCaseStatus {
+    const normalizedStatus = status.toLowerCase();
+
+    if (normalizedStatus === 'pending') {
+      return KYCCaseStatus.DRAFT;
+    }
+
+    if (
+      Object.values(KYCCaseStatus).includes(
+        normalizedStatus as KYCCaseStatus,
+      )
+    ) {
+      return normalizedStatus as KYCCaseStatus;
+    }
+
+    return KYCCaseStatus.DRAFT;
+  }
+
+  private toGraphqlKycCase(kycCase: {
+    id: string;
+    providerId: string;
+    status: string;
+    kycLevel: number;
+    ninVerified: boolean;
+    phoneVerified: boolean;
+    faceVerified: boolean;
+    vehicleVerified: boolean;
+    documentsVerified: boolean;
+    submittedAt: Date | null;
+    rejectionReason: string | null;
+    reviewedBy: string | null;
+    reviewedAt: Date | null;
+    lastVerificationAttempt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }): KYCCase {
+    return {
+      id: kycCase.id,
+      providerId: kycCase.providerId,
+      status: this.normalizeKycCaseStatus(kycCase.status),
+      kycLevel: kycCase.kycLevel,
+      ninVerified: kycCase.ninVerified,
+      phoneVerified: kycCase.phoneVerified,
+      faceVerified: kycCase.faceVerified,
+      vehicleVerified: kycCase.vehicleVerified,
+      documentsVerified: kycCase.documentsVerified,
+      submittedAt: kycCase.submittedAt ?? undefined,
+      rejectionReason: kycCase.rejectionReason ?? undefined,
+      reviewedBy: kycCase.reviewedBy ?? undefined,
+      reviewedAt: kycCase.reviewedAt ?? undefined,
+      lastVerificationAttempt: kycCase.lastVerificationAttempt ?? undefined,
+      createdAt: kycCase.createdAt,
+      updatedAt: kycCase.updatedAt,
+    };
   }
 
   private generateTrackingCode(): string {

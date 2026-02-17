@@ -5,6 +5,7 @@ import { ShipmentsService } from './shipments.service';
 import {
   Shipment,
   ShipmentDashboard,
+  ProviderDashboardQuary,
   ShipmentItem,
   ShipmentQueryFilter,
   CreateShipmentDto,
@@ -43,6 +44,14 @@ export class ShipmentsResolver {
     @CurrentUser() user: User,
   ): Promise<ShipmentDashboard> {
     return this.shipmentsService.getCustomerShipmentDashboard(user.id);
+  }
+
+  @Query(() => ProviderDashboardQuary)
+  @UseGuards(GqlAuthGuard)
+  async getProviderDashboardQuary(
+    @CurrentUser() user: User,
+  ): Promise<ProviderDashboardQuary> {
+    return this.shipmentsService.getProviderDashboardQuary(user.id);
   }
 
   @Mutation(() => Shipment)

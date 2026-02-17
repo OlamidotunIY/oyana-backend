@@ -295,10 +295,19 @@ enum ProfileStatus {
   SUSPENDED
 }
 
+type ProviderDashboardQuary {
+  activeAssignments: [Shipment!]!
+  completedShipments: [Shipment!]!
+  kycCases: [KYCCase!]!
+  myShipmentDashboard: ShipmentDashboard!
+  myWallet: WalletAccount
+}
+
 type Query {
   allowedShipmentCurrencies: [String!]!
   currentAddress(lat: Float!, lng: Float!): ResolvedAddress
   dispatchBatches: [DispatchBatch!]!
+  getProviderDashboardQuary: ProviderDashboardQuary!
   kycCase(id: String!): KYCCase
   kycCases: [KYCCase!]!
   me: Profile
