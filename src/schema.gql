@@ -209,6 +209,8 @@ type Mutation {
   awardShipmentBid(input: AwardShipmentBidDto!): ShipmentBidAward!
   cancelShipment(input: CancelShipmentDto!): Shipment!
   cancelShipmentAssignment(id: String!): ShipmentAssignment!
+  confirmDropoff(shipmentId: String!): Shipment!
+  confirmPickup(shipmentId: String!): Shipment!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
   createKycCase(providerId: String!): KYCCase!
   createShipment(input: CreateShipmentDto!): Shipment!
@@ -217,6 +219,7 @@ type Mutation {
   createUserAddress(input: CreateUserAddressDto!): UserAddress!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
   initiateNinVerification(input: VerifyNINDto!): NINVerification!
+  markEnRoutePickup(shipmentId: String!): Shipment!
   refreshToken(refreshToken: String!): AuthResponse!
   requestOtp(input: RequestOtpInput!): MessageResponse!
   resetPassword(input: ResetPasswordInput!): MessageResponse!
@@ -565,6 +568,7 @@ enum TransactionType {
 }
 
 input UpdateDispatchOfferDto {
+  offerId: String!
   providerEtaMinutes: Float
   respondedAt: DateTime
   status: DispatchOfferStatus!

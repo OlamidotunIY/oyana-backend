@@ -1,8 +1,11 @@
-import { InputType, Field } from '@nestjs/graphql';
+import { Field, InputType } from '@nestjs/graphql';
 import { DispatchOfferStatus } from '../../enums';
 
 @InputType()
 export class UpdateDispatchOfferDto {
+  @Field()
+  offerId: string;
+
   @Field(() => DispatchOfferStatus)
   status: DispatchOfferStatus;
 
