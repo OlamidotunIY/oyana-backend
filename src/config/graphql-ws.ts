@@ -6,9 +6,10 @@ import { ApolloServerPluginUsageReporting } from '@apollo/server/plugin/usageRep
 import { ApolloServerPluginSchemaReporting } from '@apollo/server/plugin/schemaReporting';
 import { ApolloServerPluginInlineTrace } from '@apollo/server/plugin/inlineTrace';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { UnauthorizedException } from '@nestjs/common';
+import { HttpException, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
+import { randomUUID } from 'crypto';
 import { join } from 'path';
 import type { Context } from 'graphql-ws';
 import { SupabaseModule } from 'src/auth/supabase/supabase.module';
@@ -23,6 +24,129 @@ type WsExtra = {
 
 type WsContext = Context<Record<string, unknown> | undefined, WsExtra>;
 
+type ParsedGraphQLError = {
+  message: string;
+  details?: string[];
+  statusCode?: number;
+};
+
+function mapStatusCodeToGraphQLCode(statusCode?: number): string {
+  if (!statusCode) {
+    return 'INTERNAL_SERVER_ERROR';
+  }
+
+  if (statusCode === 400) return 'BAD_USER_INPUT';
+  if (statusCode === 401) return 'UNAUTHENTICATED';
+  if (statusCode === 403) return 'FORBIDDEN';
+  if (statusCode === 404) return 'NOT_FOUND';
+  if (statusCode === 409) return 'CONFLICT';
+  if (statusCode === 429) return 'TOO_MANY_REQUESTS';
+  if (statusCode >= 500) return 'INTERNAL_SERVER_ERROR';
+
+  return 'BAD_USER_INPUT';
+}
+
+function extractRequestIdFromHeaders(
+  headers?: Record<string, unknown>,
+): string {
+  if (!headers) {
+    return randomUUID();
+  }
+
+  const headerValue =
+    headers['x-request-id'] ??
+    headers['X-Request-Id'] ??
+    headers['x-requestid'];
+
+  if (Array.isArray(headerValue)) {
+    const value = headerValue.find(
+      (item): item is string => typeof item === 'string' && item.trim().length > 0,
+    );
+    return value?.trim() ?? randomUUID();
+  }
+
+  if (typeof headerValue === 'string' && headerValue.trim().length > 0) {
+    return headerValue.trim();
+  }
+
+  return randomUUID();
+}
+
+function parseGraphQLError(error: unknown): ParsedGraphQLError {
+  if (error instanceof HttpException) {
+    const statusCode = error.getStatus();
+    const response = error.getResponse();
+
+    if (typeof response === 'string') {
+      return {
+        message: response,
+        statusCode,
+      };
+    }
+
+    if (response && typeof response === 'object') {
+      const responseObject = response as Record<string, unknown>;
+      const responseMessage = responseObject.message;
+
+      if (Array.isArray(responseMessage)) {
+        const details = responseMessage
+          .map((value) =>
+            typeof value === 'string'
+              ? value
+              : value && typeof value === 'object'
+                ? JSON.stringify(value)
+                : String(value),
+          )
+          .filter((value) => value.trim().length > 0);
+
+        if (details.length) {
+          return {
+            message: details[0],
+            details,
+            statusCode,
+          };
+        }
+      }
+
+      if (typeof responseMessage === 'string' && responseMessage.trim().length > 0) {
+        return {
+          message: responseMessage,
+          statusCode,
+        };
+      }
+
+      const responseError = responseObject.error;
+      if (typeof responseError === 'string' && responseError.trim().length > 0) {
+        return {
+          message: responseError,
+          statusCode,
+        };
+      }
+    }
+
+    return {
+      message: error.message,
+      statusCode,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+    };
+  }
+
+  if (typeof error === 'string') {
+    return {
+      message: error,
+    };
+  }
+
+  return {
+    message: 'Internal server error',
+  };
+}
+
 export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
   imports: [ConfigModule, SupabaseModule],
   inject: [ConfigService, SupabaseService],
@@ -32,6 +156,72 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
     supabaseService: SupabaseService,
   ) => {
     const isProduction = configService.get('NODE_ENV') === 'production';
+    const logger = new Logger('GraphQL');
+    const graphQLErrorLoggingPlugin = {
+      async requestDidStart() {
+        return {
+          didEncounterErrors(requestContext: any) {
+            const contextValue = requestContext.contextValue as
+              | {
+                  requestId?: string;
+                  req?: { user?: { id?: string }; url?: string };
+                  user?: { id?: string };
+                }
+              | undefined;
+            const requestId = contextValue?.requestId ?? randomUUID();
+            const operationName =
+              requestContext.operationName ??
+              requestContext.request?.operationName ??
+              'anonymous';
+            const operationType = requestContext.operation?.operation ?? 'unknown';
+            const userId =
+              contextValue?.req?.user?.id ?? contextValue?.user?.id ?? 'anonymous';
+
+            for (const graphQLError of requestContext.errors ?? []) {
+              const parsedError = parseGraphQLError(
+                graphQLError.originalError ?? graphQLError,
+              );
+              const errorPath = Array.isArray(graphQLError.path)
+                ? graphQLError.path.join('.')
+                : 'unknown';
+              const code =
+                (graphQLError.extensions?.code as string | undefined) ??
+                'INTERNAL_SERVER_ERROR';
+              const message = `[${requestId}] GraphQL ${operationType} ${operationName} failed at ${errorPath}: ${parsedError.message} (code=${code}, status=${parsedError.statusCode ?? 'n/a'}, user=${userId})`;
+              const stack = !isProduction
+                ? ((graphQLError.originalError as Error | undefined)?.stack ??
+                  (graphQLError as Error).stack)
+                : undefined;
+
+              if (stack) {
+                logger.error(message, stack);
+              } else {
+                logger.error(message);
+              }
+
+              if (parsedError.details?.length) {
+                logger.warn(
+                  `[${requestId}] GraphQL validation details: ${parsedError.details.join(' | ')}`,
+                );
+              }
+
+              if (
+                graphQLError.extensions &&
+                !Object.prototype.hasOwnProperty.call(
+                  graphQLError.extensions,
+                  'requestId',
+                )
+              ) {
+                (
+                  graphQLError.extensions as Record<string, unknown>
+                ).requestId = requestId;
+              }
+            }
+          },
+        };
+      },
+    };
+
     return {
       playground: false, // Disabled in favor of Apollo Sandbox
       plugins: [
@@ -50,6 +240,7 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
               ApolloServerPluginInlineTrace(),
             ]
           : []),
+        graphQLErrorLoggingPlugin,
       ],
       autoSchemaFile: isProduction
         ? true
@@ -57,12 +248,21 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
       sortSchema: true,
       context: (ctx) => {
         if ('req' in ctx && ctx.req) {
-          return ctx;
+          const requestId = extractRequestIdFromHeaders(
+            (ctx.req.headers ?? {}) as Record<string, unknown>,
+          );
+
+          return {
+            ...ctx,
+            requestId,
+          };
         }
 
         const wsContext = ctx as WsContext;
+        const headers = wsContext.extra?.headers ?? {};
+        const requestId = extractRequestIdFromHeaders(headers);
         const req = {
-          headers: wsContext.extra?.headers ?? {},
+          headers,
           user: wsContext.extra?.user,
         };
 
@@ -71,6 +271,36 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
           user: wsContext.extra?.user,
           connectionParams: wsContext.connectionParams,
           extra: wsContext.extra,
+          requestId,
+        };
+      },
+      formatError: (formattedError, error) => {
+        const parsedError = parseGraphQLError(error.originalError ?? error);
+        const requestId =
+          (error.extensions?.requestId as string | undefined) ??
+          (formattedError.extensions?.requestId as string | undefined) ??
+          randomUUID();
+        const defaultCode = mapStatusCodeToGraphQLCode(parsedError.statusCode);
+        const code =
+          (formattedError.extensions?.code as string | undefined) ?? defaultCode;
+        const extensions: Record<string, unknown> = {
+          ...(formattedError.extensions ?? {}),
+          code,
+          requestId,
+        };
+
+        if (parsedError.statusCode) {
+          extensions.statusCode = parsedError.statusCode;
+        }
+
+        if (parsedError.details?.length) {
+          extensions.details = parsedError.details;
+        }
+
+        return {
+          ...formattedError,
+          message: parsedError.message || formattedError.message,
+          extensions,
         };
       },
       subscriptions: {

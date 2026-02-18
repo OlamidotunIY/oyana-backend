@@ -11,9 +11,15 @@ import {
   ShipmentScheduleType,
   ShipmentStatus,
   UpdateShipmentDto,
+  Vehicle,
+  VehicleStatus,
   WalletAccount,
 } from '../graphql';
-import type { Prisma, Shipment as PrismaShipment } from '@prisma/client';
+import type {
+  Prisma,
+  Shipment as PrismaShipment,
+  Vehicle as PrismaVehicle,
+} from '@prisma/client';
 
 @Injectable()
 export class ShipmentsService {
@@ -171,6 +177,20 @@ export class ShipmentsService {
       () =>
         this.prisma.shipment.findUnique({
           where: { id },
+          include: {
+            pickupAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+            dropoffAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+          },
         }),
     );
 
@@ -178,7 +198,11 @@ export class ShipmentsService {
       return null;
     }
 
-    return this.toGraphqlShipment(shipment);
+    return {
+      ...this.toGraphqlShipment(shipment),
+      pickupAddressSummary: this.toAddressSummary(shipment.pickupAddress),
+      dropoffAddressSummary: this.toAddressSummary(shipment.dropoffAddress),
+    };
   }
 
   async getCustomerShipmentDashboard(
@@ -339,6 +363,7 @@ export class ShipmentsService {
         kycCases: [],
         activeAssignments: [],
         completedShipments: [],
+        vehicles: [],
       };
     }
 
@@ -351,6 +376,7 @@ export class ShipmentsService {
       activeAssignments,
       completedShipments,
       kycCases,
+      vehicles,
     ] = await Promise.all([
       this.prisma.runWithRetry(
         'ShipmentsService.getProviderDashboardQuary.totalShipments',
@@ -499,6 +525,18 @@ export class ShipmentsService {
             },
           }),
       ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getProviderDashboardQuary.vehicles',
+        () =>
+          this.prisma.vehicle.findMany({
+            where: {
+              providerId,
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          }),
+      ),
     ]);
 
     const pendingPaymentAmountMinor = pendingPaymentShipments.reduce<bigint>(
@@ -541,6 +579,7 @@ export class ShipmentsService {
       completedShipments: completedShipments.map((shipment) =>
         this.toGraphqlShipment(shipment),
       ),
+      vehicles: vehicles.map((vehicle) => this.toGraphqlVehicle(vehicle)),
     };
   }
 
@@ -833,6 +872,24 @@ export class ShipmentsService {
       cancelledAt: shipment.cancelledAt ?? undefined,
       cancelledByProfileId: shipment.cancelledByProfileId ?? undefined,
       cancellationReason: shipment.cancellationReason ?? undefined,
+    };
+  }
+
+  private toGraphqlVehicle(vehicle: PrismaVehicle): Vehicle {
+    const status =
+      vehicle.status && Object.values(VehicleStatus).includes(vehicle.status as VehicleStatus)
+        ? (vehicle.status as VehicleStatus)
+        : VehicleStatus.ACTIVE;
+
+    return {
+      ...vehicle,
+      plateNumber: vehicle.plateNumber ?? undefined,
+      make: vehicle.make ?? undefined,
+      model: vehicle.model ?? undefined,
+      color: vehicle.color ?? undefined,
+      capacityKg: vehicle.capacityKg ?? undefined,
+      capacityVolumeCm3: vehicle.capacityVolumeCm3 ?? undefined,
+      status,
     };
   }
 

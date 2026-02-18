@@ -6,8 +6,8 @@ export class CreateShipmentBidDto {
   @Field()
   shipmentId: string;
 
-  @Field()
-  providerId: string;
+  @Field({ nullable: true })
+  providerId?: string;
 
   @Field(() => GraphQLBigInt)
   amountMinor: bigint;

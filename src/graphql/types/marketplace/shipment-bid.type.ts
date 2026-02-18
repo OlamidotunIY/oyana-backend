@@ -1,6 +1,8 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { BidStatus } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
+import { Shipment } from '../shipment/shipment.type';
+import { ShipmentBidAward } from './shipment-bid-award.type';
 
 @ObjectType()
 export class ShipmentBid {
@@ -24,6 +26,12 @@ export class ShipmentBid {
 
   @Field(() => BidStatus)
   status: BidStatus;
+
+  @Field(() => Shipment, { nullable: true })
+  shipment?: Shipment;
+
+  @Field(() => ShipmentBidAward, { nullable: true })
+  award?: ShipmentBidAward;
 
   @Field()
   createdAt: Date;

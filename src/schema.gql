@@ -33,7 +33,7 @@ type AuthResponse {
 }
 
 input AwardShipmentBidDto {
-  awardedByProfileId: String!
+  awardedByProfileId: String
   bidId: String!
   notes: String
   shipmentId: String!
@@ -73,7 +73,7 @@ input CreateShipmentBidDto {
   amountMinor: BigInt!
   currency: String
   message: String
-  providerId: String!
+  providerId: String
   shipmentId: String!
 }
 
@@ -199,6 +199,22 @@ enum KycCaseStatus {
   SUBMITTED
 }
 
+input MarketplaceShipmentsFilterDto {
+  cargoQuery: String
+  cursor: String
+  distanceKmMax: Int
+  routeQuery: String
+  scheduledFrom: DateTime
+  scheduledTo: DateTime
+  take: Int
+  vehicleCategories: [VehicleCategory!]
+}
+
+type MarketplaceShipmentsResult {
+  items: [Shipment!]!
+  nextCursor: String
+}
+
 type MessageResponse {
   message: String!
   success: Boolean!
@@ -304,6 +320,7 @@ type ProviderDashboardQuary {
   kycCases: [KYCCase!]!
   myShipmentDashboard: ShipmentDashboard!
   myWallet: WalletAccount
+  vehicles: [Vehicle!]!
 }
 
 type Query {
@@ -313,6 +330,7 @@ type Query {
   getProviderDashboardQuary: ProviderDashboardQuary!
   kycCase(id: String!): KYCCase
   kycCases: [KYCCase!]!
+  marketplaceShipments(filter: MarketplaceShipmentsFilterDto): MarketplaceShipmentsResult!
   me: Profile
   myBids: [ShipmentBid!]!
   myDispatchOffers: [DispatchOffer!]!
@@ -379,12 +397,14 @@ type Shipment {
   createdAt: DateTime!
   customerProfileId: String!
   dropoffAddressId: String!
+  dropoffAddressSummary: String
   finalPriceMinor: BigInt
   id: ID!
   mode: ShipmentMode!
   packageDescription: String
   packageValueMinor: BigInt
   pickupAddressId: String!
+  pickupAddressSummary: String
   pricingCurrency: String!
   quotedPriceMinor: BigInt
   requiresEscrow: Boolean!
@@ -423,11 +443,13 @@ enum ShipmentAssignmentStatus {
 
 type ShipmentBid {
   amountMinor: BigInt!
+  award: ShipmentBidAward
   createdAt: DateTime!
   currency: String!
   id: ID!
   message: String
   providerId: String!
+  shipment: Shipment
   shipmentId: String!
   status: BidStatus!
   updatedAt: DateTime!
@@ -643,10 +665,31 @@ enum UserType {
   INDIVIDUAL
 }
 
+type Vehicle {
+  capacityKg: Int
+  capacityVolumeCm3: BigInt
+  category: VehicleCategory!
+  color: String
+  createdAt: DateTime!
+  id: ID!
+  make: String
+  model: String
+  plateNumber: String
+  providerId: String!
+  status: VehicleStatus!
+  updatedAt: DateTime!
+}
+
 enum VehicleCategory {
   BIKE
   TRUCK
   VAN
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
 }
 
 input VerifyNINDto {

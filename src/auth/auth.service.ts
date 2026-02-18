@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { User } from '@supabase/supabase-js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -26,6 +27,8 @@ import { Response as ExpressResponse } from 'express';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly configService: ConfigService,
@@ -278,6 +281,13 @@ export class AuthService {
     accessToken: string,
     refreshToken: string,
   ): void {
+    if (!response || response.headersSent || response.writableEnded) {
+      this.logger.warn(
+        'Skipping auth cookie set because headers are already sent or response is closed.',
+      );
+      return;
+    }
+
     const isProduction = this.configService.get('NODE_ENV') === 'production';
 
     response.cookie('oyana-accessToken', accessToken, {

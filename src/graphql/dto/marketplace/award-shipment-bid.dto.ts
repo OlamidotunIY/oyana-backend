@@ -8,8 +8,8 @@ export class AwardShipmentBidDto {
   @Field()
   shipmentId: string;
 
-  @Field()
-  awardedByProfileId: string;
+  @Field({ nullable: true })
+  awardedByProfileId?: string;
 
   @Field({ nullable: true })
   notes?: string;

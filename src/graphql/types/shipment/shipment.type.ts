@@ -37,6 +37,12 @@ export class Shipment {
   dropoffAddressId: string;
 
   @Field({ nullable: true })
+  pickupAddressSummary?: string;
+
+  @Field({ nullable: true })
+  dropoffAddressSummary?: string;
+
+  @Field({ nullable: true })
   scheduledAt?: Date;
 
   @Field({ nullable: true })
