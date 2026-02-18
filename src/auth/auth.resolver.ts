@@ -1,16 +1,21 @@
 import { Resolver, Mutation, Args, Context } from '@nestjs/graphql';
+import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { Response as ExpressResponse } from 'express';
+import type { User } from '@supabase/supabase-js';
 import { AuthService } from './auth.service';
 import {
   SignUpInput,
   SignInInput,
   RequestOtpInput,
   VerifyOtpInput,
+  RequestPhoneOtpInput,
+  VerifyPhoneOtpInput,
   ForgotPasswordInput,
   ResetPasswordInput,
-  CompleteSignupInput,
 } from '../graphql/dto/auth';
 import { AuthResponse, MessageResponse } from '../graphql/types/auth';
+import { GqlAuthGuard } from './guards/gql-auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
 
 @Resolver()
 export class AuthResolver {
@@ -45,6 +50,24 @@ export class AuthResolver {
   }
 
   @Mutation(() => MessageResponse)
+  @UseGuards(GqlAuthGuard)
+  async requestPhoneOtp(
+    @CurrentUser() user: User,
+    @Args('input') input: RequestPhoneOtpInput,
+  ): Promise<MessageResponse> {
+    return this.authService.requestPhoneOtp(user.id, input);
+  }
+
+  @Mutation(() => MessageResponse)
+  @UseGuards(GqlAuthGuard)
+  async verifyPhoneOtp(
+    @CurrentUser() user: User,
+    @Args('input') input: VerifyPhoneOtpInput,
+  ): Promise<MessageResponse> {
+    return this.authService.verifyPhoneOtp(user.id, input);
+  }
+
+  @Mutation(() => MessageResponse)
   async forgotPassword(
     @Args('input') input: ForgotPasswordInput,
   ): Promise<MessageResponse> {
@@ -66,9 +89,16 @@ export class AuthResolver {
 
   @Mutation(() => AuthResponse)
   async refreshToken(
-    @Args('refreshToken') refreshToken: string,
-    @Context() context: { res: ExpressResponse },
+    @Args('refreshToken', { nullable: true }) refreshToken: string | null,
+    @Context() context: { req?: { cookies?: Record<string, string> }; res: ExpressResponse },
   ): Promise<AuthResponse> {
-    return this.authService.refreshToken(refreshToken, context.res);
+    const resolvedRefreshToken =
+      refreshToken ?? context.req?.cookies?.['oyana-refreshToken'];
+
+    if (!resolvedRefreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    return this.authService.refreshToken(resolvedRefreshToken, context.res);
   }
 }

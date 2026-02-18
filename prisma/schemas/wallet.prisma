@@ -16,6 +16,9 @@ model WalletAccount {
   ownerProfile   Profile?            @relation("ProfileWallet", fields: [ownerProfileId], references: [id])
   transactions   WalletTransaction[]
   paymentIntents PaymentIntent[]
+  cardMethods    WalletCardMethod[]
+  bankAccounts   WalletSavedBankAccount[]
+  withdrawals    WalletWithdrawal[]
 
   @@index([ownerProfileId])
   @@map("wallet_accounts")
@@ -40,6 +43,7 @@ model WalletTransaction {
   walletAccount        WalletAccount  @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
   relatedShipment      Shipment?      @relation(fields: [relatedShipmentId], references: [id])
   relatedPaymentIntent PaymentIntent? @relation(fields: [relatedPaymentIntentId], references: [id])
+  walletWithdrawal     WalletWithdrawal?
   refunds              Refund[]
 
   @@index([walletAccountId, createdAt(sort: Desc)])
@@ -69,6 +73,138 @@ model PaymentIntent {
   @@index([walletAccountId, createdAt(sort: Desc)])
   @@index([status])
   @@map("payment_intents")
+}
+
+model PhoneVerificationAttempt {
+  id         String   @id @default(uuid()) @db.Uuid
+  profileId  String   @map("profile_id") @db.Uuid
+  phoneE164  String   @map("phone_e164")
+  provider   String
+  status     String
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([phoneE164, createdAt(sort: Desc)])
+  @@map("phone_verification_attempts")
+}
+
+model WalletCardMethod {
+  id                String   @id @default(uuid()) @db.Uuid
+  profileId         String   @map("profile_id") @db.Uuid
+  walletAccountId   String   @map("wallet_account_id") @db.Uuid
+  provider          String   @default("paystack")
+  authorizationCode String   @unique @map("authorization_code")
+  signature         String?  @map("signature")
+  cardType          String?  @map("card_type")
+  bank              String?
+  countryCode       String?  @map("country_code") @db.Char(2)
+  brand             String?
+  first6            String?  @map("first_6")
+  last4             String?  @map("last_4")
+  expMonth          String?  @map("exp_month")
+  expYear           String?  @map("exp_year")
+  reusable          Boolean  @default(true)
+  customerCode      String?  @map("customer_code")
+  channel           String?
+  metadata          Json?
+  lastUsedAt        DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  profile      Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  walletAccount WalletAccount @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([walletAccountId, createdAt(sort: Desc)])
+  @@map("wallet_card_methods")
+}
+
+model WalletSavedBankAccount {
+  id                  String   @id @default(uuid()) @db.Uuid
+  profileId           String   @map("profile_id") @db.Uuid
+  walletAccountId     String   @map("wallet_account_id") @db.Uuid
+  provider            String   @default("paystack")
+  bankCode            String   @map("bank_code")
+  bankName            String   @map("bank_name")
+  accountNumberMasked String   @map("account_number_masked")
+  accountName         String   @map("account_name")
+  recipientCode       String   @map("recipient_code")
+  metadata            Json?
+  lastUsedAt          DateTime? @map("last_used_at") @db.Timestamptz(6)
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  profile      Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  walletAccount WalletAccount    @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+  withdrawals  WalletWithdrawal[]
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([walletAccountId, createdAt(sort: Desc)])
+  @@index([recipientCode])
+  @@map("wallet_saved_bank_accounts")
+}
+
+model WalletWithdrawal {
+  id                  String    @id @default(uuid()) @db.Uuid
+  walletAccountId     String    @map("wallet_account_id") @db.Uuid
+  profileId           String    @map("profile_id") @db.Uuid
+  reference           String    @unique
+  amountMinor         BigInt    @map("amount_minor")
+  currency            String    @default("NGN") @db.Char(3)
+  status              String
+  bankCode            String?   @map("bank_code")
+  bankName            String?   @map("bank_name")
+  accountNumberMasked String?   @map("account_number_masked")
+  accountName         String?   @map("account_name")
+  recipientCode       String?   @map("recipient_code")
+  transferCode        String?   @map("transfer_code")
+  paystackTransferId  String?   @map("paystack_transfer_id")
+  failureReason       String?   @map("failure_reason")
+  rawInitResponse     Json?     @map("raw_init_response")
+  rawWebhook          Json?     @map("raw_webhook")
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz(6)
+  failedAt            DateTime? @map("failed_at") @db.Timestamptz(6)
+  relatedTransactionId String?  @unique @map("related_transaction_id") @db.Uuid
+  savedBankAccountId  String?   @map("saved_bank_account_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  walletAccount    WalletAccount          @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+  profile          Profile                @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  relatedTransaction WalletTransaction?   @relation(fields: [relatedTransactionId], references: [id])
+  savedBankAccount WalletSavedBankAccount? @relation(fields: [savedBankAccountId], references: [id], onDelete: SetNull)
+
+  @@index([walletAccountId, createdAt(sort: Desc)])
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("wallet_withdrawals")
+}
+
+model WalletIdempotencyKey {
+  id          String   @id @default(uuid()) @db.Uuid
+  profileId   String   @map("profile_id") @db.Uuid
+  operation   String
+  key         String
+  requestHash String   @map("request_hash")
+  status      String   @default("in_progress")
+  response    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, operation, key])
+  @@index([profileId, createdAt(sort: Desc)])
+  @@map("wallet_idempotency_keys")
 }
 
 model ShipmentFinancials {

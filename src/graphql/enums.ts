@@ -257,6 +257,7 @@ export enum TransactionDirection {
 
 export enum TransactionType {
   TOPUP = 'topup',
+  WITHDRAWAL = 'withdrawal',
   SHIPMENT_PAYMENT = 'shipment_payment',
   PROVIDER_PAYOUT = 'provider_payout',
   COMMISSION = 'commission',

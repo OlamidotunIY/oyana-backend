@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { User } from '@supabase/supabase-js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SupabaseService } from '../auth/supabase/supabase.service';
@@ -13,9 +14,10 @@ import {
   SignInInput,
   RequestOtpInput,
   VerifyOtpInput,
+  RequestPhoneOtpInput,
+  VerifyPhoneOtpInput,
   ForgotPasswordInput,
   ResetPasswordInput,
-  CompleteSignupInput,
   OtpMode,
   UserType,
 } from '../graphql/dto/auth';
@@ -34,6 +36,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
     private readonly userService: UserService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async signUp(input: SignUpInput): Promise<MessageResponse> {
@@ -274,6 +277,198 @@ export class AuthService {
       refreshToken: data.session.refresh_token,
       user: profile,
     };
+  }
+
+  async requestPhoneOtp(
+    profileId: string,
+    input: RequestPhoneOtpInput,
+  ): Promise<MessageResponse> {
+    const profile = await this.prisma.runWithRetry(
+      'AuthService.requestPhoneOtp.profile',
+      () =>
+        this.prisma.profile.findUnique({
+          where: { id: profileId },
+          select: {
+            id: true,
+          },
+        }),
+    );
+
+    if (!profile) {
+      throw new UnauthorizedException('Profile not found');
+    }
+
+    const supabase = this.supabaseService.getClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      phone: input.phoneE164,
+      options: {
+        shouldCreateUser: false,
+      },
+    });
+
+    if (error) {
+      await this.recordPhoneVerificationAttempt(
+        profileId,
+        input.phoneE164,
+        'failed',
+        { stage: 'request', message: error.message },
+      );
+      throw new BadRequestException(error.message);
+    }
+
+    await this.recordPhoneVerificationAttempt(
+      profileId,
+      input.phoneE164,
+      'requested',
+      { stage: 'request' },
+    );
+
+    return {
+      message: 'OTP sent to your phone number',
+      success: true,
+    };
+  }
+
+  async verifyPhoneOtp(
+    profileId: string,
+    input: VerifyPhoneOtpInput,
+  ): Promise<MessageResponse> {
+    const supabase = this.supabaseService.getClient();
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: input.phoneE164,
+      token: input.token,
+      type: 'sms',
+    });
+
+    if (error || !data.user) {
+      await this.recordPhoneVerificationAttempt(
+        profileId,
+        input.phoneE164,
+        'failed',
+        { stage: 'verify', message: error?.message ?? 'Invalid OTP' },
+      );
+      throw new UnauthorizedException(error?.message ?? 'Invalid OTP');
+    }
+
+    await this.prisma.runWithRetry('AuthService.verifyPhoneOtp.updateProfile', async () =>
+      this.prisma.$transaction(async (tx) => {
+        await tx.profile.update({
+          where: { id: profileId },
+          data: {
+            phoneE164: input.phoneE164,
+            phoneVerified: true,
+            phoneVerifiedAt: new Date(),
+          },
+        });
+
+        await this.markProviderPhoneVerified(profileId, tx);
+      }),
+    );
+
+    await this.recordPhoneVerificationAttempt(
+      profileId,
+      input.phoneE164,
+      'verified',
+      { stage: 'verify' },
+    );
+
+    return {
+      message: 'Phone number verified successfully',
+      success: true,
+    };
+  }
+
+  private async markProviderPhoneVerified(
+    profileId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    const providers = await tx.provider.findMany({
+      where: {
+        OR: [
+          {
+            profileId,
+          },
+          {
+            members: {
+              some: {
+                profileId,
+                status: 'active',
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!providers.length) {
+      return;
+    }
+
+    for (const provider of providers) {
+      const latestKycCase = await tx.providerKycCase.findFirst({
+        where: {
+          providerId: provider.id,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      if (!latestKycCase) {
+        await tx.providerKycCase.create({
+          data: {
+            providerId: provider.id,
+            status: 'pending',
+            phoneVerified: true,
+            kycLevel: 1,
+          },
+        });
+        continue;
+      }
+
+      await tx.providerKycCase.update({
+        where: {
+          id: latestKycCase.id,
+        },
+        data: {
+          phoneVerified: true,
+          kycLevel: latestKycCase.kycLevel >= 1 ? latestKycCase.kycLevel : 1,
+          lastVerificationAttempt: new Date(),
+        },
+      });
+    }
+  }
+
+  private async recordPhoneVerificationAttempt(
+    profileId: string,
+    phoneE164: string,
+    status: 'requested' | 'verified' | 'failed',
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.prisma.runWithRetry(
+        'AuthService.recordPhoneVerificationAttempt',
+        () =>
+          this.prisma.phoneVerificationAttempt.create({
+            data: {
+              profileId,
+              phoneE164,
+              provider: 'supabase',
+              status,
+              metadata,
+            },
+          }),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to write phone verification attempt for profile ${profileId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private setCookies(

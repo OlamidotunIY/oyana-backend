@@ -26,6 +26,12 @@ export class Profile {
   @Field(() => String, { nullable: true })
   phoneE164: string | null;
 
+  @Field(() => Boolean)
+  phoneVerified: boolean;
+
+  @Field(() => Date, { nullable: true })
+  phoneVerifiedAt: Date | null;
+
   @Field(() => State)
   state: State;
 
