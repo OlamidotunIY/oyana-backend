@@ -16,9 +16,14 @@ type RequestWithUser = ExpressRequest & {
   cookies?: Record<string, string>;
 };
 
+type RefreshSessionResult = Awaited<
+  ReturnType<ReturnType<SupabaseService['getClient']>['auth']['refreshSession']>
+>;
+
 @Injectable()
 export class GqlAuthGuard implements CanActivate {
   private readonly logger = new Logger(GqlAuthGuard.name);
+  private readonly refreshSessionInFlight = new Map<string, Promise<RefreshSessionResult>>();
 
   constructor(
     private readonly supabaseService: SupabaseService,
@@ -83,15 +88,23 @@ export class GqlAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired session');
     }
 
-    const { data, error } = await this.supabaseService.getClient().auth.refreshSession({
-      refresh_token: refreshToken,
-    });
+    const { data, error } = await this.refreshSession(refreshToken);
 
     if (error || !data.session || !data.user) {
       this.logger.warn(
         `Refresh session failed for GraphQL operation ${operationName ?? 'unknown'}: ${error?.message ?? 'unknown error'}`,
       );
-      this.clearAuthCookies(res);
+
+      // Refresh-token rotation can create short-lived races across parallel requests.
+      // In that case, avoid clearing cookies preemptively and let the next request settle.
+      const isRefreshReuseRace =
+        typeof error?.message === 'string' &&
+        error.message.toLowerCase().includes('already used');
+
+      if (!isRefreshReuseRace) {
+        this.clearAuthCookies(res);
+      }
+
       throw new UnauthorizedException('Invalid or expired session');
     }
 
@@ -172,5 +185,24 @@ export class GqlAuthGuard implements CanActivate {
     response: ExpressResponse | undefined,
   ): response is ExpressResponse {
     return Boolean(response && !response.headersSent && !response.writableEnded);
+  }
+
+  private async refreshSession(refreshToken: string) {
+    const inFlightRefresh = this.refreshSessionInFlight.get(refreshToken);
+    if (inFlightRefresh) {
+      return inFlightRefresh;
+    }
+
+    const refreshRequest = this.supabaseService
+      .getClient()
+      .auth.refreshSession({
+        refresh_token: refreshToken,
+      })
+      .finally(() => {
+        this.refreshSessionInFlight.delete(refreshToken);
+      });
+
+    this.refreshSessionInFlight.set(refreshToken, refreshRequest);
+    return refreshRequest;
   }
 }
