@@ -185,9 +185,12 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
               const errorPath = Array.isArray(graphQLError.path)
                 ? graphQLError.path.join('.')
                 : 'unknown';
-              const code =
+              const rawCode =
                 (graphQLError.extensions?.code as string | undefined) ??
                 'INTERNAL_SERVER_ERROR';
+              const code = parsedError.statusCode
+                ? mapStatusCodeToGraphQLCode(parsedError.statusCode)
+                : rawCode;
               const message = `[${requestId}] GraphQL ${operationType} ${operationName} failed at ${errorPath}: ${parsedError.message} (code=${code}, status=${parsedError.statusCode ?? 'n/a'}, user=${userId})`;
               const stack = !isProduction
                 ? ((graphQLError.originalError as Error | undefined)?.stack ??
@@ -290,9 +293,10 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
           (graphQLError?.extensions?.requestId as string | undefined) ??
           (formattedError.extensions?.requestId as string | undefined) ??
           randomUUID();
-        const defaultCode = mapStatusCodeToGraphQLCode(parsedError.statusCode);
-        const code =
-          (formattedError.extensions?.code as string | undefined) ?? defaultCode;
+        const rawCode = formattedError.extensions?.code as string | undefined;
+        const code = parsedError.statusCode
+          ? mapStatusCodeToGraphQLCode(parsedError.statusCode)
+          : (rawCode ?? mapStatusCodeToGraphQLCode(undefined));
         const extensions: Record<string, unknown> = {
           ...(formattedError.extensions ?? {}),
           code,
