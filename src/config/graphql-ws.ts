@@ -2,6 +2,7 @@ import {
   ApolloServerPluginLandingPageLocalDefault,
   ApolloServerPluginLandingPageProductionDefault,
 } from '@apollo/server/plugin/landingPage/default';
+import type { ApolloServerPlugin } from '@apollo/server';
 import { ApolloServerPluginUsageReporting } from '@apollo/server/plugin/usageReporting';
 import { ApolloServerPluginSchemaReporting } from '@apollo/server/plugin/schemaReporting';
 import { ApolloServerPluginInlineTrace } from '@apollo/server/plugin/inlineTrace';
@@ -157,10 +158,10 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
   ) => {
     const isProduction = configService.get('NODE_ENV') === 'production';
     const logger = new Logger('GraphQL');
-    const graphQLErrorLoggingPlugin = {
+    const graphQLErrorLoggingPlugin: ApolloServerPlugin<any> = {
       async requestDidStart() {
         return {
-          didEncounterErrors(requestContext: any) {
+          async didEncounterErrors(requestContext: any): Promise<void> {
             const contextValue = requestContext.contextValue as
               | {
                   requestId?: string;
@@ -275,9 +276,18 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
         };
       },
       formatError: (formattedError, error) => {
-        const parsedError = parseGraphQLError(error.originalError ?? error);
+        const graphQLError =
+          error && typeof error === 'object'
+            ? (error as {
+                originalError?: unknown;
+                extensions?: Record<string, unknown>;
+              })
+            : undefined;
+        const parsedError = parseGraphQLError(
+          graphQLError?.originalError ?? error,
+        );
         const requestId =
-          (error.extensions?.requestId as string | undefined) ??
+          (graphQLError?.extensions?.requestId as string | undefined) ??
           (formattedError.extensions?.requestId as string | undefined) ??
           randomUUID();
         const defaultCode = mapStatusCodeToGraphQLCode(parsedError.statusCode);
