@@ -105,6 +105,17 @@ input CreateUserAddressDto {
   placeId: String!
 }
 
+input CreateVehicleDto {
+  capacityKg: Int
+  capacityVolumeCm3: BigInt
+  category: VehicleCategory!
+  color: String
+  make: String
+  model: String
+  plateNumber: String
+  providerId: String
+}
+
 input CreateWalletFundingInput {
   amountMinor: BigInt!
   callbackUrl: String
@@ -253,11 +264,12 @@ type Mutation {
   confirmPickup(shipmentId: String!): Shipment!
   confirmWalletFunding(input: ConfirmWalletFundingInput!): WalletFundingResult!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
-  createKycCase(providerId: String!): KYCCase!
+  createKycCase(providerId: String): KYCCase!
   createShipment(input: CreateShipmentDto!): Shipment!
   createShipmentAssignment(input: AssignShipmentDto!): ShipmentAssignment!
   createShipmentBid(input: CreateShipmentBidDto!): ShipmentBid!
   createUserAddress(input: CreateUserAddressDto!): UserAddress!
+  createVehicle(input: CreateVehicleDto!): Vehicle!
   createWalletFunding(input: CreateWalletFundingInput!): WalletFundingResult!
   createWalletWithdrawal(input: CreateWalletWithdrawalInput!): WalletWithdrawal!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
@@ -760,10 +772,10 @@ enum VehicleStatus {
 input VerifyNINDto {
   dateOfBirth: DateTime
   firstName: String
-  kycCaseId: String!
+  kycCaseId: String
   lastName: String
-  ninHash: String!
-  providerId: String!
+  ninHash: String
+  providerId: String
 }
 
 input VerifyOtpInput {

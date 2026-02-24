@@ -1,10 +1,16 @@
+import { UseGuards } from '@nestjs/common';
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import type { SupabaseUser } from '../auth/supabase/supabase.types';
 import { KycService } from './kyc.service';
 import {
+  CreateVehicleDto,
   KYCCase,
   KYCDocument,
   NINVerification,
   UploadKYCDocumentDto,
+  Vehicle,
   VerifyNINDto,
 } from '../graphql';
 
@@ -13,53 +19,72 @@ export class KycResolver {
   constructor(private readonly kycService: KycService) {}
 
   @Query(() => [KYCCase])
-  async kycCases(): Promise<KYCCase[]> {
-    // TODO: Implement
-    return [];
+  @UseGuards(GqlAuthGuard)
+  async kycCases(@CurrentUser() user: SupabaseUser): Promise<KYCCase[]> {
+    return this.kycService.getKycCases(user.id);
   }
 
   @Query(() => KYCCase, { nullable: true })
-  async kycCase(@Args('id') id: string): Promise<KYCCase | null> {
-    // TODO: Implement
-    return null;
+  @UseGuards(GqlAuthGuard)
+  async kycCase(
+    @CurrentUser() user: SupabaseUser,
+    @Args('id') id: string,
+  ): Promise<KYCCase | null> {
+    return this.kycService.getKycCase(user.id, id);
   }
 
   @Mutation(() => KYCCase)
+  @UseGuards(GqlAuthGuard)
   async createKycCase(
-    @Args('providerId') providerId: string,
+    @CurrentUser() user: SupabaseUser,
+    @Args('providerId', { nullable: true }) providerId?: string,
   ): Promise<KYCCase> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    return this.kycService.createKycCase(user.id, providerId);
   }
 
   @Mutation(() => KYCCase)
-  async submitKycCase(@Args('id') id: string): Promise<KYCCase> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+  @UseGuards(GqlAuthGuard)
+  async submitKycCase(
+    @CurrentUser() user: SupabaseUser,
+    @Args('id') id: string,
+  ): Promise<KYCCase> {
+    return this.kycService.submitKycCase(user.id, id);
   }
 
   @Mutation(() => KYCCase)
+  @UseGuards(GqlAuthGuard)
   async reviewKycCase(
+    @CurrentUser() user: SupabaseUser,
     @Args('id') id: string,
     @Args('approved') approved: boolean,
   ): Promise<KYCCase> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    return this.kycService.reviewKycCase(user.id, id, approved);
   }
 
   @Mutation(() => KYCDocument)
+  @UseGuards(GqlAuthGuard)
   async uploadKycDocument(
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: UploadKYCDocumentDto,
   ): Promise<KYCDocument> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    return this.kycService.uploadKycDocument(user.id, input);
   }
 
   @Mutation(() => NINVerification)
+  @UseGuards(GqlAuthGuard)
   async initiateNinVerification(
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: VerifyNINDto,
   ): Promise<NINVerification> {
-    // TODO: Implement
-    throw new Error('Not implemented');
+    return this.kycService.initiateNinVerification(user.id, input);
+  }
+
+  @Mutation(() => Vehicle)
+  @UseGuards(GqlAuthGuard)
+  async createVehicle(
+    @CurrentUser() user: SupabaseUser,
+    @Args('input') input: CreateVehicleDto,
+  ): Promise<Vehicle> {
+    return this.kycService.createVehicle(user.id, input);
   }
 }
