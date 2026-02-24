@@ -1,8 +1,8 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
-import type { User } from '@supabase/supabase-js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import type { SupabaseUser } from '../auth/supabase/supabase.types';
 import {
   AssignShipmentDto,
   CreateDispatchBatchDto,
@@ -26,7 +26,7 @@ export class DispatchResolver {
 
   @Query(() => [DispatchOffer])
   @UseGuards(GqlAuthGuard)
-  async myDispatchOffers(@CurrentUser() user: User): Promise<DispatchOffer[]> {
+  async myDispatchOffers(@CurrentUser() user: SupabaseUser): Promise<DispatchOffer[]> {
     return this.dispatchService.myDispatchOffers(user.id);
   }
 
@@ -47,7 +47,7 @@ export class DispatchResolver {
   @Mutation(() => DispatchOffer)
   @UseGuards(GqlAuthGuard)
   async respondToDispatchOffer(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: UpdateDispatchOfferDto,
   ): Promise<DispatchOffer> {
     return this.dispatchService.respondToDispatchOffer(user.id, input);
@@ -56,7 +56,7 @@ export class DispatchResolver {
   @Mutation(() => Shipment)
   @UseGuards(GqlAuthGuard)
   async markEnRoutePickup(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<Shipment> {
     return this.dispatchService.markEnRoutePickup(user.id, shipmentId);
@@ -65,7 +65,7 @@ export class DispatchResolver {
   @Mutation(() => Shipment)
   @UseGuards(GqlAuthGuard)
   async confirmPickup(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<Shipment> {
     return this.dispatchService.confirmPickup(user.id, shipmentId);
@@ -74,7 +74,7 @@ export class DispatchResolver {
   @Mutation(() => Shipment)
   @UseGuards(GqlAuthGuard)
   async confirmDropoff(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<Shipment> {
     return this.dispatchService.confirmDropoff(user.id, shipmentId);

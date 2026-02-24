@@ -5,7 +5,6 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { User } from '@supabase/supabase-js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SupabaseService } from '../auth/supabase/supabase.service';
 import { ConfigService } from '@nestjs/config';
@@ -26,6 +25,7 @@ import { PrismaService } from '../database/prisma.service';
 import { UserSignedUpEvent } from './events/user-signed-up.event';
 import { UserService } from '../user/user.service';
 import { Response as ExpressResponse } from 'express';
+import type { SupabaseUser } from './supabase/supabase.types';
 
 @Injectable()
 export class AuthService {
@@ -141,7 +141,7 @@ export class AuthService {
     // Check if email exists in auth.users
     const { data: existingUsers } = await supabase.auth.admin.listUsers();
     const userExists = existingUsers?.users?.some(
-      (user: User) => user.email === input.email,
+      (user: SupabaseUser) => user.email === input.email,
     );
 
     if (input.mode === OtpMode.SIGNUP && userExists) {
@@ -458,7 +458,7 @@ export class AuthService {
               phoneE164,
               provider: 'supabase',
               status,
-              metadata,
+              metadata: metadata as Prisma.InputJsonValue | undefined,
             },
           }),
       );

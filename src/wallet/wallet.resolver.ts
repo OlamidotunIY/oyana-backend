@@ -1,6 +1,5 @@
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
-import type { User } from '@supabase/supabase-js';
 import { WalletService } from './wallet.service';
 import {
   ConfirmWalletFundingInput,
@@ -19,6 +18,7 @@ import {
 } from '../graphql';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { SupabaseUser } from '../auth/supabase/supabase.types';
 
 @Resolver(() => WalletAccount)
 export class WalletResolver {
@@ -26,7 +26,7 @@ export class WalletResolver {
 
   @Query(() => WalletAccount, { nullable: true })
   @UseGuards(GqlAuthGuard)
-  async myWallet(@CurrentUser() user: User): Promise<WalletAccount | null> {
+  async myWallet(@CurrentUser() user: SupabaseUser): Promise<WalletAccount | null> {
     if (!user?.id) {
       return null;
     }
@@ -37,7 +37,7 @@ export class WalletResolver {
   @Query(() => WalletCompliance)
   @UseGuards(GqlAuthGuard)
   async myWalletCompliance(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
   ): Promise<WalletCompliance> {
     return this.walletService.getWalletCompliance(user.id);
   }
@@ -45,7 +45,7 @@ export class WalletResolver {
   @Query(() => [WalletCardMethod])
   @UseGuards(GqlAuthGuard)
   async mySavedFundingCards(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
   ): Promise<WalletCardMethod[]> {
     return this.walletService.getSavedFundingCards(user.id);
   }
@@ -53,7 +53,7 @@ export class WalletResolver {
   @Query(() => [WalletSavedBankAccount])
   @UseGuards(GqlAuthGuard)
   async mySavedWithdrawalAccounts(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
   ): Promise<WalletSavedBankAccount[]> {
     return this.walletService.getSavedWithdrawalAccounts(user.id);
   }
@@ -69,7 +69,7 @@ export class WalletResolver {
   @Query(() => WalletTransactionsConnection)
   @UseGuards(GqlAuthGuard)
   async myWalletTransactions(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input', { nullable: true }) input?: WalletTransactionsInput,
   ): Promise<WalletTransactionsConnection> {
     return this.walletService.getMyWalletTransactions(user.id, input);
@@ -78,7 +78,7 @@ export class WalletResolver {
   @Query(() => [Transaction])
   @UseGuards(GqlAuthGuard)
   async walletTransactions(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('walletAccountId') walletAccountId: string,
   ): Promise<Transaction[]> {
     return this.walletService.getWalletTransactions(user.id, walletAccountId);
@@ -87,7 +87,7 @@ export class WalletResolver {
   @Mutation(() => WalletFundingResult)
   @UseGuards(GqlAuthGuard)
   async createWalletFunding(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateWalletFundingInput,
   ): Promise<WalletFundingResult> {
     return this.walletService.createWalletFunding(user.id, input);
@@ -96,7 +96,7 @@ export class WalletResolver {
   @Mutation(() => WalletFundingResult)
   @UseGuards(GqlAuthGuard)
   async confirmWalletFunding(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: ConfirmWalletFundingInput,
   ): Promise<WalletFundingResult> {
     return this.walletService.confirmWalletFunding(user.id, input);
@@ -105,7 +105,7 @@ export class WalletResolver {
   @Mutation(() => WalletWithdrawal)
   @UseGuards(GqlAuthGuard)
   async createWalletWithdrawal(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateWalletWithdrawalInput,
   ): Promise<WalletWithdrawal> {
     return this.walletService.createWalletWithdrawal(user.id, input);

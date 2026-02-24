@@ -1,6 +1,5 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
-import type { User } from '@supabase/supabase-js';
 import { ShipmentsService } from './shipments.service';
 import {
   Shipment,
@@ -15,6 +14,7 @@ import {
 } from '../graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import type { SupabaseUser } from '../auth/supabase/supabase.types';
 
 @Resolver(() => Shipment)
 export class ShipmentsResolver {
@@ -41,7 +41,7 @@ export class ShipmentsResolver {
   @Query(() => ShipmentDashboard)
   @UseGuards(GqlAuthGuard)
   async myShipmentDashboard(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
   ): Promise<ShipmentDashboard> {
     return this.shipmentsService.getCustomerShipmentDashboard(user.id);
   }
@@ -49,7 +49,7 @@ export class ShipmentsResolver {
   @Query(() => ProviderDashboardQuary)
   @UseGuards(GqlAuthGuard)
   async getProviderDashboardQuary(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
   ): Promise<ProviderDashboardQuary> {
     return this.shipmentsService.getProviderDashboardQuary(user.id);
   }
@@ -57,7 +57,7 @@ export class ShipmentsResolver {
   @Mutation(() => Shipment)
   @UseGuards(GqlAuthGuard)
   async createShipment(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateShipmentDto,
   ): Promise<Shipment> {
     return this.shipmentsService.createShipment({

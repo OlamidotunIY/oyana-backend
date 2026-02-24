@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClientLike, SupabaseUser } from './supabase.types';
 
 @Injectable()
 export class SupabaseService {
-  private supabase: SupabaseClient;
+  private supabase: SupabaseClientLike;
 
   constructor(private configService: ConfigService) {
     const supabaseUrl = this.configService.get<string>('SUPABASE_URL');
@@ -18,10 +19,13 @@ export class SupabaseService {
       );
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseKey);
+    this.supabase = createClient(
+      supabaseUrl,
+      supabaseKey,
+    ) as unknown as SupabaseClientLike;
   }
 
-  getClient(): SupabaseClient {
+  getClient(): SupabaseClientLike {
     return this.supabase;
   }
 
@@ -30,7 +34,7 @@ export class SupabaseService {
    * @param authHeader Authorization header (Bearer token)
    * @returns User object if valid, null otherwise
    */
-  async verifySession(authHeader: string | undefined) {
+  async verifySession(authHeader: string | undefined): Promise<SupabaseUser | null> {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return null;
     }

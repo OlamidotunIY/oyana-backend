@@ -1,7 +1,6 @@
 import { Resolver, Mutation, Args, Context } from '@nestjs/graphql';
 import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { Response as ExpressResponse } from 'express';
-import type { User } from '@supabase/supabase-js';
 import { AuthService } from './auth.service';
 import {
   SignUpInput,
@@ -16,6 +15,7 @@ import {
 import { AuthResponse, MessageResponse } from '../graphql/types/auth';
 import { GqlAuthGuard } from './guards/gql-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
+import type { SupabaseUser } from './supabase/supabase.types';
 
 @Resolver()
 export class AuthResolver {
@@ -52,7 +52,7 @@ export class AuthResolver {
   @Mutation(() => MessageResponse)
   @UseGuards(GqlAuthGuard)
   async requestPhoneOtp(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: RequestPhoneOtpInput,
   ): Promise<MessageResponse> {
     return this.authService.requestPhoneOtp(user.id, input);
@@ -61,7 +61,7 @@ export class AuthResolver {
   @Mutation(() => MessageResponse)
   @UseGuards(GqlAuthGuard)
   async verifyPhoneOtp(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: VerifyPhoneOtpInput,
   ): Promise<MessageResponse> {
     return this.authService.verifyPhoneOtp(user.id, input);
@@ -89,7 +89,8 @@ export class AuthResolver {
 
   @Mutation(() => AuthResponse)
   async refreshToken(
-    @Args('refreshToken', { nullable: true }) refreshToken: string | null,
+    @Args('refreshToken', { type: () => String, nullable: true })
+    refreshToken: string | null,
     @Context() context: { req?: { cookies?: Record<string, string> }; res: ExpressResponse },
   ): Promise<AuthResponse> {
     const resolvedRefreshToken =

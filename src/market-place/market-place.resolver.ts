@@ -1,6 +1,5 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
-import type { User } from '@supabase/supabase-js';
 import { MarketPlaceService } from './market-place.service';
 import {
   ShipmentBid,
@@ -13,6 +12,7 @@ import {
 } from '../graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import type { SupabaseUser } from '../auth/supabase/supabase.types';
 
 @Resolver(() => ShipmentBid)
 export class MarketPlaceResolver {
@@ -21,7 +21,7 @@ export class MarketPlaceResolver {
   @Query(() => MarketplaceShipmentsResult)
   @UseGuards(GqlAuthGuard)
   async marketplaceShipments(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('filter', { type: () => MarketplaceShipmentsFilterDto, nullable: true })
     filter?: MarketplaceShipmentsFilterDto,
   ): Promise<MarketplaceShipmentsResult> {
@@ -31,7 +31,7 @@ export class MarketPlaceResolver {
   @Query(() => [ShipmentBid])
   @UseGuards(GqlAuthGuard)
   async shipmentBids(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<ShipmentBid[]> {
     return this.marketPlaceService.shipmentBids(user.id, shipmentId);
@@ -39,14 +39,14 @@ export class MarketPlaceResolver {
 
   @Query(() => [ShipmentBid])
   @UseGuards(GqlAuthGuard)
-  async myBids(@CurrentUser() user: User): Promise<ShipmentBid[]> {
+  async myBids(@CurrentUser() user: SupabaseUser): Promise<ShipmentBid[]> {
     return this.marketPlaceService.myBids(user.id);
   }
 
   @Mutation(() => ShipmentBid)
   @UseGuards(GqlAuthGuard)
   async createShipmentBid(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateShipmentBidDto,
   ): Promise<ShipmentBid> {
     return this.marketPlaceService.createShipmentBid(user.id, input);
@@ -55,7 +55,7 @@ export class MarketPlaceResolver {
   @Mutation(() => ShipmentBid)
   @UseGuards(GqlAuthGuard)
   async updateShipmentBid(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('id') id: string,
     @Args('input') input: UpdateShipmentBidDto,
   ): Promise<ShipmentBid> {
@@ -65,7 +65,7 @@ export class MarketPlaceResolver {
   @Mutation(() => ShipmentBid)
   @UseGuards(GqlAuthGuard)
   async withdrawBid(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('id') id: string,
   ): Promise<ShipmentBid> {
     return this.marketPlaceService.withdrawBid(user.id, id);
@@ -74,7 +74,7 @@ export class MarketPlaceResolver {
   @Mutation(() => ShipmentBidAward)
   @UseGuards(GqlAuthGuard)
   async awardShipmentBid(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: AwardShipmentBidDto,
   ): Promise<ShipmentBidAward> {
     return this.marketPlaceService.awardShipmentBid(user.id, input);

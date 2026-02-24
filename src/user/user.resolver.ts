@@ -5,7 +5,7 @@ import { Profile } from '../graphql/types/core/profile.type';
 import { UpdateProfileInput } from '../graphql/dto/core/profile.dto';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { User } from '@supabase/supabase-js';
+import type { SupabaseUser } from '../auth/supabase/supabase.types';
 
 @Resolver(() => Profile)
 export class UserResolver {
@@ -13,14 +13,14 @@ export class UserResolver {
 
   @Query(() => Profile, { nullable: true })
   @UseGuards(GqlAuthGuard)
-  async me(@CurrentUser() user: User): Promise<Profile | null> {
+  async me(@CurrentUser() user: SupabaseUser): Promise<Profile | null> {
     return this.userService.findProfileById(user.id);
   }
 
   @Mutation(() => Profile)
   @UseGuards(GqlAuthGuard)
   async updateProfile(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: UpdateProfileInput,
   ): Promise<Profile> {
     return this.userService.updateProfile(user.id, input);

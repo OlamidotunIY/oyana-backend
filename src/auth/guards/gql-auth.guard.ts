@@ -7,12 +7,12 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GqlExecutionContext } from '@nestjs/graphql';
-import type { User } from '@supabase/supabase-js';
 import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { SupabaseService } from '../supabase/supabase.service';
+import type { SupabaseUser } from '../supabase/supabase.types';
 
 type RequestWithUser = ExpressRequest & {
-  user?: User;
+  user?: SupabaseUser;
   cookies?: Record<string, string>;
 };
 

@@ -54,6 +54,10 @@ input CancelShipmentDto {
   shipmentId: String!
 }
 
+input ConfirmWalletFundingInput {
+  reference: String!
+}
+
 input CreateDispatchBatchDto {
   expiresAt: DateTime
   shipmentId: String!
@@ -99,6 +103,26 @@ input CreateUserAddressDto {
   countryCode: String
   label: String
   placeId: String!
+}
+
+input CreateWalletFundingInput {
+  amountMinor: BigInt!
+  callbackUrl: String
+  currency: String = "NGN"
+  idempotencyKey: String!
+  metadata: JSON
+  savedCardMethodId: String
+}
+
+input CreateWalletWithdrawalInput {
+  accountNumber: String
+  amountMinor: BigInt!
+  bankCode: String
+  currency: String = "NGN"
+  idempotencyKey: String!
+  reason: String
+  saveAccount: Boolean = false
+  savedBankAccountId: String
 }
 
 """
@@ -227,17 +251,21 @@ type Mutation {
   cancelShipmentAssignment(id: String!): ShipmentAssignment!
   confirmDropoff(shipmentId: String!): Shipment!
   confirmPickup(shipmentId: String!): Shipment!
+  confirmWalletFunding(input: ConfirmWalletFundingInput!): WalletFundingResult!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
   createKycCase(providerId: String!): KYCCase!
   createShipment(input: CreateShipmentDto!): Shipment!
   createShipmentAssignment(input: AssignShipmentDto!): ShipmentAssignment!
   createShipmentBid(input: CreateShipmentBidDto!): ShipmentBid!
   createUserAddress(input: CreateUserAddressDto!): UserAddress!
+  createWalletFunding(input: CreateWalletFundingInput!): WalletFundingResult!
+  createWalletWithdrawal(input: CreateWalletWithdrawalInput!): WalletWithdrawal!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
   initiateNinVerification(input: VerifyNINDto!): NINVerification!
   markEnRoutePickup(shipmentId: String!): Shipment!
-  refreshToken(refreshToken: String!): AuthResponse!
+  refreshToken(refreshToken: String): AuthResponse!
   requestOtp(input: RequestOtpInput!): MessageResponse!
+  requestPhoneOtp(input: RequestPhoneOtpInput!): MessageResponse!
   resetPassword(input: ResetPasswordInput!): MessageResponse!
   respondToDispatchOffer(input: UpdateDispatchOfferDto!): DispatchOffer!
   reviewKycCase(approved: Boolean!, id: String!): KYCCase!
@@ -251,6 +279,7 @@ type Mutation {
   updateShipmentBid(id: String!, input: UpdateShipmentBidDto!): ShipmentBid!
   uploadKycDocument(input: UploadKYCDocumentDto!): KYCDocument!
   verifyOtp(input: VerifyOtpInput!): AuthResponse!
+  verifyPhoneOtp(input: VerifyPhoneOtpInput!): MessageResponse!
   withdrawBid(id: String!): ShipmentBid!
 }
 
@@ -279,6 +308,30 @@ enum NinVerificationStatus {
   VERIFIED
 }
 
+type PaymentIntent {
+  amountMinor: BigInt!
+  authorizationUrl: String
+  confirmedAt: DateTime
+  createdAt: DateTime!
+  currency: String!
+  id: ID!
+  paystackReference: String
+  provider: String!
+  rawInitResponse: JSON
+  rawWebhook: JSON
+  status: PaymentIntentStatus!
+  updatedAt: DateTime!
+  walletAccountId: String!
+}
+
+enum PaymentIntentStatus {
+  CANCELLED
+  FAILED
+  INITIALIZED
+  PENDING
+  SUCCEEDED
+}
+
 type Permission {
   createdAt: DateTime!
   description: String
@@ -300,6 +353,8 @@ type Profile {
   lastLoginAt: DateTime
   lastName: String
   phoneE164: String
+  phoneVerified: Boolean!
+  phoneVerifiedAt: DateTime
   preferredLanguage: PreferredLanguage!
   referralCode: String
   state: State!
@@ -334,9 +389,14 @@ type Query {
   me: Profile
   myBids: [ShipmentBid!]!
   myDispatchOffers: [DispatchOffer!]!
+  mySavedFundingCards: [WalletCardMethod!]!
+  mySavedWithdrawalAccounts: [WalletSavedBankAccount!]!
   myShipmentDashboard: ShipmentDashboard!
   myUserAddresses: [UserAddress!]!
   myWallet: WalletAccount
+  myWalletCompliance: WalletCompliance!
+  myWalletTransactions(input: WalletTransactionsInput): WalletTransactionsConnection!
+  paystackSupportedBanks(countryCode: String): [WalletBank!]!
   searchAddresses(input: SearchAddressInput!): [AddressSuggestion!]!
   shipment(id: String!): Shipment
   shipmentBids(shipmentId: String!): [ShipmentBid!]!
@@ -347,6 +407,10 @@ type Query {
 input RequestOtpInput {
   email: String!
   mode: String!
+}
+
+input RequestPhoneOtpInput {
+  phoneE164: String!
 }
 
 input ResetPasswordInput {
@@ -587,6 +651,7 @@ enum TransactionType {
   REFUND
   SHIPMENT_PAYMENT
   TOPUP
+  WITHDRAWAL
 }
 
 input UpdateDispatchOfferDto {
@@ -706,6 +771,11 @@ input VerifyOtpInput {
   token: String!
 }
 
+input VerifyPhoneOtpInput {
+  phoneE164: String!
+  token: String!
+}
+
 type WalletAccount {
   balanceMinor: BigInt!
   createdAt: DateTime!
@@ -721,4 +791,112 @@ enum WalletAccountStatus {
   ACTIVE
   CLOSED
   SUSPENDED
+}
+
+type WalletBank {
+  active: Boolean
+  code: String!
+  country: String
+  currency: String
+  gateway: String
+  longcode: String
+  name: String!
+  payWithBank: Boolean
+  slug: String
+}
+
+type WalletCardMethod {
+  bank: String
+  brand: String
+  cardType: String
+  channel: String
+  countryCode: String
+  createdAt: DateTime!
+  customerCode: String
+  expMonth: String
+  expYear: String
+  first6: String
+  id: ID!
+  last4: String
+  lastUsedAt: DateTime
+  metadata: JSON
+  profileId: String!
+  provider: String!
+  reusable: Boolean!
+  signature: String
+  updatedAt: DateTime!
+  walletAccountId: String!
+}
+
+type WalletCompliance {
+  blockReasons: [String!]!
+  canFund: Boolean!
+  canWithdraw: Boolean!
+  phoneVerified: Boolean!
+}
+
+type WalletFundingResult {
+  authorizationUrl: String
+  message: String
+  paymentIntent: PaymentIntent
+  reference: String!
+  status: PaymentIntentStatus!
+  success: Boolean!
+  walletTransaction: Transaction
+}
+
+type WalletSavedBankAccount {
+  accountName: String!
+  accountNumberMasked: String!
+  bankCode: String!
+  bankName: String!
+  createdAt: DateTime!
+  id: ID!
+  lastUsedAt: DateTime
+  metadata: JSON
+  profileId: String!
+  provider: String!
+  recipientCode: String!
+  updatedAt: DateTime!
+  walletAccountId: String!
+}
+
+type WalletTransactionsConnection {
+  hasMore: Boolean!
+  items: [Transaction!]!
+  nextCursor: String
+}
+
+input WalletTransactionsInput {
+  cursor: String
+  direction: TransactionDirection
+  status: TransactionStatus
+  take: Int
+  transactionType: TransactionType
+}
+
+type WalletWithdrawal {
+  accountName: String
+  accountNumberMasked: String
+  amountMinor: BigInt!
+  bankCode: String
+  bankName: String
+  completedAt: DateTime
+  createdAt: DateTime!
+  currency: String!
+  failedAt: DateTime
+  failureReason: String
+  id: ID!
+  paystackTransferId: String
+  profileId: String!
+  rawInitResponse: JSON
+  rawWebhook: JSON
+  recipientCode: String
+  reference: String!
+  relatedTransactionId: String
+  savedBankAccountId: String
+  status: String!
+  transferCode: String
+  updatedAt: DateTime!
+  walletAccountId: String!
 }

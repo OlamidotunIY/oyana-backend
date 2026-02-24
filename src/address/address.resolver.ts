@@ -1,8 +1,8 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Float, Mutation, Query, Resolver } from '@nestjs/graphql';
-import type { User } from '@supabase/supabase-js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import type { SupabaseUser } from '../auth/supabase/supabase.types';
 import { CreateUserAddressDto, UserAddress } from '../graphql';
 import { AddressService } from './address.service';
 import { SearchAddressInput } from './dto/search-address.input';
@@ -15,14 +15,14 @@ export class AddressResolver {
 
   @Query(() => [UserAddress])
   @UseGuards(GqlAuthGuard)
-  async myUserAddresses(@CurrentUser() user: User): Promise<UserAddress[]> {
+  async myUserAddresses(@CurrentUser() user: SupabaseUser): Promise<UserAddress[]> {
     return this.addressService.getMyUserAddresses(user.id);
   }
 
   @Mutation(() => UserAddress)
   @UseGuards(GqlAuthGuard)
   async createUserAddress(
-    @CurrentUser() user: User,
+    @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateUserAddressDto,
   ): Promise<UserAddress> {
     return this.addressService.createUserAddress(user.id, input);

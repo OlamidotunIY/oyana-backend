@@ -1201,9 +1201,9 @@ export class WalletService {
               status: 'reversed',
               failureReason,
               failedAt: new Date(),
-              rawWebhook: rawPayload
-                ? (rawPayload as unknown as Prisma.InputJsonValue)
-                : withdrawal.rawWebhook,
+              ...(rawPayload
+                ? { rawWebhook: rawPayload as unknown as Prisma.InputJsonValue }
+                : {}),
             },
           });
         }),
@@ -1260,6 +1260,7 @@ export class WalletService {
     accountName: string;
     accountNumberMasked: string;
     recipientCode: string;
+    savedBankAccountId: null;
     persistable: true;
   }> {
     const resolveAccountResult = await this.paystackService.resolveBankAccount({
@@ -1282,6 +1283,7 @@ export class WalletService {
       accountName: resolveAccountResult.account_name,
       accountNumberMasked: this.maskAccountNumber(accountNumber),
       recipientCode: recipient.recipient_code,
+      savedBankAccountId: null,
       persistable: true,
     };
   }
