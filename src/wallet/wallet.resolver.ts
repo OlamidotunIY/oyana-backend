@@ -16,16 +16,20 @@ import {
   WalletTransactionsInput,
   WalletWithdrawal,
 } from '../graphql';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import { UserType } from '../graphql/enums';
 
 @Resolver(() => WalletAccount)
 export class WalletResolver {
   constructor(private readonly walletService: WalletService) {}
 
   @Query(() => WalletAccount, { nullable: true })
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async myWallet(@CurrentUser() user: SupabaseUser): Promise<WalletAccount | null> {
     if (!user?.id) {
       return null;
@@ -35,7 +39,8 @@ export class WalletResolver {
   }
 
   @Query(() => WalletCompliance)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async myWalletCompliance(
     @CurrentUser() user: SupabaseUser,
   ): Promise<WalletCompliance> {
@@ -43,7 +48,8 @@ export class WalletResolver {
   }
 
   @Query(() => [WalletCardMethod])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async mySavedFundingCards(
     @CurrentUser() user: SupabaseUser,
   ): Promise<WalletCardMethod[]> {
@@ -51,7 +57,8 @@ export class WalletResolver {
   }
 
   @Query(() => [WalletSavedBankAccount])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async mySavedWithdrawalAccounts(
     @CurrentUser() user: SupabaseUser,
   ): Promise<WalletSavedBankAccount[]> {
@@ -59,7 +66,8 @@ export class WalletResolver {
   }
 
   @Query(() => [WalletBank])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async paystackSupportedBanks(
     @Args('countryCode', { nullable: true }) countryCode?: string,
   ): Promise<WalletBank[]> {
@@ -67,7 +75,8 @@ export class WalletResolver {
   }
 
   @Query(() => WalletTransactionsConnection)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async myWalletTransactions(
     @CurrentUser() user: SupabaseUser,
     @Args('input', { nullable: true }) input?: WalletTransactionsInput,
@@ -76,7 +85,8 @@ export class WalletResolver {
   }
 
   @Query(() => [Transaction])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async walletTransactions(
     @CurrentUser() user: SupabaseUser,
     @Args('walletAccountId') walletAccountId: string,
@@ -85,7 +95,8 @@ export class WalletResolver {
   }
 
   @Mutation(() => WalletFundingResult)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async createWalletFunding(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateWalletFundingInput,
@@ -94,7 +105,8 @@ export class WalletResolver {
   }
 
   @Mutation(() => WalletFundingResult)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async confirmWalletFunding(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: ConfirmWalletFundingInput,
@@ -103,7 +115,8 @@ export class WalletResolver {
   }
 
   @Mutation(() => WalletWithdrawal)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async createWalletWithdrawal(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateWalletWithdrawalInput,

@@ -1,21 +1,40 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {
+  AddShipmentItemDto,
+  CancelShipmentDto,
   CreateShipmentDto,
   KYCCase,
   KYCCaseStatus,
   ProviderDashboardQuary,
   Shipment,
+  ShipmentActorRole,
   ShipmentDashboard,
+  ShipmentEvent,
+  ShipmentEventType,
+  ShipmentItem,
+  ShipmentMilestone,
+  ShipmentMilestoneStatus,
+  ShipmentMilestoneType,
   ShipmentQueryFilter,
   ShipmentScheduleType,
   ShipmentStatus,
+  ShipmentTracking,
   UpdateShipmentDto,
+  UserType,
   Vehicle,
   VehicleStatus,
   WalletAccount,
 } from '../graphql';
 import type {
+  ShipmentEvent as PrismaShipmentEvent,
+  ShipmentItem as PrismaShipmentItem,
+  ShipmentMilestone as PrismaShipmentMilestone,
   Prisma,
   Shipment as PrismaShipment,
   Vehicle as PrismaVehicle,
@@ -57,6 +76,40 @@ export class ShipmentsService {
     ShipmentStatus.DELIVERED,
   ];
 
+  private static readonly CANCELLABLE_STATUSES: ShipmentStatus[] = [
+    ShipmentStatus.DRAFT,
+    ShipmentStatus.CREATED,
+    ShipmentStatus.BROADCASTING,
+    ShipmentStatus.ASSIGNED,
+    ShipmentStatus.EN_ROUTE_PICKUP,
+    ShipmentStatus.PICKED_UP,
+    ShipmentStatus.EN_ROUTE_DROPOFF,
+    ShipmentStatus.DELIVERED,
+  ];
+
+  private static readonly STATUS_TO_EVENT_TYPE: Partial<
+    Record<ShipmentStatus, ShipmentEventType>
+  > = {
+    [ShipmentStatus.CREATED]: ShipmentEventType.CREATED,
+    [ShipmentStatus.BROADCASTING]: ShipmentEventType.BROADCASTED,
+    [ShipmentStatus.ASSIGNED]: ShipmentEventType.ASSIGNED,
+    [ShipmentStatus.PICKED_UP]: ShipmentEventType.PICKED_UP,
+    [ShipmentStatus.DELIVERED]: ShipmentEventType.DELIVERED,
+    [ShipmentStatus.COMPLETED]: ShipmentEventType.COMPLETED,
+    [ShipmentStatus.CANCELLED]: ShipmentEventType.CANCELLED,
+  };
+
+  private static readonly STATUS_TO_MILESTONE: Partial<
+    Record<ShipmentStatus, ShipmentMilestoneType>
+  > = {
+    [ShipmentStatus.ASSIGNED]: ShipmentMilestoneType.ACCEPTED,
+    [ShipmentStatus.EN_ROUTE_PICKUP]: ShipmentMilestoneType.ARRIVED_PICKUP,
+    [ShipmentStatus.PICKED_UP]: ShipmentMilestoneType.PICKED_UP,
+    [ShipmentStatus.EN_ROUTE_DROPOFF]: ShipmentMilestoneType.ARRIVED_DROPOFF,
+    [ShipmentStatus.DELIVERED]: ShipmentMilestoneType.DELIVERED,
+    [ShipmentStatus.COMPLETED]: ShipmentMilestoneType.COMPLETED,
+  };
+
   private readonly allowedShipmentCurrencies: string[] = (
     process.env.ALLOWED_SHIPMENT_CURRENCIES ?? 'NGN'
   )
@@ -88,13 +141,32 @@ export class ShipmentsService {
     return this.defaultCommissionRateBps;
   }
 
-  async getShipments(filter?: ShipmentQueryFilter): Promise<Shipment[]> {
+  async getShipmentsForViewer(
+    viewerProfileId: string,
+    filter?: ShipmentQueryFilter,
+  ): Promise<Shipment[]> {
     const now = new Date();
+    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const viewerWhere = await this.buildViewerShipmentWhereFilter(
+      viewerProfileId,
+      viewerRole,
+    );
+
+    if (viewerWhere === null) {
+      return [];
+    }
+
+    const baseFilter = this.buildShipmentWhereFilter(filter, now);
+    const where: Prisma.ShipmentWhereInput = {
+      ...(baseFilter ?? {}),
+      ...(viewerWhere ?? {}),
+    };
+
     const shipments = await this.prisma.runWithRetry(
-      'ShipmentsService.getShipments',
+      'ShipmentsService.getShipmentsForViewer',
       () =>
         this.prisma.shipment.findMany({
-          where: this.buildShipmentWhereFilter(filter, now),
+          where,
           orderBy: {
             createdAt: 'desc',
           },
@@ -171,9 +243,13 @@ export class ShipmentsService {
     };
   }
 
-  async getShipmentById(id: string): Promise<Shipment | null> {
+  async getShipmentByIdForViewer(
+    viewerProfileId: string,
+    id: string,
+  ): Promise<Shipment | null> {
+    const viewerRole = await this.requireUserRole(viewerProfileId);
     const shipment = await this.prisma.runWithRetry(
-      'ShipmentsService.getShipmentById',
+      'ShipmentsService.getShipmentByIdForViewer',
       () =>
         this.prisma.shipment.findUnique({
           where: { id },
@@ -198,10 +274,116 @@ export class ShipmentsService {
       return null;
     }
 
+    const hasAccess = await this.canAccessShipment(
+      viewerProfileId,
+      viewerRole,
+      shipment.id,
+      shipment.customerProfileId,
+    );
+    if (!hasAccess) {
+      throw new ForbiddenException('You are not allowed to access this shipment');
+    }
+
     return {
       ...this.toGraphqlShipment(shipment),
       pickupAddressSummary: this.toAddressSummary(shipment.pickupAddress),
       dropoffAddressSummary: this.toAddressSummary(shipment.dropoffAddress),
+    };
+  }
+
+  async getShipmentTimelineForViewer(
+    viewerProfileId: string,
+    shipmentId: string,
+  ): Promise<ShipmentEvent[]> {
+    await this.assertViewerCanAccessShipment(viewerProfileId, shipmentId);
+
+    const events = await this.prisma.runWithRetry(
+      'ShipmentsService.getShipmentTimelineForViewer.events',
+      () =>
+        this.prisma.shipmentEvent.findMany({
+          where: {
+            shipmentId,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        }),
+    );
+
+    return events.map((event) => this.toGraphqlShipmentEvent(event));
+  }
+
+  async getShipmentTrackingForViewer(
+    viewerProfileId: string,
+    shipmentId: string,
+  ): Promise<ShipmentTracking> {
+    await this.assertViewerCanAccessShipment(viewerProfileId, shipmentId);
+
+    const shipment = await this.prisma.runWithRetry(
+      'ShipmentsService.getShipmentTrackingForViewer.shipment',
+      () =>
+        this.prisma.shipment.findUnique({
+          where: {
+            id: shipmentId,
+          },
+          include: {
+            pickupAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+            dropoffAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+          },
+        }),
+    );
+
+    if (!shipment) {
+      throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+    }
+
+    const [events, milestones] = await Promise.all([
+      this.prisma.runWithRetry(
+        'ShipmentsService.getShipmentTrackingForViewer.events',
+        () =>
+          this.prisma.shipmentEvent.findMany({
+            where: {
+              shipmentId,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          }),
+      ),
+      this.prisma.runWithRetry(
+        'ShipmentsService.getShipmentTrackingForViewer.milestones',
+        () =>
+          this.prisma.shipmentMilestone.findMany({
+            where: {
+              shipmentId,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          }),
+      ),
+    ]);
+
+    return {
+      shipment: {
+        ...this.toGraphqlShipment(shipment),
+        pickupAddressSummary: this.toAddressSummary(shipment.pickupAddress),
+        dropoffAddressSummary: this.toAddressSummary(shipment.dropoffAddress),
+      },
+      events: events.map((event) => this.toGraphqlShipmentEvent(event)),
+      milestones: milestones.map((milestone) =>
+        this.toGraphqlShipmentMilestone(milestone),
+      ),
     };
   }
 
@@ -587,27 +769,45 @@ export class ShipmentsService {
     const shipment = await this.prisma.runWithRetry(
       'ShipmentsService.createShipment',
       () =>
-        this.prisma.shipment.create({
-          data: {
-            trackingCode: input.trackingCode ?? this.generateTrackingCode(),
-            customerProfileId: input.customerProfileId,
-            mode: input.mode,
-            vehicleCategory: input.vehicleCategory,
-            scheduleType: input.scheduleType,
-            status: ShipmentStatus.CREATED,
-            pickupAddressId: input.pickupAddressId,
-            dropoffAddressId: input.dropoffAddressId,
-            scheduledAt: input.scheduledAt,
-            packageDescription: input.packageDescription,
-            packageValueMinor: input.packageValueMinor,
-            specialInstructions: input.specialInstructions,
-            requiresEscrow: input.requiresEscrow,
-            pricingCurrency: input.pricingCurrency,
-            quotedPriceMinor: input.quotedPriceMinor,
-            finalPriceMinor: input.finalPriceMinor,
-            commissionRateBps: this.defaultCommissionRateBps,
-            commissionAmountMinor: 0,
-          },
+        this.prisma.$transaction(async (tx) => {
+          const createdShipment = await tx.shipment.create({
+            data: {
+              trackingCode: input.trackingCode ?? this.generateTrackingCode(),
+              customerProfileId: input.customerProfileId,
+              mode: input.mode,
+              vehicleCategory: input.vehicleCategory,
+              scheduleType: input.scheduleType,
+              status: ShipmentStatus.CREATED,
+              pickupAddressId: input.pickupAddressId,
+              dropoffAddressId: input.dropoffAddressId,
+              scheduledAt: input.scheduledAt,
+              packageDescription: input.packageDescription,
+              packageValueMinor: input.packageValueMinor,
+              specialInstructions: input.specialInstructions,
+              requiresEscrow: input.requiresEscrow,
+              pricingCurrency: input.pricingCurrency,
+              quotedPriceMinor: input.quotedPriceMinor,
+              finalPriceMinor: input.finalPriceMinor,
+              commissionRateBps: this.defaultCommissionRateBps,
+              commissionAmountMinor: 0,
+            },
+          });
+
+          await tx.shipmentEvent.create({
+            data: {
+              shipmentId: createdShipment.id,
+              eventType: ShipmentEventType.CREATED,
+              actorProfileId: input.customerProfileId,
+              actorRole: ShipmentActorRole.CUSTOMER,
+              metadata: {
+                mode: createdShipment.mode,
+                vehicleCategory: createdShipment.vehicleCategory,
+              } as Prisma.InputJsonValue,
+            },
+          });
+
+          await this.createInitialMilestones(tx, createdShipment.id);
+          return createdShipment;
         }),
     );
 
@@ -615,20 +815,46 @@ export class ShipmentsService {
   }
 
   async updateShipment(
+    viewerProfileId: string,
     id: string,
     input: UpdateShipmentDto,
   ): Promise<Shipment> {
+    const viewerRole = await this.requireUserRole(viewerProfileId);
     const existingShipment = await this.prisma.runWithRetry(
       'ShipmentsService.updateShipment.findUnique',
       () =>
         this.prisma.shipment.findUnique({
           where: { id },
-          select: { id: true, commissionRateBps: true },
+          select: {
+            id: true,
+            commissionRateBps: true,
+            customerProfileId: true,
+            status: true,
+          },
         }),
     );
 
     if (!existingShipment) {
       throw new NotFoundException(`Shipment with id ${id} not found`);
+    }
+
+    const canMutate =
+      viewerRole === UserType.ADMIN ||
+      existingShipment.customerProfileId === viewerProfileId;
+    if (!canMutate) {
+      throw new ForbiddenException(
+        'You are not allowed to update this shipment',
+      );
+    }
+
+    if (
+      existingShipment.status === ShipmentStatus.CANCELLED ||
+      existingShipment.status === ShipmentStatus.COMPLETED ||
+      existingShipment.status === ShipmentStatus.EXPIRED
+    ) {
+      throw new BadRequestException(
+        `Cannot update shipment in ${existingShipment.status} status`,
+      );
     }
 
     // Calculate commission if final price is being set
@@ -644,38 +870,241 @@ export class ShipmentsService {
       );
     }
 
+    const statusChanged =
+      input.status !== undefined && input.status !== existingShipment.status;
+    const eventType =
+      (input.status && ShipmentsService.STATUS_TO_EVENT_TYPE[input.status]) ??
+      undefined;
+    const milestoneType =
+      (input.status && ShipmentsService.STATUS_TO_MILESTONE[input.status]) ??
+      undefined;
+
     const shipment = await this.prisma.runWithRetry(
       'ShipmentsService.updateShipment',
       () =>
-        this.prisma.shipment.update({
-          where: { id },
-          data: {
-            trackingCode: input.trackingCode,
-            customerProfileId: input.customerProfileId,
-            mode: input.mode,
-            vehicleCategory: input.vehicleCategory,
-            scheduleType: input.scheduleType,
-            status: input.status,
-            pickupAddressId: input.pickupAddressId,
-            dropoffAddressId: input.dropoffAddressId,
-            scheduledAt: input.scheduledAt,
-            packageDescription: input.packageDescription,
-            packageValueMinor: input.packageValueMinor,
-            specialInstructions: input.specialInstructions,
-            requiresEscrow: input.requiresEscrow,
-            pricingCurrency: input.pricingCurrency,
-            quotedPriceMinor: input.quotedPriceMinor,
-            finalPriceMinor: input.finalPriceMinor,
-            commissionRateBps: input.commissionRateBps,
-            commissionAmountMinor,
-            cancelledAt: input.cancelledAt,
-            cancelledByProfileId: input.cancelledByProfileId,
-            cancellationReason: input.cancellationReason,
-          },
+        this.prisma.$transaction(async (tx) => {
+          const updatedShipment = await tx.shipment.update({
+            where: { id },
+            data: {
+              trackingCode: input.trackingCode,
+              customerProfileId: input.customerProfileId,
+              mode: input.mode,
+              vehicleCategory: input.vehicleCategory,
+              scheduleType: input.scheduleType,
+              status: input.status,
+              pickupAddressId: input.pickupAddressId,
+              dropoffAddressId: input.dropoffAddressId,
+              scheduledAt: input.scheduledAt,
+              packageDescription: input.packageDescription,
+              packageValueMinor: input.packageValueMinor,
+              specialInstructions: input.specialInstructions,
+              requiresEscrow: input.requiresEscrow,
+              pricingCurrency: input.pricingCurrency,
+              quotedPriceMinor: input.quotedPriceMinor,
+              finalPriceMinor: input.finalPriceMinor,
+              commissionRateBps: input.commissionRateBps,
+              commissionAmountMinor,
+              cancelledAt: input.cancelledAt,
+              cancelledByProfileId: input.cancelledByProfileId,
+              cancellationReason: input.cancellationReason,
+            },
+          });
+
+          if (statusChanged && eventType) {
+            await tx.shipmentEvent.create({
+              data: {
+                shipmentId: id,
+                eventType,
+                actorProfileId: viewerProfileId,
+                actorRole:
+                  viewerRole === UserType.ADMIN
+                    ? ShipmentActorRole.ADMIN
+                    : ShipmentActorRole.CUSTOMER,
+                metadata: {
+                  previousStatus: existingShipment.status,
+                  nextStatus: input.status,
+                } as Prisma.InputJsonValue,
+              },
+            });
+          }
+
+          if (statusChanged && milestoneType) {
+            await this.markShipmentMilestoneReached(
+              tx,
+              id,
+              milestoneType,
+              input.status === ShipmentStatus.COMPLETED
+                ? ShipmentMilestoneStatus.VERIFIED
+                : ShipmentMilestoneStatus.REACHED,
+            );
+          }
+
+          return updatedShipment;
         }),
     );
 
     return this.toGraphqlShipment(shipment);
+  }
+
+  async cancelShipment(
+    viewerProfileId: string,
+    input: CancelShipmentDto,
+  ): Promise<Shipment> {
+    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const shipment = await this.prisma.runWithRetry(
+      'ShipmentsService.cancelShipment.findShipment',
+      () =>
+        this.prisma.shipment.findUnique({
+          where: {
+            id: input.shipmentId,
+          },
+          select: {
+            id: true,
+            customerProfileId: true,
+            status: true,
+          },
+        }),
+    );
+
+    if (!shipment) {
+      throw new NotFoundException(
+        `Shipment with id ${input.shipmentId} not found`,
+      );
+    }
+
+    const canMutate =
+      viewerRole === UserType.ADMIN ||
+      shipment.customerProfileId === viewerProfileId;
+    if (!canMutate) {
+      throw new ForbiddenException(
+        'You are not allowed to cancel this shipment',
+      );
+    }
+
+    if (!ShipmentsService.CANCELLABLE_STATUSES.includes(shipment.status as ShipmentStatus)) {
+      throw new BadRequestException(
+        `Shipment in ${shipment.status} status cannot be cancelled`,
+      );
+    }
+
+    const cancelledShipment = await this.prisma.runWithRetry(
+      'ShipmentsService.cancelShipment.update',
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          const updatedShipment = await tx.shipment.update({
+            where: {
+              id: input.shipmentId,
+            },
+            data: {
+              status: ShipmentStatus.CANCELLED,
+              cancelledAt: new Date(),
+              cancelledByProfileId: viewerProfileId,
+              cancellationReason: input.cancellationReason.trim(),
+            },
+          });
+
+          await tx.shipmentEvent.create({
+            data: {
+              shipmentId: updatedShipment.id,
+              eventType: ShipmentEventType.CANCELLED,
+              actorProfileId: viewerProfileId,
+              actorRole:
+                viewerRole === UserType.ADMIN
+                  ? ShipmentActorRole.ADMIN
+                  : ShipmentActorRole.CUSTOMER,
+              metadata: {
+                reason: input.cancellationReason.trim(),
+              } as Prisma.InputJsonValue,
+            },
+          });
+
+          return updatedShipment;
+        }),
+    );
+
+    return this.toGraphqlShipment(cancelledShipment);
+  }
+
+  async addShipmentItem(
+    viewerProfileId: string,
+    input: AddShipmentItemDto,
+  ): Promise<ShipmentItem> {
+    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const shipment = await this.prisma.runWithRetry(
+      'ShipmentsService.addShipmentItem.shipment',
+      () =>
+        this.prisma.shipment.findUnique({
+          where: {
+            id: input.shipmentId,
+          },
+          select: {
+            id: true,
+            customerProfileId: true,
+          },
+        }),
+    );
+
+    if (!shipment) {
+      throw new NotFoundException(
+        `Shipment with id ${input.shipmentId} not found`,
+      );
+    }
+
+    const canMutate =
+      viewerRole === UserType.ADMIN ||
+      shipment.customerProfileId === viewerProfileId;
+    if (!canMutate) {
+      throw new ForbiddenException(
+        'You are not allowed to add shipment items for this shipment',
+      );
+    }
+
+    const normalizedName = input.name.trim();
+    if (!normalizedName) {
+      throw new BadRequestException('Shipment item name is required');
+    }
+
+    const normalizedQuantity = Math.max(1, Math.round(Number(input.quantity)));
+    if (!Number.isFinite(normalizedQuantity)) {
+      throw new BadRequestException('Shipment item quantity is invalid');
+    }
+
+    const createdItem = await this.prisma.runWithRetry(
+      'ShipmentsService.addShipmentItem.create',
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          const item = await tx.shipmentItem.create({
+            data: {
+              shipmentId: input.shipmentId,
+              name: normalizedName,
+              quantity: normalizedQuantity,
+              weightKg: input.weightKg ?? undefined,
+            },
+          });
+
+          await tx.shipmentEvent.create({
+            data: {
+              shipmentId: input.shipmentId,
+              eventType: ShipmentEventType.CREATED,
+              actorProfileId: viewerProfileId,
+              actorRole:
+                viewerRole === UserType.ADMIN
+                  ? ShipmentActorRole.ADMIN
+                  : ShipmentActorRole.CUSTOMER,
+              metadata: {
+                action: 'add_shipment_item',
+                itemId: item.id,
+                name: item.name,
+                quantity: item.quantity,
+              } as Prisma.InputJsonValue,
+            },
+          });
+
+          return item;
+        }),
+    );
+
+    return this.toGraphqlShipmentItem(createdItem);
   }
 
   private async resolveProviderIdForProfile(
@@ -716,6 +1145,239 @@ export class ShipmentsService {
     );
 
     return providerMember?.providerId ?? null;
+  }
+
+  private async requireUserRole(profileId: string): Promise<UserType> {
+    const profile = await this.prisma.runWithRetry(
+      'ShipmentsService.requireUserRole.profile',
+      () =>
+        this.prisma.profile.findUnique({
+          where: {
+            id: profileId,
+          },
+          select: {
+            userType: true,
+          },
+        }),
+    );
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return profile.userType as UserType;
+  }
+
+  private async buildViewerShipmentWhereFilter(
+    profileId: string,
+    role: UserType,
+  ): Promise<Prisma.ShipmentWhereInput | null> {
+    if (role === UserType.ADMIN) {
+      return {};
+    }
+
+    if (role === UserType.INDIVIDUAL) {
+      return {
+        customerProfileId: profileId,
+      };
+    }
+
+    if (role === UserType.BUSINESS) {
+      const providerId = await this.resolveProviderIdForProfile(profileId);
+      if (!providerId) {
+        return null;
+      }
+
+      return {
+        OR: [
+          {
+            assignment: {
+              is: {
+                providerId,
+              },
+            },
+          },
+          {
+            dispatchOffers: {
+              some: {
+                providerId,
+              },
+            },
+          },
+          {
+            bids: {
+              some: {
+                providerId,
+              },
+            },
+          },
+        ],
+      };
+    }
+
+    return null;
+  }
+
+  private async canAccessShipment(
+    profileId: string,
+    role: UserType,
+    shipmentId: string,
+    customerProfileId: string,
+  ): Promise<boolean> {
+    if (role === UserType.ADMIN) {
+      return true;
+    }
+
+    if (role === UserType.INDIVIDUAL) {
+      return customerProfileId === profileId;
+    }
+
+    if (role !== UserType.BUSINESS) {
+      return false;
+    }
+
+    const providerId = await this.resolveProviderIdForProfile(profileId);
+    if (!providerId) {
+      return false;
+    }
+
+    const providerShipment = await this.prisma.runWithRetry(
+      'ShipmentsService.canAccessShipment.business',
+      () =>
+        this.prisma.shipment.findFirst({
+          where: {
+            id: shipmentId,
+            OR: [
+              {
+                assignment: {
+                  is: {
+                    providerId,
+                  },
+                },
+              },
+              {
+                dispatchOffers: {
+                  some: {
+                    providerId,
+                  },
+                },
+              },
+              {
+                bids: {
+                  some: {
+                    providerId,
+                  },
+                },
+              },
+            ],
+          },
+          select: {
+            id: true,
+          },
+        }),
+    );
+
+    return Boolean(providerShipment);
+  }
+
+  private async assertViewerCanAccessShipment(
+    viewerProfileId: string,
+    shipmentId: string,
+  ): Promise<void> {
+    const viewerRole = await this.requireUserRole(viewerProfileId);
+
+    const shipment = await this.prisma.runWithRetry(
+      'ShipmentsService.assertViewerCanAccessShipment.shipment',
+      () =>
+        this.prisma.shipment.findUnique({
+          where: {
+            id: shipmentId,
+          },
+          select: {
+            id: true,
+            customerProfileId: true,
+          },
+        }),
+    );
+
+    if (!shipment) {
+      throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+    }
+
+    const hasAccess = await this.canAccessShipment(
+      viewerProfileId,
+      viewerRole,
+      shipment.id,
+      shipment.customerProfileId,
+    );
+
+    if (!hasAccess) {
+      throw new ForbiddenException('You are not allowed to access this shipment');
+    }
+  }
+
+  private async createInitialMilestones(
+    tx: Prisma.TransactionClient,
+    shipmentId: string,
+  ): Promise<void> {
+    const now = new Date();
+    const milestoneTypes = [
+      ShipmentMilestoneType.ACCEPTED,
+      ShipmentMilestoneType.ARRIVED_PICKUP,
+      ShipmentMilestoneType.PICKED_UP,
+      ShipmentMilestoneType.ARRIVED_DROPOFF,
+      ShipmentMilestoneType.DELIVERED,
+      ShipmentMilestoneType.COMPLETED,
+    ];
+
+    await tx.shipmentMilestone.createMany({
+      data: milestoneTypes.map((type) => ({
+        shipmentId,
+        type,
+        status: ShipmentMilestoneStatus.PENDING,
+        createdAt: now,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  private async markShipmentMilestoneReached(
+    tx: Prisma.TransactionClient,
+    shipmentId: string,
+    milestoneType: ShipmentMilestoneType,
+    status: ShipmentMilestoneStatus,
+  ): Promise<void> {
+    const existing = await tx.shipmentMilestone.findFirst({
+      where: {
+        shipmentId,
+        type: milestoneType,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!existing) {
+      await tx.shipmentMilestone.create({
+        data: {
+          shipmentId,
+          type: milestoneType,
+          status,
+          occurredAt: new Date(),
+        },
+      });
+      return;
+    }
+
+    await tx.shipmentMilestone.update({
+      where: {
+        id: existing.id,
+      },
+      data: {
+        status,
+        occurredAt: new Date(),
+      },
+    });
   }
 
   private async getOrCreateWalletAccount(
@@ -872,6 +1534,47 @@ export class ShipmentsService {
       cancelledAt: shipment.cancelledAt ?? undefined,
       cancelledByProfileId: shipment.cancelledByProfileId ?? undefined,
       cancellationReason: shipment.cancellationReason ?? undefined,
+    };
+  }
+
+  private toGraphqlShipmentItem(item: PrismaShipmentItem): ShipmentItem {
+    return {
+      id: item.id,
+      shipmentId: item.shipmentId,
+      name: item.name,
+      quantity: item.quantity,
+      weightKg: item.weightKg ? Number(item.weightKg) : undefined,
+      createdAt: item.createdAt,
+    };
+  }
+
+  private toGraphqlShipmentEvent(event: PrismaShipmentEvent): ShipmentEvent {
+    return {
+      id: event.id,
+      shipmentId: event.shipmentId,
+      eventType: event.eventType as ShipmentEventType,
+      actorProfileId: event.actorProfileId ?? undefined,
+      actorRole: event.actorRole
+        ? (event.actorRole as ShipmentActorRole)
+        : undefined,
+      metadata: event.metadata as Record<string, unknown> | undefined,
+      createdAt: event.createdAt,
+    };
+  }
+
+  private toGraphqlShipmentMilestone(
+    milestone: PrismaShipmentMilestone,
+  ): ShipmentMilestone {
+    return {
+      id: milestone.id,
+      shipmentId: milestone.shipmentId,
+      milestoneType: milestone.type as ShipmentMilestoneType,
+      status: milestone.status as ShipmentMilestoneStatus,
+      occurredAt: milestone.occurredAt ?? undefined,
+      lat: milestone.lat ?? undefined,
+      lng: milestone.lng ?? undefined,
+      metadata: milestone.metadata as Record<string, unknown> | undefined,
+      createdAt: milestone.createdAt,
     };
   }
 

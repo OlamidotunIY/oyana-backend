@@ -18,6 +18,7 @@ import {
   NINVerification,
   NINVerificationStatus,
   UploadKYCDocumentDto,
+  UserType,
   VerifyNINDto,
   Vehicle,
   VehicleStatus,
@@ -153,8 +154,29 @@ export class KycService {
     id: string,
     approved: boolean,
   ): Promise<KYCCase> {
-    const providerId = await this.requireAuthorizedProviderId(profileId);
-    await this.requireOwnedKycCase(providerId, id);
+    const role = await this.requireUserRole(profileId);
+
+    if (role !== UserType.ADMIN) {
+      const providerId = await this.requireAuthorizedProviderId(profileId);
+      await this.requireOwnedKycCase(providerId, id);
+    } else {
+      const existingCase = await this.prisma.runWithRetry(
+        'KycService.reviewKycCase.adminFind',
+        () =>
+          this.prisma.providerKycCase.findUnique({
+            where: {
+              id,
+            },
+            select: {
+              id: true,
+            },
+          }),
+      );
+
+      if (!existingCase) {
+        throw new NotFoundException('KYC case not found');
+      }
+    }
 
     const updated = await this.prisma.runWithRetry('KycService.reviewKycCase', () =>
       this.prisma.providerKycCase.update({
@@ -337,6 +359,22 @@ export class KycService {
 
       throw error;
     }
+  }
+
+  async getVehicles(profileId: string): Promise<Vehicle[]> {
+    const providerId = await this.requireAuthorizedProviderId(profileId);
+    const vehicles = await this.prisma.runWithRetry('KycService.getVehicles', () =>
+      this.prisma.vehicle.findMany({
+        where: {
+          providerId,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+    );
+
+    return vehicles.map((vehicle) => this.toGraphqlVehicle(vehicle));
   }
 
   private async initiatePremblyWidgetSession(input: {
@@ -711,6 +749,25 @@ export class KycService {
     }
 
     return profile;
+  }
+
+  private async requireUserRole(profileId: string): Promise<UserType> {
+    const profile = await this.prisma.runWithRetry('KycService.requireUserRole', () =>
+      this.prisma.profile.findUnique({
+        where: {
+          id: profileId,
+        },
+        select: {
+          userType: true,
+        },
+      }),
+    );
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return profile.userType as UserType;
   }
 
   private async getOrCreateKycCaseForProvider(

@@ -1,7 +1,9 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { SupabaseUser } from '../auth/supabase/supabase.types';
 import {
   AssignShipmentDto,
@@ -13,6 +15,7 @@ import {
   ShipmentAssignment,
   UpdateDispatchOfferDto,
 } from '../graphql';
+import { UserType } from '../graphql/enums';
 import { DispatchService } from './dispatch.service';
 
 @Resolver(() => DispatchBatch)
@@ -20,17 +23,22 @@ export class DispatchResolver {
   constructor(private readonly dispatchService: DispatchService) {}
 
   @Query(() => [DispatchBatch])
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
   async dispatchBatches(): Promise<DispatchBatch[]> {
     return this.dispatchService.dispatchBatches();
   }
 
   @Query(() => [DispatchOffer])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async myDispatchOffers(@CurrentUser() user: SupabaseUser): Promise<DispatchOffer[]> {
     return this.dispatchService.myDispatchOffers(user.id);
   }
 
   @Mutation(() => DispatchBatch)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
   async createDispatchBatch(
     @Args('input') input: CreateDispatchBatchDto,
   ): Promise<DispatchBatch> {
@@ -38,6 +46,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => DispatchOffer)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
   async sendDispatchOffer(
     @Args('input') input: CreateDispatchOfferDto,
   ): Promise<DispatchOffer> {
@@ -45,7 +55,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => DispatchOffer)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async respondToDispatchOffer(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: UpdateDispatchOfferDto,
@@ -54,7 +65,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => Shipment)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async markEnRoutePickup(
     @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
@@ -63,7 +75,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => Shipment)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async confirmPickup(
     @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
@@ -72,7 +85,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => Shipment)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async confirmDropoff(
     @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
@@ -81,6 +95,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => ShipmentAssignment)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
   async createShipmentAssignment(
     @Args('input') input: AssignShipmentDto,
   ): Promise<ShipmentAssignment> {
@@ -88,6 +104,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => ShipmentAssignment)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
   async updateShipmentAssignment(
     @Args('id') id: string,
     @Args('input') input: AssignShipmentDto,
@@ -96,6 +114,8 @@ export class DispatchResolver {
   }
 
   @Mutation(() => ShipmentAssignment)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN)
   async cancelShipmentAssignment(
     @Args('id') id: string,
   ): Promise<ShipmentAssignment> {

@@ -3,6 +3,7 @@ import { UseGuards } from '@nestjs/common';
 import { MarketPlaceService } from './market-place.service';
 import {
   ShipmentBid,
+  Shipment,
   ShipmentBidAward,
   CreateShipmentBidDto,
   UpdateShipmentBidDto,
@@ -11,15 +12,19 @@ import {
   MarketplaceShipmentsResult,
 } from '../graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import { UserType } from '../graphql/enums';
 
 @Resolver(() => ShipmentBid)
 export class MarketPlaceResolver {
   constructor(private readonly marketPlaceService: MarketPlaceService) {}
 
   @Query(() => MarketplaceShipmentsResult)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async marketplaceShipments(
     @CurrentUser() user: SupabaseUser,
     @Args('filter', { type: () => MarketplaceShipmentsFilterDto, nullable: true })
@@ -29,7 +34,8 @@ export class MarketPlaceResolver {
   }
 
   @Query(() => [ShipmentBid])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async shipmentBids(
     @CurrentUser() user: SupabaseUser,
     @Args('shipmentId') shipmentId: string,
@@ -38,13 +44,34 @@ export class MarketPlaceResolver {
   }
 
   @Query(() => [ShipmentBid])
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async myBids(@CurrentUser() user: SupabaseUser): Promise<ShipmentBid[]> {
     return this.marketPlaceService.myBids(user.id);
   }
 
+  @Query(() => [Shipment])
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
+  async myFreightRequests(
+    @CurrentUser() user: SupabaseUser,
+  ): Promise<Shipment[]> {
+    return this.marketPlaceService.myFreightRequests(user.id);
+  }
+
+  @Query(() => [ShipmentBid])
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
+  async freightRequestBids(
+    @CurrentUser() user: SupabaseUser,
+    @Args('shipmentId') shipmentId: string,
+  ): Promise<ShipmentBid[]> {
+    return this.marketPlaceService.freightRequestBids(user.id, shipmentId);
+  }
+
   @Mutation(() => ShipmentBid)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async createShipmentBid(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: CreateShipmentBidDto,
@@ -53,7 +80,8 @@ export class MarketPlaceResolver {
   }
 
   @Mutation(() => ShipmentBid)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async updateShipmentBid(
     @CurrentUser() user: SupabaseUser,
     @Args('id') id: string,
@@ -63,7 +91,8 @@ export class MarketPlaceResolver {
   }
 
   @Mutation(() => ShipmentBid)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
   async withdrawBid(
     @CurrentUser() user: SupabaseUser,
     @Args('id') id: string,
@@ -72,7 +101,8 @@ export class MarketPlaceResolver {
   }
 
   @Mutation(() => ShipmentBidAward)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
   async awardShipmentBid(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: AwardShipmentBidDto,

@@ -13,9 +13,12 @@ import {
   ResetPasswordInput,
 } from '../graphql/dto/auth';
 import { AuthResponse, MessageResponse } from '../graphql/types/auth';
+import { Roles } from './decorators/roles.decorator';
 import { GqlAuthGuard } from './guards/gql-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { SupabaseUser } from './supabase/supabase.types';
+import { UserType } from '../graphql/enums';
 
 @Resolver()
 export class AuthResolver {
@@ -50,7 +53,8 @@ export class AuthResolver {
   }
 
   @Mutation(() => MessageResponse)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async requestPhoneOtp(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: RequestPhoneOtpInput,
@@ -59,7 +63,8 @@ export class AuthResolver {
   }
 
   @Mutation(() => MessageResponse)
-  @UseGuards(GqlAuthGuard)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async verifyPhoneOtp(
     @CurrentUser() user: SupabaseUser,
     @Args('input') input: VerifyPhoneOtpInput,

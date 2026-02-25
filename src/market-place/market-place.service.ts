@@ -24,6 +24,7 @@ import {
   ShipmentMode,
   ShipmentStatus,
   UpdateShipmentBidDto,
+  UserType,
   VehicleCategory,
 } from '../graphql';
 
@@ -293,6 +294,127 @@ export class MarketPlaceService {
     );
   }
 
+  async myFreightRequests(profileId: string): Promise<Shipment[]> {
+    const role = await this.requireUserRole(profileId);
+    const where: Prisma.ShipmentWhereInput = {
+      mode: ShipmentMode.MARKETPLACE,
+      ...(role === UserType.ADMIN ? {} : { customerProfileId: profileId }),
+    };
+
+    const shipments = await this.prisma.runWithRetry(
+      'MarketPlaceService.myFreightRequests',
+      () =>
+        this.prisma.shipment.findMany({
+          where,
+          include: {
+            pickupAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+            dropoffAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+    );
+
+    return shipments.map((shipment) =>
+      this.toGraphqlShipment(shipment, {
+        pickupAddressSummary: this.toAddressSummary(shipment.pickupAddress),
+        dropoffAddressSummary: this.toAddressSummary(shipment.dropoffAddress),
+      }),
+    );
+  }
+
+  async freightRequestBids(
+    profileId: string,
+    shipmentId: string,
+  ): Promise<ShipmentBid[]> {
+    const role = await this.requireUserRole(profileId);
+    const shipment = await this.prisma.runWithRetry(
+      'MarketPlaceService.freightRequestBids.shipment',
+      () =>
+        this.prisma.shipment.findUnique({
+          where: {
+            id: shipmentId,
+          },
+          select: {
+            id: true,
+            customerProfileId: true,
+            mode: true,
+          },
+        }),
+    );
+
+    if (!shipment) {
+      throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+    }
+
+    if (shipment.mode !== ShipmentMode.MARKETPLACE) {
+      throw new BadRequestException('Shipment is not a marketplace request');
+    }
+
+    if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
+      throw new ForbiddenException('Only owner can view bids on this request');
+    }
+
+    const bids = await this.prisma.runWithRetry(
+      'MarketPlaceService.freightRequestBids.bids',
+      () =>
+        this.prisma.shipmentBid.findMany({
+          where: {
+            shipmentId,
+          },
+          include: {
+            award: true,
+            shipment: {
+              include: {
+                pickupAddress: {
+                  select: {
+                    address: true,
+                    city: true,
+                  },
+                },
+                dropoffAddress: {
+                  select: {
+                    address: true,
+                    city: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            amountMinor: 'asc',
+          },
+        }),
+    );
+
+    return bids.map((bid) =>
+      this.toGraphqlShipmentBid(bid, {
+        shipment: bid.shipment
+          ? this.toGraphqlShipment(bid.shipment, {
+              pickupAddressSummary: this.toAddressSummary(
+                bid.shipment.pickupAddress,
+              ),
+              dropoffAddressSummary: this.toAddressSummary(
+                bid.shipment.dropoffAddress,
+              ),
+            })
+          : undefined,
+        award: bid.award ? this.toGraphqlShipmentBidAward(bid.award) : undefined,
+      }),
+    );
+  }
+
   async createShipmentBid(
     profileId: string,
     input: CreateShipmentBidDto,
@@ -503,6 +625,7 @@ export class MarketPlaceService {
     input: AwardShipmentBidDto,
   ): Promise<ShipmentBidAward> {
     const now = new Date();
+    const role = await this.requireUserRole(profileId);
 
     const award = await this.prisma.runWithRetry(
       'MarketPlaceService.awardShipmentBid.transaction',
@@ -524,7 +647,7 @@ export class MarketPlaceService {
             );
           }
 
-          if (shipment.customerProfileId !== profileId) {
+          if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
             throw new ForbiddenException(
               'Only the shipment owner can award bids',
             );
@@ -663,6 +786,27 @@ export class MarketPlaceService {
     );
 
     return providerMember?.providerId ?? null;
+  }
+
+  private async requireUserRole(profileId: string): Promise<UserType> {
+    const profile = await this.prisma.runWithRetry(
+      'MarketPlaceService.requireUserRole.profile',
+      () =>
+        this.prisma.profile.findUnique({
+          where: {
+            id: profileId,
+          },
+          select: {
+            userType: true,
+          },
+        }),
+    );
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return profile.userType as UserType;
   }
 
   private async getProviderVehicleCategories(
