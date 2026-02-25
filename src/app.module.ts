@@ -15,6 +15,9 @@ import { UserModule } from './user/user.module';
 import { DatabaseModule } from './database/database.module';
 import { BigIntScalar } from './graphql/scalars';
 import { AddressModule } from './address/address.module';
+import { GqlAuthGuard } from './auth/guards/gql-auth.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
+import { OpsModule } from './ops/ops.module';
 
 @Module({
   imports: [
@@ -33,8 +36,9 @@ import { AddressModule } from './address/address.module';
     KycModule,
     UserModule,
     AddressModule,
+    OpsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, BigIntScalar],
+  providers: [AppService, BigIntScalar, GqlAuthGuard, RolesGuard],
 })
 export class AppModule {}

@@ -2,6 +2,11 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input AddDisputeCommentDto {
+  disputeId: String!
+  message: String!
+}
+
 input AddShipmentItemDto {
   name: String!
   quantity: Float!
@@ -14,6 +19,46 @@ type AddressSuggestion {
   mainText: String
   placeId: String!
   secondaryText: String
+}
+
+type AdminFinanceSummary {
+  currency: String!
+  overdueInvoiceAmountMinor: BigInt!
+  overdueInvoiceCount: Int!
+  pendingRefundAmountMinor: BigInt!
+  pendingRefundCount: Int!
+  totalEscrowMinor: BigInt!
+  totalWalletBalanceMinor: BigInt!
+}
+
+type AdminOverview {
+  activeShipments: Int!
+  currency: String!
+  openDispatchBatches: Int!
+  openDisputes: Int!
+  openFraudFlags: Int!
+  openMarketplaceRequests: Int!
+  openSupportTickets: Int!
+  pendingKycReviews: Int!
+  totalUsers: Int!
+  walletBalanceMinor: BigInt!
+  walletEscrowMinor: BigInt!
+}
+
+type AdminProviderOverview {
+  activeAssignments: Int!
+  businessName: String!
+  createdAt: DateTime!
+  id: ID!
+  kycStatus: String!
+  openOffers: Int!
+  status: String!
+  updatedAt: DateTime!
+}
+
+input ApproveRefundDto {
+  approved: Boolean!
+  refundId: String!
 }
 
 input AssignShipmentDto {
@@ -73,6 +118,29 @@ input CreateDispatchOfferDto {
   vehicleId: String
 }
 
+input CreateDisputeDto {
+  category: String!
+  invoiceId: String
+  reason: String!
+  referenceId: String
+  shipmentId: String
+}
+
+input CreateInvoiceDto {
+  currency: String
+  dueAt: DateTime
+  lineItems: [CreateInvoiceLineItemDto!]!
+  notes: String
+  profileId: String!
+  shipmentId: String
+}
+
+input CreateInvoiceLineItemDto {
+  description: String!
+  quantity: Int
+  unitAmountMinor: BigInt!
+}
+
 input CreateShipmentBidDto {
   amountMinor: BigInt!
   currency: String
@@ -97,6 +165,23 @@ input CreateShipmentDto {
   specialInstructions: String
   trackingCode: String
   vehicleCategory: VehicleCategory!
+}
+
+input CreateSlaRuleDto {
+  isActive: Boolean
+  key: String!
+  providerId: String
+  scope: SlaRuleScope!
+  value: JSON!
+  vehicleCategory: String
+}
+
+input CreateSupportTicketDto {
+  category: String!
+  description: String!
+  priority: SupportTicketPriority
+  referenceId: String
+  subject: String!
 }
 
 input CreateUserAddressDto {
@@ -185,8 +270,143 @@ enum DispatchOfferStatus {
   VIEWED
 }
 
+type DisputeCase {
+  category: String!
+  createdAt: DateTime!
+  disputeNumber: String!
+  events: [DisputeEvent!]
+  id: ID!
+  invoiceId: String
+  ownerProfileId: String!
+  reason: String!
+  referenceId: String
+  resolutionSummary: String
+  resolvedAt: DateTime
+  resolvedByProfileId: String
+  shipmentId: String
+  status: DisputeStatus!
+  updatedAt: DateTime!
+}
+
+type DisputeEvent {
+  actorProfileId: String
+  actorRole: ShipmentActorRole!
+  createdAt: DateTime!
+  disputeCaseId: String!
+  eventType: DisputeEventType!
+  id: ID!
+  message: String
+  metadata: JSON
+}
+
+enum DisputeEventType {
+  COMMENT
+  CREATED
+  RESOLVED
+  STATUS_CHANGED
+}
+
+enum DisputeStatus {
+  INVESTIGATING
+  OPEN
+  REJECTED
+  RESOLVED
+}
+
+input FlagFraudCaseDto {
+  invoiceId: String
+  metadata: JSON
+  reason: String!
+  severity: FraudSeverity
+  shipmentId: String
+  targetId: String!
+  targetType: FraudTargetType!
+}
+
 input ForgotPasswordInput {
   email: String!
+}
+
+type FraudFlag {
+  assignedToProfileId: String
+  createdAt: DateTime!
+  flagCode: String!
+  id: ID!
+  invoiceId: String
+  metadata: JSON
+  raisedByProfileId: String
+  reason: String!
+  resolvedAt: DateTime
+  resolvedByProfileId: String
+  severity: FraudSeverity!
+  shipmentId: String
+  status: FraudStatus!
+  targetId: String!
+  targetType: FraudTargetType!
+  updatedAt: DateTime!
+}
+
+enum FraudSeverity {
+  CRITICAL
+  HIGH
+  LOW
+  MEDIUM
+}
+
+enum FraudStatus {
+  DISMISSED
+  OPEN
+  RESOLVED
+  UNDER_REVIEW
+}
+
+enum FraudTargetType {
+  DISPUTE
+  INVOICE
+  OTHER
+  PROFILE
+  PROVIDER
+  SHIPMENT
+  WALLET
+}
+
+type Invoice {
+  createdAt: DateTime!
+  currency: String!
+  dueAt: DateTime
+  feeMinor: BigInt!
+  id: ID!
+  invoiceNumber: String!
+  issuedAt: DateTime!
+  lineItems: [InvoiceLineItem!]
+  notes: String
+  paidAt: DateTime
+  profileId: String!
+  shipmentId: String
+  status: InvoiceStatus!
+  subtotalMinor: BigInt!
+  taxMinor: BigInt!
+  totalMinor: BigInt!
+  updatedAt: DateTime!
+}
+
+type InvoiceLineItem {
+  createdAt: DateTime!
+  description: String!
+  id: ID!
+  invoiceId: String!
+  quantity: Int!
+  totalAmountMinor: BigInt!
+  unitAmountMinor: BigInt!
+}
+
+enum InvoiceStatus {
+  CANCELLED
+  DRAFT
+  OVERDUE
+  PAID
+  PENDING
+  REFUNDED
 }
 
 """
@@ -256,7 +476,9 @@ type MessageResponse {
 }
 
 type Mutation {
+  addDisputeComment(input: AddDisputeCommentDto!): DisputeEvent!
   addShipmentItem(input: AddShipmentItemDto!): ShipmentItem!
+  approveRefund(input: ApproveRefundDto!): Refund!
   awardShipmentBid(input: AwardShipmentBidDto!): ShipmentBidAward!
   cancelShipment(input: CancelShipmentDto!): Shipment!
   cancelShipmentAssignment(id: String!): ShipmentAssignment!
@@ -264,31 +486,43 @@ type Mutation {
   confirmPickup(shipmentId: String!): Shipment!
   confirmWalletFunding(input: ConfirmWalletFundingInput!): WalletFundingResult!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
+  createDispute(input: CreateDisputeDto!): DisputeCase!
+  createInvoice(input: CreateInvoiceDto!): Invoice!
   createKycCase(providerId: String): KYCCase!
   createShipment(input: CreateShipmentDto!): Shipment!
   createShipmentAssignment(input: AssignShipmentDto!): ShipmentAssignment!
   createShipmentBid(input: CreateShipmentBidDto!): ShipmentBid!
+  createSlaRule(input: CreateSlaRuleDto!): SLARule!
+  createSupportTicket(input: CreateSupportTicketDto!): SupportTicket!
   createUserAddress(input: CreateUserAddressDto!): UserAddress!
   createVehicle(input: CreateVehicleDto!): Vehicle!
   createWalletFunding(input: CreateWalletFundingInput!): WalletFundingResult!
   createWalletWithdrawal(input: CreateWalletWithdrawalInput!): WalletWithdrawal!
+  flagFraudCase(input: FlagFraudCaseDto!): FraudFlag!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
   initiateNinVerification(input: VerifyNINDto!): NINVerification!
   markEnRoutePickup(shipmentId: String!): Shipment!
   refreshToken(refreshToken: String): AuthResponse!
+  replySupportTicket(input: ReplySupportTicketDto!): SupportTicketMessage!
   requestOtp(input: RequestOtpInput!): MessageResponse!
   requestPhoneOtp(input: RequestPhoneOtpInput!): MessageResponse!
   resetPassword(input: ResetPasswordInput!): MessageResponse!
+  resolveDispute(input: ResolveDisputeDto!): DisputeCase!
   respondToDispatchOffer(input: UpdateDispatchOfferDto!): DispatchOffer!
   reviewKycCase(approved: Boolean!, id: String!): KYCCase!
   sendDispatchOffer(input: CreateDispatchOfferDto!): DispatchOffer!
   signIn(input: SignInInput!): AuthResponse!
   signUp(input: SignUpInput!): MessageResponse!
   submitKycCase(id: String!): KYCCase!
+  updateFraudFlagStatus(input: UpdateFraudFlagStatusDto!): FraudFlag!
+  updateInvoiceStatus(input: UpdateInvoiceStatusDto!): Invoice!
+  updatePlatformConfig(input: UpdatePlatformConfigDto!): PlatformConfig!
   updateProfile(input: UpdateProfileInput!): Profile!
   updateShipment(id: String!, input: UpdateShipmentDto!): Shipment!
   updateShipmentAssignment(id: String!, input: AssignShipmentDto!): ShipmentAssignment!
   updateShipmentBid(id: String!, input: UpdateShipmentBidDto!): ShipmentBid!
+  updateSlaRule(input: UpdateSlaRuleDto!): SLARule!
+  updateSupportTicketStatus(input: UpdateSupportTicketStatusDto!): SupportTicket!
   uploadKycDocument(input: UploadKYCDocumentDto!): KYCDocument!
   verifyOtp(input: VerifyOtpInput!): AuthResponse!
   verifyPhoneOtp(input: VerifyPhoneOtpInput!): MessageResponse!
@@ -352,6 +586,16 @@ type Permission {
   updatedAt: DateTime!
 }
 
+type PlatformConfig {
+  createdAt: DateTime!
+  description: String
+  id: ID!
+  key: String!
+  updatedAt: DateTime!
+  updatedByProfileId: String
+  value: JSON!
+}
+
 enum PreferredLanguage {
   EN
   ZH_HANS
@@ -391,29 +635,79 @@ type ProviderDashboardQuary {
 }
 
 type Query {
+  adminConfig: [PlatformConfig!]!
+  adminDispatchQueue: [DispatchBatch!]!
+  adminDisputes: [DisputeCase!]!
+  adminFinanceSummary: AdminFinanceSummary!
+  adminFraudFlags: [FraudFlag!]!
+  adminLiveShipments: [Shipment!]!
+  adminMarketplaceBoard: [Shipment!]!
+  adminOverview: AdminOverview!
+  adminProviderKyc(providerId: String!): [KYCCase!]!
+  adminProviders: [AdminProviderOverview!]!
+  adminSlaRules: [SLARule!]!
   allowedShipmentCurrencies: [String!]!
   currentAddress(lat: Float!, lng: Float!): ResolvedAddress
   dispatchBatches: [DispatchBatch!]!
+  dispute(id: String!): DisputeCase
+  freightRequestBids(shipmentId: String!): [ShipmentBid!]!
   getProviderDashboardQuary: ProviderDashboardQuary!
+  invoice(id: String!): Invoice
   kycCase(id: String!): KYCCase
   kycCases: [KYCCase!]!
   marketplaceShipments(filter: MarketplaceShipmentsFilterDto): MarketplaceShipmentsResult!
   me: Profile
   myBids: [ShipmentBid!]!
   myDispatchOffers: [DispatchOffer!]!
+  myDisputes: [DisputeCase!]!
+  myFreightRequests: [Shipment!]!
+  myInvoices: [Invoice!]!
   mySavedFundingCards: [WalletCardMethod!]!
   mySavedWithdrawalAccounts: [WalletSavedBankAccount!]!
   myShipmentDashboard: ShipmentDashboard!
+  mySupportTickets: [SupportTicket!]!
   myUserAddresses: [UserAddress!]!
+  myVehicles: [Vehicle!]!
   myWallet: WalletAccount
   myWalletCompliance: WalletCompliance!
   myWalletTransactions(input: WalletTransactionsInput): WalletTransactionsConnection!
   paystackSupportedBanks(countryCode: String): [WalletBank!]!
+  providerDashboard: ProviderDashboardQuary!
   searchAddresses(input: SearchAddressInput!): [AddressSuggestion!]!
   shipment(id: String!): Shipment
   shipmentBids(shipmentId: String!): [ShipmentBid!]!
+  shipmentTimeline(id: String!): [ShipmentEvent!]!
+  shipmentTracking(id: String!): ShipmentTracking!
   shipments(filter: ShipmentQueryFilter): [Shipment!]!
+  supportTicket(id: String!): SupportTicket
   walletTransactions(walletAccountId: String!): [Transaction!]!
+}
+
+type Refund {
+  amountMinor: BigInt!
+  approvedAt: DateTime
+  approvedByProfileId: String
+  createdAt: DateTime!
+  currency: String!
+  id: ID!
+  initiatedByProfileId: String!
+  processedAt: DateTime
+  reason: String
+  shipmentId: String!
+  status: RefundStatus!
+  transactionId: String!
+  updatedAt: DateTime!
+}
+
+enum RefundStatus {
+  FAILED
+  PENDING
+  SUCCEEDED
+}
+
+input ReplySupportTicketDto {
+  message: String!
+  ticketId: String!
 }
 
 input RequestOtpInput {
@@ -427,6 +721,12 @@ input RequestPhoneOtpInput {
 
 input ResetPasswordInput {
   newPassword: String!
+}
+
+input ResolveDisputeDto {
+  disputeId: String!
+  resolutionSummary: String!
+  status: DisputeStatus
 }
 
 type ResolvedAddress {
@@ -455,6 +755,17 @@ type RolePermission {
   permission: Permission!
   permissionId: String!
   roleId: String!
+}
+
+type SLARule {
+  createdAt: DateTime!
+  id: ID!
+  isActive: Boolean!
+  key: String!
+  providerId: String
+  scope: SlaRuleScope!
+  value: JSON!
+  vehicleCategory: String
 }
 
 input SearchAddressInput {
@@ -491,6 +802,13 @@ type Shipment {
   trackingCode: String!
   updatedAt: DateTime!
   vehicleCategory: VehicleCategory!
+}
+
+enum ShipmentActorRole {
+  ADMIN
+  CUSTOMER
+  PROVIDER
+  SYSTEM
 }
 
 type ShipmentAssignment {
@@ -565,6 +883,28 @@ type ShipmentDashboardSummary {
   totalShipments: Int!
 }
 
+type ShipmentEvent {
+  actorProfileId: String
+  actorRole: ShipmentActorRole
+  createdAt: DateTime!
+  eventType: ShipmentEventType!
+  id: ID!
+  metadata: JSON
+  shipmentId: String!
+}
+
+enum ShipmentEventType {
+  ACCEPTED
+  ASSIGNED
+  BID_PLACED
+  BROADCASTED
+  CANCELLED
+  COMPLETED
+  CREATED
+  DELIVERED
+  PICKED_UP
+}
+
 type ShipmentItem {
   createdAt: DateTime!
   id: ID!
@@ -572,6 +912,33 @@ type ShipmentItem {
   quantity: Float!
   shipmentId: String!
   weightKg: Float
+}
+
+type ShipmentMilestone {
+  createdAt: DateTime!
+  id: ID!
+  lat: Float
+  lng: Float
+  metadata: JSON
+  milestoneType: ShipmentMilestoneType!
+  occurredAt: DateTime
+  shipmentId: String!
+  status: ShipmentMilestoneStatus!
+}
+
+enum ShipmentMilestoneStatus {
+  PENDING
+  REACHED
+  VERIFIED
+}
+
+enum ShipmentMilestoneType {
+  ACCEPTED
+  ARRIVED_DROPOFF
+  ARRIVED_PICKUP
+  COMPLETED
+  DELIVERED
+  PICKED_UP
 }
 
 enum ShipmentMode {
@@ -604,6 +971,12 @@ enum ShipmentStatus {
   PICKED_UP
 }
 
+type ShipmentTracking {
+  events: [ShipmentEvent!]!
+  milestones: [ShipmentMilestone!]!
+  shipment: Shipment!
+}
+
 input SignInInput {
   email: String!
   password: String!
@@ -622,10 +995,57 @@ input SignUpInput {
   userType: UserType!
 }
 
+enum SlaRuleScope {
+  GLOBAL
+  PROVIDER
+  VEHICLE_CATEGORY
+}
+
 enum State {
   ABUJA
   LAGOS
   OYO
+}
+
+type SupportTicket {
+  assignedAdminProfileId: String
+  category: String!
+  closedAt: DateTime
+  createdAt: DateTime!
+  description: String!
+  id: ID!
+  messages: [SupportTicketMessage!]
+  ownerProfileId: String!
+  priority: SupportTicketPriority!
+  referenceId: String
+  resolvedAt: DateTime
+  status: SupportTicketStatus!
+  subject: String!
+  ticketNumber: String!
+  updatedAt: DateTime!
+}
+
+type SupportTicketMessage {
+  authorProfileId: String
+  authorRole: ShipmentActorRole!
+  body: String!
+  createdAt: DateTime!
+  id: ID!
+  ticketId: String!
+}
+
+enum SupportTicketPriority {
+  CRITICAL
+  HIGH
+  LOW
+  MEDIUM
+}
+
+enum SupportTicketStatus {
+  CLOSED
+  IN_PROGRESS
+  OPEN
+  RESOLVED
 }
 
 type Transaction {
@@ -673,6 +1093,23 @@ input UpdateDispatchOfferDto {
   status: DispatchOfferStatus!
 }
 
+input UpdateFraudFlagStatusDto {
+  fraudFlagId: String!
+  note: String
+  status: FraudStatus!
+}
+
+input UpdateInvoiceStatusDto {
+  invoiceId: String!
+  status: InvoiceStatus!
+}
+
+input UpdatePlatformConfigDto {
+  description: String
+  key: String!
+  value: JSON!
+}
+
 input UpdateProfileInput {
   firstName: String
   lastName: String
@@ -710,6 +1147,17 @@ input UpdateShipmentDto {
   status: ShipmentStatus
   trackingCode: String
   vehicleCategory: VehicleCategory
+}
+
+input UpdateSlaRuleDto {
+  id: String!
+  isActive: Boolean
+  value: JSON
+}
+
+input UpdateSupportTicketStatusDto {
+  status: SupportTicketStatus!
+  ticketId: String!
 }
 
 input UploadKYCDocumentDto {

@@ -98,6 +98,9 @@ model Shipment {
   penalties          ProviderPenalty[]
   walletTransactions WalletTransaction[]
   refunds            Refund[]
+  disputes           DisputeCase[]
+  invoices           Invoice[]            @relation("ShipmentInvoices")
+  fraudFlags         FraudFlag[]
 
   @@index([customerProfileId, createdAt(sort: Desc)])
   @@index([status, vehicleCategory, mode])

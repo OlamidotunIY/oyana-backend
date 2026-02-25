@@ -37,6 +37,17 @@ model Profile {
   savedBankAccounts         WalletSavedBankAccount[]
   walletWithdrawals         WalletWithdrawal[]
   walletIdempotencyKeys     WalletIdempotencyKey[]
+  supportTickets            SupportTicket[]       @relation("SupportTicketOwner")
+  assignedSupportTickets    SupportTicket[]       @relation("SupportTicketAssignee")
+  supportTicketMessages     SupportTicketMessage[] @relation("SupportTicketMessageAuthor")
+  disputeCases              DisputeCase[]         @relation("DisputeOwner")
+  resolvedDisputes          DisputeCase[]         @relation("DisputeResolver")
+  disputeEvents             DisputeEvent[]        @relation("DisputeEventActor")
+  invoices                  Invoice[]             @relation("ProfileInvoices")
+  fraudFlagsRaised          FraudFlag[]           @relation("FraudRaisedBy")
+  fraudFlagsAssigned        FraudFlag[]           @relation("FraudAssignedTo")
+  fraudFlagsResolved        FraudFlag[]           @relation("FraudResolvedBy")
+  platformConfigUpdates     PlatformConfig[]      @relation("PlatformConfigUpdater")
 
   @@map("profiles")
 }

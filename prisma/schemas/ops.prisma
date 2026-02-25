@@ -1,0 +1,251 @@
+// ============================================================================
+// OPS DOMAIN: Support, Disputes, Invoices, Fraud, Platform Config
+// ============================================================================
+
+enum SupportTicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum SupportTicketPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum DisputeStatus {
+  open
+  investigating
+  resolved
+  rejected
+}
+
+enum DisputeEventType {
+  created
+  comment
+  status_changed
+  resolved
+}
+
+enum InvoiceStatus {
+  draft
+  pending
+  paid
+  overdue
+  cancelled
+  refunded
+}
+
+enum FraudSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum FraudStatus {
+  open
+  under_review
+  resolved
+  dismissed
+}
+
+enum FraudTargetType {
+  shipment
+  profile
+  provider
+  wallet
+  invoice
+  dispute
+  other
+}
+
+model SupportTicket {
+  id                     String                @id @default(uuid()) @db.Uuid
+  ticketNumber           String                @unique @map("ticket_number")
+  ownerProfileId         String                @map("owner_profile_id") @db.Uuid
+  subject                String
+  category               String
+  priority               SupportTicketPriority @default(medium)
+  status                 SupportTicketStatus   @default(open)
+  referenceId            String?               @map("reference_id")
+  description            String
+  assignedAdminProfileId String?               @map("assigned_admin_profile_id") @db.Uuid
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  resolvedAt             DateTime?             @map("resolved_at") @db.Timestamptz(6)
+  closedAt               DateTime?             @map("closed_at") @db.Timestamptz(6)
+
+  // Relations
+  ownerProfile  Profile                @relation("SupportTicketOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  assignedAdmin Profile?               @relation("SupportTicketAssignee", fields: [assignedAdminProfileId], references: [id], onDelete: SetNull)
+  messages      SupportTicketMessage[]
+
+  @@index([ownerProfileId, createdAt(sort: Desc)])
+  @@index([status, priority, updatedAt(sort: Desc)])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id              String            @id @default(uuid()) @db.Uuid
+  ticketId        String            @map("ticket_id") @db.Uuid
+  authorProfileId String?           @map("author_profile_id") @db.Uuid
+  authorRole      ShipmentActorRole @map("author_role")
+  body            String
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  ticket        SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorProfile Profile?      @relation("SupportTicketMessageAuthor", fields: [authorProfileId], references: [id], onDelete: SetNull)
+
+  @@index([ticketId, createdAt])
+  @@index([authorProfileId, createdAt(sort: Desc)])
+  @@map("support_ticket_messages")
+}
+
+model DisputeCase {
+  id                String       @id @default(uuid()) @db.Uuid
+  disputeNumber     String       @unique @map("dispute_number")
+  ownerProfileId    String       @map("owner_profile_id") @db.Uuid
+  shipmentId        String?      @map("shipment_id") @db.Uuid
+  invoiceId         String?      @map("invoice_id") @db.Uuid
+  referenceId       String?      @map("reference_id")
+  category          String
+  reason            String
+  status            DisputeStatus @default(open)
+  resolutionSummary String?      @map("resolution_summary")
+  resolvedByProfileId String?    @map("resolved_by_profile_id") @db.Uuid
+  resolvedAt        DateTime?    @map("resolved_at") @db.Timestamptz(6)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  ownerProfile      Profile        @relation("DisputeOwner", fields: [ownerProfileId], references: [id], onDelete: Cascade)
+  resolvedByProfile Profile?       @relation("DisputeResolver", fields: [resolvedByProfileId], references: [id], onDelete: SetNull)
+  shipment          Shipment?      @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  invoice           Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  events            DisputeEvent[]
+
+  @@index([ownerProfileId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([shipmentId])
+  @@index([invoiceId])
+  @@map("dispute_cases")
+}
+
+model DisputeEvent {
+  id            String            @id @default(uuid()) @db.Uuid
+  disputeCaseId String            @map("dispute_case_id") @db.Uuid
+  actorProfileId String?          @map("actor_profile_id") @db.Uuid
+  actorRole     ShipmentActorRole @map("actor_role")
+  eventType     DisputeEventType  @map("event_type")
+  message       String?
+  metadata      Json?
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  disputeCase  DisputeCase @relation(fields: [disputeCaseId], references: [id], onDelete: Cascade)
+  actorProfile Profile?    @relation("DisputeEventActor", fields: [actorProfileId], references: [id], onDelete: SetNull)
+
+  @@index([disputeCaseId, createdAt])
+  @@index([actorProfileId, createdAt(sort: Desc)])
+  @@map("dispute_events")
+}
+
+model Invoice {
+  id           String       @id @default(uuid()) @db.Uuid
+  invoiceNumber String      @unique @map("invoice_number")
+  profileId    String       @map("profile_id") @db.Uuid
+  shipmentId   String?      @map("shipment_id") @db.Uuid
+  status       InvoiceStatus @default(pending)
+  currency     String       @default("NGN") @db.Char(3)
+  subtotalMinor BigInt      @map("subtotal_minor")
+  feeMinor     BigInt       @default(0) @map("fee_minor")
+  taxMinor     BigInt       @default(0) @map("tax_minor")
+  totalMinor   BigInt       @map("total_minor")
+  issuedAt     DateTime     @default(now()) @map("issued_at") @db.Timestamptz(6)
+  dueAt        DateTime?    @map("due_at") @db.Timestamptz(6)
+  paidAt       DateTime?    @map("paid_at") @db.Timestamptz(6)
+  notes        String?
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  profile   Profile           @relation("ProfileInvoices", fields: [profileId], references: [id], onDelete: Cascade)
+  shipment  Shipment?         @relation("ShipmentInvoices", fields: [shipmentId], references: [id], onDelete: SetNull)
+  lineItems InvoiceLineItem[]
+  disputes  DisputeCase[]
+  fraudFlags FraudFlag[]
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([status, dueAt])
+  @@index([shipmentId])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id              String   @id @default(uuid()) @db.Uuid
+  invoiceId       String   @map("invoice_id") @db.Uuid
+  description     String
+  quantity        Int      @default(1)
+  unitAmountMinor BigInt   @map("unit_amount_minor")
+  totalAmountMinor BigInt  @map("total_amount_minor")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_line_items")
+}
+
+model FraudFlag {
+  id                 String         @id @default(uuid()) @db.Uuid
+  flagCode           String         @unique @map("flag_code")
+  targetType         FraudTargetType @map("target_type")
+  targetId           String         @map("target_id")
+  severity           FraudSeverity  @default(medium)
+  status             FraudStatus    @default(open)
+  reason             String
+  metadata           Json?
+  invoiceId          String?        @map("invoice_id") @db.Uuid
+  shipmentId         String?        @map("shipment_id") @db.Uuid
+  raisedByProfileId  String?        @map("raised_by_profile_id") @db.Uuid
+  assignedToProfileId String?       @map("assigned_to_profile_id") @db.Uuid
+  resolvedByProfileId String?       @map("resolved_by_profile_id") @db.Uuid
+  resolvedAt         DateTime?      @map("resolved_at") @db.Timestamptz(6)
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  invoice           Invoice? @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  shipment          Shipment? @relation(fields: [shipmentId], references: [id], onDelete: SetNull)
+  raisedByProfile   Profile? @relation("FraudRaisedBy", fields: [raisedByProfileId], references: [id], onDelete: SetNull)
+  assignedToProfile Profile? @relation("FraudAssignedTo", fields: [assignedToProfileId], references: [id], onDelete: SetNull)
+  resolvedByProfile Profile? @relation("FraudResolvedBy", fields: [resolvedByProfileId], references: [id], onDelete: SetNull)
+
+  @@index([targetType, targetId])
+  @@index([status, severity, createdAt(sort: Desc)])
+  @@index([invoiceId])
+  @@index([shipmentId])
+  @@map("fraud_flags")
+}
+
+model PlatformConfig {
+  id               String   @id @default(uuid()) @db.Uuid
+  key              String   @unique
+  value            Json
+  description      String?
+  updatedByProfileId String? @map("updated_by_profile_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  updatedByProfile Profile? @relation("PlatformConfigUpdater", fields: [updatedByProfileId], references: [id], onDelete: SetNull)
+
+  @@index([key])
+  @@map("platform_configs")
+}

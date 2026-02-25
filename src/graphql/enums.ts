@@ -234,6 +234,83 @@ export const BidStatus = {
 export type BidStatus = (typeof BidStatus)[keyof typeof BidStatus];
 
 // ============================================================================
+// OPS ENUMS
+// ============================================================================
+
+export const SupportTicketStatus = {
+  OPEN: 'open',
+  IN_PROGRESS: 'in_progress',
+  RESOLVED: 'resolved',
+  CLOSED: 'closed',
+} as const;
+export type SupportTicketStatus =
+  (typeof SupportTicketStatus)[keyof typeof SupportTicketStatus];
+
+export const SupportTicketPriority = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  CRITICAL: 'critical',
+} as const;
+export type SupportTicketPriority =
+  (typeof SupportTicketPriority)[keyof typeof SupportTicketPriority];
+
+export const DisputeStatus = {
+  OPEN: 'open',
+  INVESTIGATING: 'investigating',
+  RESOLVED: 'resolved',
+  REJECTED: 'rejected',
+} as const;
+export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus];
+
+export const DisputeEventType = {
+  CREATED: 'created',
+  COMMENT: 'comment',
+  STATUS_CHANGED: 'status_changed',
+  RESOLVED: 'resolved',
+} as const;
+export type DisputeEventType =
+  (typeof DisputeEventType)[keyof typeof DisputeEventType];
+
+export const InvoiceStatus = {
+  DRAFT: 'draft',
+  PENDING: 'pending',
+  PAID: 'paid',
+  OVERDUE: 'overdue',
+  CANCELLED: 'cancelled',
+  REFUNDED: 'refunded',
+} as const;
+export type InvoiceStatus = (typeof InvoiceStatus)[keyof typeof InvoiceStatus];
+
+export const FraudSeverity = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  CRITICAL: 'critical',
+} as const;
+export type FraudSeverity = (typeof FraudSeverity)[keyof typeof FraudSeverity];
+
+export const FraudStatus = {
+  OPEN: 'open',
+  UNDER_REVIEW: 'under_review',
+  RESOLVED: 'resolved',
+  DISMISSED: 'dismissed',
+} as const;
+export type FraudStatus = (typeof FraudStatus)[keyof typeof FraudStatus];
+
+export const FraudTargetType = {
+  SHIPMENT: 'shipment',
+  PROFILE: 'profile',
+  PROVIDER: 'provider',
+  WALLET: 'wallet',
+  INVOICE: 'invoice',
+  DISPUTE: 'dispute',
+  OTHER: 'other',
+} as const;
+export type FraudTargetType =
+  (typeof FraudTargetType)[keyof typeof FraudTargetType];
+
+// ============================================================================
 // WALLET ENUMS
 // ============================================================================
 
@@ -375,6 +452,14 @@ registerEnumType(DispatchBatchStatus, { name: 'DispatchBatchStatus' });
 registerEnumType(DispatchOfferStatus, { name: 'DispatchOfferStatus' });
 registerEnumType(ShipmentAssignmentStatus, { name: 'ShipmentAssignmentStatus' });
 registerEnumType(BidStatus, { name: 'BidStatus' });
+registerEnumType(SupportTicketStatus, { name: 'SupportTicketStatus' });
+registerEnumType(SupportTicketPriority, { name: 'SupportTicketPriority' });
+registerEnumType(DisputeStatus, { name: 'DisputeStatus' });
+registerEnumType(DisputeEventType, { name: 'DisputeEventType' });
+registerEnumType(InvoiceStatus, { name: 'InvoiceStatus' });
+registerEnumType(FraudSeverity, { name: 'FraudSeverity' });
+registerEnumType(FraudStatus, { name: 'FraudStatus' });
+registerEnumType(FraudTargetType, { name: 'FraudTargetType' });
 registerEnumType(TransactionStatus, { name: 'TransactionStatus' });
 registerEnumType(WalletAccountStatus, { name: 'WalletAccountStatus' });
 registerEnumType(TransactionDirection, { name: 'TransactionDirection' });
