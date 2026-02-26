@@ -14,8 +14,9 @@ import {
   FraudSeverity,
   FraudStatus,
   FraudTargetType,
-  KYCCase,
   PlatformConfig,
+  ProviderKycCheck,
+  ProviderKycStatus,
   Refund,
   Shipment,
   ShipmentMode,
@@ -124,10 +125,10 @@ export class AdminOpsService {
           },
         },
       }),
-      this.prisma.providerKycCase.count({
+      this.prisma.providerKycProfile.count({
         where: {
-          status: {
-            in: ['pending', 'submitted', 'needs_more_info'],
+          overallStatus: {
+            in: ['pending', 'failed', 'unverified'],
           },
         },
       }),
@@ -226,13 +227,9 @@ export class AdminOpsService {
             dispatchOffers: true,
           },
         },
-        kycCases: {
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: 1,
+        kycProfile: {
           select: {
-            status: true,
+            overallStatus: true,
           },
         },
       },
@@ -248,39 +245,88 @@ export class AdminOpsService {
       status: provider.status,
       activeAssignments: provider._count.shipmentAssignments,
       openOffers: provider._count.dispatchOffers,
-      kycStatus: provider.kycCases[0]?.status ?? 'pending',
+      kycStatus: provider.kycProfile?.overallStatus ?? 'unverified',
       createdAt: provider.createdAt,
       updatedAt: provider.updatedAt,
     }));
   }
 
-  async adminProviderKyc(profileId: string, providerId: string): Promise<KYCCase[]> {
+  async adminProviderKyc(
+    profileId: string,
+    providerId: string,
+  ): Promise<ProviderKycStatus | null> {
     await this.assertAdmin(profileId);
 
-    const cases = await this.prisma.providerKycCase.findMany({
+    const status = await this.prisma.providerKycProfile.findUnique({
+      where: {
+        providerId,
+      },
+    });
+
+    if (!status) {
+      return null;
+    }
+
+    return {
+      id: status.id,
+      providerId: status.providerId,
+      overallStatus: status.overallStatus,
+      kycLevel: status.kycLevel,
+      ninStatus: status.ninStatus,
+      phoneStatus: status.phoneStatus,
+      faceStatus: status.faceStatus,
+      vehiclePlateStatus: status.vehiclePlateStatus,
+      vehicleVinStatus: status.vehicleVinStatus,
+      ninVerifiedAt: status.ninVerifiedAt ?? undefined,
+      phoneVerifiedAt: status.phoneVerifiedAt ?? undefined,
+      faceVerifiedAt: status.faceVerifiedAt ?? undefined,
+      vehiclePlateVerifiedAt: status.vehiclePlateVerifiedAt ?? undefined,
+      vehicleVinVerifiedAt: status.vehicleVinVerifiedAt ?? undefined,
+      faceConfidence: status.faceConfidence ? Number(status.faceConfidence) : undefined,
+      maskedNin: status.maskedNin ?? undefined,
+      maskedPhone: status.maskedPhone ?? undefined,
+      failureSummary: status.failureSummary ?? undefined,
+      lastVendorSyncAt: status.lastVendorSyncAt ?? undefined,
+      lastCheckAt: status.lastCheckAt ?? undefined,
+      createdAt: status.createdAt,
+      updatedAt: status.updatedAt,
+    };
+  }
+
+  async adminProviderKycChecks(
+    profileId: string,
+    providerId: string,
+  ): Promise<ProviderKycCheck[]> {
+    await this.assertAdmin(profileId);
+
+    const checks = await this.prisma.providerKycCheck.findMany({
       where: {
         providerId,
       },
       orderBy: {
-        updatedAt: 'desc',
+        createdAt: 'desc',
       },
+      take: 200,
     });
 
-    return cases.map((item) => ({
+    return checks.map((item) => ({
       id: item.id,
       providerId: item.providerId,
-      status: item.status as KYCCase['status'],
-      kycLevel: item.kycLevel,
-      ninVerified: item.ninVerified,
-      phoneVerified: item.phoneVerified,
-      faceVerified: item.faceVerified,
-      vehicleVerified: item.vehicleVerified,
-      documentsVerified: item.documentsVerified,
-      submittedAt: item.submittedAt ?? undefined,
-      rejectionReason: item.rejectionReason ?? undefined,
-      reviewedBy: item.reviewedBy ?? undefined,
-      reviewedAt: item.reviewedAt ?? undefined,
-      lastVerificationAttempt: item.lastVerificationAttempt ?? undefined,
+      profileId: item.profileId ?? undefined,
+      vehicleId: item.vehicleId ?? undefined,
+      checkType: item.checkType,
+      status: item.status,
+      vendor: item.vendor,
+      vendorReference: item.vendorReference ?? undefined,
+      responseCode: item.responseCode ?? undefined,
+      confidence: item.confidence ? Number(item.confidence) : undefined,
+      message: item.message ?? undefined,
+      maskedIdentifier: item.maskedIdentifier ?? undefined,
+      normalizedData: item.normalizedData as Record<string, unknown> | undefined,
+      expiresAt: item.expiresAt ?? undefined,
+      verifiedAt: item.verifiedAt ?? undefined,
+      failedAt: item.failedAt ?? undefined,
+      initiatedByProfileId: item.initiatedByProfileId ?? undefined,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
     }));

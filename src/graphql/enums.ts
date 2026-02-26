@@ -83,47 +83,6 @@ export enum VehicleStatus {
   INACTIVE = 'inactive',
 }
 
-export enum KycCaseStatus {
-  DRAFT = 'draft',
-  SUBMITTED = 'submitted',
-  APPROVED = 'approved',
-  REJECTED = 'rejected',
-  NEEDS_MORE_INFO = 'needs_more_info',
-}
-
-export { KycCaseStatus as KYCCaseStatus };
-
-export enum KYCCaseType {
-  INDIVIDUAL = 'individual',
-  COMPANY = 'company',
-}
-
-export enum KycDocumentType {
-  NIN = 'nin',
-  DRIVERS_LICENSE = 'drivers_license',
-  VEHICLE_REG = 'vehicle_reg',
-  PASSPORT = 'passport',
-  WAYBILL_TEMPLATE = 'waybill_template',
-}
-
-export { KycDocumentType as KYCDocumentType };
-
-export enum KycDocumentStatus {
-  UPLOADED = 'uploaded',
-  VERIFIED = 'verified',
-  REJECTED = 'rejected',
-}
-
-export { KycDocumentStatus as KYCDocumentStatus };
-
-export enum NinVerificationStatus {
-  PENDING = 'pending',
-  VERIFIED = 'verified',
-  FAILED = 'failed',
-}
-
-export { NinVerificationStatus as NINVerificationStatus };
-
 // ============================================================================
 // SHIPMENT ENUMS
 // ============================================================================
@@ -437,11 +396,6 @@ registerEnumType(ProviderStatus, { name: 'ProviderStatus' });
 registerEnumType(ProviderMemberRole, { name: 'ProviderMemberRole' });
 registerEnumType(VehicleCategory, { name: 'VehicleCategory' });
 registerEnumType(VehicleStatus, { name: 'VehicleStatus' });
-registerEnumType(KycCaseStatus, { name: 'KycCaseStatus' });
-registerEnumType(KYCCaseType, { name: 'KYCCaseType' });
-registerEnumType(KycDocumentType, { name: 'KycDocumentType' });
-registerEnumType(KycDocumentStatus, { name: 'KycDocumentStatus' });
-registerEnumType(NinVerificationStatus, { name: 'NinVerificationStatus' });
 registerEnumType(ShipmentMode, { name: 'ShipmentMode' });
 registerEnumType(ShipmentScheduleType, { name: 'ShipmentScheduleType' });
 registerEnumType(ShipmentStatus, { name: 'ShipmentStatus' });

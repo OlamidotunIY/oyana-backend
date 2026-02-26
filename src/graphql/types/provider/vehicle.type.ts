@@ -17,6 +17,9 @@ export class Vehicle {
   plateNumber?: string;
 
   @Field({ nullable: true })
+  vin?: string;
+
+  @Field({ nullable: true })
   make?: string;
 
   @Field({ nullable: true })
@@ -30,6 +33,18 @@ export class Vehicle {
 
   @Field(() => GraphQLBigInt, { nullable: true })
   capacityVolumeCm3?: bigint;
+
+  @Field({ nullable: true })
+  plateVerificationStatus?: string;
+
+  @Field({ nullable: true })
+  vinVerificationStatus?: string;
+
+  @Field({ nullable: true })
+  lastVerificationAt?: Date;
+
+  @Field({ nullable: true })
+  verificationFailureReason?: string;
 
   @Field(() => VehicleStatus)
   status: VehicleStatus;

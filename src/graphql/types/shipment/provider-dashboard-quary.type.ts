@@ -1,5 +1,5 @@
 import { Field, ObjectType } from '@nestjs/graphql';
-import { KYCCase } from '../provider/kyc-case.type';
+import { ProviderKycStatus } from '../provider/provider-kyc-status.type';
 import { Vehicle } from '../provider/vehicle.type';
 import { WalletAccount } from '../wallet/wallet-account.type';
 import { ShipmentDashboard } from './shipment-dashboard.type';
@@ -13,8 +13,8 @@ export class ProviderDashboardQuary {
   @Field(() => WalletAccount, { nullable: true })
   myWallet: WalletAccount | null;
 
-  @Field(() => [KYCCase])
-  kycCases: KYCCase[];
+  @Field(() => ProviderKycStatus, { nullable: true })
+  kycStatus?: ProviderKycStatus | null;
 
   @Field(() => [Shipment])
   activeAssignments: Shipment[];

@@ -1,96 +1,109 @@
 import { UseGuards } from '@nestjs/common';
-import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
+import { MobileClientGuard } from '../auth/guards/mobile-client.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { SupabaseUser } from '../auth/supabase/supabase.types';
-import { KycService } from './kyc.service';
 import {
+  CreateKycUploadUrlDto,
   CreateVehicleDto,
-  KYCCase,
-  KYCDocument,
-  NINVerification,
-  UploadKYCDocumentDto,
+  KycUploadUrl,
+  MyKycChecksFilterDto,
+  ProviderKycCheck,
+  ProviderKycStatus,
+  StartNinFaceVerificationDto,
+  StartPhoneVerificationDto,
+  StartVehiclePlateVerificationDto,
+  StartVehicleVinVerificationDto,
+  SyncKycStatusDto,
+  UserType,
   Vehicle,
-  VerifyNINDto,
 } from '../graphql';
-import { UserType } from '../graphql/enums';
+import { KycService } from './kyc.service';
 
-@Resolver(() => KYCCase)
+@Resolver()
+@UseGuards(GqlAuthGuard, RolesGuard)
 export class KycResolver {
   constructor(private readonly kycService: KycService) {}
 
-  @Query(() => [KYCCase])
-  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Query(() => ProviderKycStatus, { nullable: true })
   @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async kycCases(@CurrentUser() user: SupabaseUser): Promise<KYCCase[]> {
-    return this.kycService.getKycCases(user.id);
+  async myKycStatus(@CurrentUser() user: SupabaseUser): Promise<ProviderKycStatus | null> {
+    return this.kycService.myKycStatus(user.id);
   }
 
-  @Query(() => KYCCase, { nullable: true })
-  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Query(() => [ProviderKycCheck])
   @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async kycCase(
+  async myKycChecks(
     @CurrentUser() user: SupabaseUser,
-    @Args('id') id: string,
-  ): Promise<KYCCase | null> {
-    return this.kycService.getKycCase(user.id, id);
+    @Args('filter', { nullable: true }) filter?: MyKycChecksFilterDto,
+  ): Promise<ProviderKycCheck[]> {
+    return this.kycService.myKycChecks(user.id, filter);
   }
 
-  @Mutation(() => KYCCase)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async createKycCase(
+  @Mutation(() => KycUploadUrl)
+  @Roles(UserType.BUSINESS)
+  @UseGuards(MobileClientGuard)
+  async createKycUploadUrl(
     @CurrentUser() user: SupabaseUser,
-    @Args('providerId', { nullable: true }) providerId?: string,
-  ): Promise<KYCCase> {
-    return this.kycService.createKycCase(user.id, providerId);
+    @Args('input') input: CreateKycUploadUrlDto,
+  ): Promise<KycUploadUrl> {
+    return this.kycService.createKycUploadUrl(user.id, input);
   }
 
-  @Mutation(() => KYCCase)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async submitKycCase(
+  @Mutation(() => ProviderKycCheck)
+  @Roles(UserType.BUSINESS)
+  @UseGuards(MobileClientGuard)
+  async startNinFaceVerification(
     @CurrentUser() user: SupabaseUser,
-    @Args('id') id: string,
-  ): Promise<KYCCase> {
-    return this.kycService.submitKycCase(user.id, id);
+    @Args('input') input: StartNinFaceVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    return this.kycService.startNinFaceVerification(user.id, input);
   }
 
-  @Mutation(() => KYCCase)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN)
-  async reviewKycCase(
+  @Mutation(() => ProviderKycCheck)
+  @Roles(UserType.BUSINESS)
+  @UseGuards(MobileClientGuard)
+  async startPhoneVerification(
     @CurrentUser() user: SupabaseUser,
-    @Args('id') id: string,
-    @Args('approved') approved: boolean,
-  ): Promise<KYCCase> {
-    return this.kycService.reviewKycCase(user.id, id, approved);
+    @Args('input') input: StartPhoneVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    return this.kycService.startPhoneVerification(user.id, input);
   }
 
-  @Mutation(() => KYCDocument)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async uploadKycDocument(
+  @Mutation(() => ProviderKycCheck)
+  @Roles(UserType.BUSINESS)
+  @UseGuards(MobileClientGuard)
+  async startVehiclePlateVerification(
     @CurrentUser() user: SupabaseUser,
-    @Args('input') input: UploadKYCDocumentDto,
-  ): Promise<KYCDocument> {
-    return this.kycService.uploadKycDocument(user.id, input);
+    @Args('input') input: StartVehiclePlateVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    return this.kycService.startVehiclePlateVerification(user.id, input);
   }
 
-  @Mutation(() => NINVerification)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async initiateNinVerification(
+  @Mutation(() => ProviderKycCheck)
+  @Roles(UserType.BUSINESS)
+  @UseGuards(MobileClientGuard)
+  async startVehicleVinVerification(
     @CurrentUser() user: SupabaseUser,
-    @Args('input') input: VerifyNINDto,
-  ): Promise<NINVerification> {
-    return this.kycService.initiateNinVerification(user.id, input);
+    @Args('input') input: StartVehicleVinVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    return this.kycService.startVehicleVinVerification(user.id, input);
+  }
+
+  @Mutation(() => [ProviderKycCheck])
+  @Roles(UserType.BUSINESS)
+  @UseGuards(MobileClientGuard)
+  async syncKycStatus(
+    @CurrentUser() user: SupabaseUser,
+    @Args('input') input: SyncKycStatusDto,
+  ): Promise<ProviderKycCheck[]> {
+    return this.kycService.syncKycStatus(user.id, input);
   }
 
   @Mutation(() => Vehicle)
-  @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS, UserType.ADMIN)
   async createVehicle(
     @CurrentUser() user: SupabaseUser,
@@ -100,7 +113,6 @@ export class KycResolver {
   }
 
   @Query(() => [Vehicle])
-  @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS, UserType.ADMIN)
   async myVehicles(@CurrentUser() user: SupabaseUser): Promise<Vehicle[]> {
     return this.kycService.getVehicles(user.id);

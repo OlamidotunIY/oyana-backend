@@ -35,6 +35,13 @@ export class CreateVehicleDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(64)
+  vin?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
   make?: string;
 
   @Field({ nullable: true })

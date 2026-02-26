@@ -141,6 +141,13 @@ input CreateInvoiceLineItemDto {
   unitAmountMinor: BigInt!
 }
 
+input CreateKycUploadUrlDto {
+  fileName: String!
+  mimeType: String
+  providerId: String
+  sizeBytes: BigInt
+}
+
 input CreateShipmentBidDto {
   amountMinor: BigInt!
   currency: String
@@ -199,6 +206,7 @@ input CreateVehicleDto {
   model: String
   plateNumber: String
   providerId: String
+  vin: String
 }
 
 input CreateWalletFundingInput {
@@ -414,44 +422,12 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://
 """
 scalar JSON @specifiedBy(url: "http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf")
 
-type KYCCase {
-  createdAt: DateTime!
-  documentsVerified: Boolean!
-  faceVerified: Boolean!
-  id: ID!
-  kycLevel: Int!
-  lastVerificationAttempt: DateTime
-  ninVerified: Boolean!
-  phoneVerified: Boolean!
-  providerId: String!
-  rejectionReason: String
-  reviewedAt: DateTime
-  reviewedBy: String
-  status: KycCaseStatus!
-  submittedAt: DateTime
-  updatedAt: DateTime!
-  vehicleVerified: Boolean!
-}
-
-type KYCDocument {
-  createdAt: DateTime!
-  docType: String!
-  id: ID!
-  kycCaseId: String!
-  mimeType: String
-  status: String!
+type KycUploadUrl {
+  expiresAt: DateTime!
+  mediaId: String!
   storageBucket: String!
   storagePath: String!
-  updatedAt: DateTime!
-  uploadedBy: String
-}
-
-enum KycCaseStatus {
-  APPROVED
-  DRAFT
-  NEEDS_MORE_INFO
-  REJECTED
-  SUBMITTED
+  uploadUrl: String!
 }
 
 input MarketplaceShipmentsFilterDto {
@@ -488,7 +464,7 @@ type Mutation {
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
   createDispute(input: CreateDisputeDto!): DisputeCase!
   createInvoice(input: CreateInvoiceDto!): Invoice!
-  createKycCase(providerId: String): KYCCase!
+  createKycUploadUrl(input: CreateKycUploadUrlDto!): KycUploadUrl!
   createShipment(input: CreateShipmentDto!): Shipment!
   createShipmentAssignment(input: AssignShipmentDto!): ShipmentAssignment!
   createShipmentBid(input: CreateShipmentBidDto!): ShipmentBid!
@@ -500,7 +476,6 @@ type Mutation {
   createWalletWithdrawal(input: CreateWalletWithdrawalInput!): WalletWithdrawal!
   flagFraudCase(input: FlagFraudCaseDto!): FraudFlag!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
-  initiateNinVerification(input: VerifyNINDto!): NINVerification!
   markEnRoutePickup(shipmentId: String!): Shipment!
   refreshToken(refreshToken: String): AuthResponse!
   replySupportTicket(input: ReplySupportTicketDto!): SupportTicketMessage!
@@ -509,11 +484,14 @@ type Mutation {
   resetPassword(input: ResetPasswordInput!): MessageResponse!
   resolveDispute(input: ResolveDisputeDto!): DisputeCase!
   respondToDispatchOffer(input: UpdateDispatchOfferDto!): DispatchOffer!
-  reviewKycCase(approved: Boolean!, id: String!): KYCCase!
   sendDispatchOffer(input: CreateDispatchOfferDto!): DispatchOffer!
   signIn(input: SignInInput!): AuthResponse!
   signUp(input: SignUpInput!): MessageResponse!
-  submitKycCase(id: String!): KYCCase!
+  startNinFaceVerification(input: StartNinFaceVerificationDto!): ProviderKycCheck!
+  startPhoneVerification(input: StartPhoneVerificationDto!): ProviderKycCheck!
+  startVehiclePlateVerification(input: StartVehiclePlateVerificationDto!): ProviderKycCheck!
+  startVehicleVinVerification(input: StartVehicleVinVerificationDto!): ProviderKycCheck!
+  syncKycStatus(input: SyncKycStatusDto!): [ProviderKycCheck!]!
   updateFraudFlagStatus(input: UpdateFraudFlagStatusDto!): FraudFlag!
   updateInvoiceStatus(input: UpdateInvoiceStatusDto!): Invoice!
   updatePlatformConfig(input: UpdatePlatformConfigDto!): PlatformConfig!
@@ -523,35 +501,15 @@ type Mutation {
   updateShipmentBid(id: String!, input: UpdateShipmentBidDto!): ShipmentBid!
   updateSlaRule(input: UpdateSlaRuleDto!): SLARule!
   updateSupportTicketStatus(input: UpdateSupportTicketStatusDto!): SupportTicket!
-  uploadKycDocument(input: UploadKYCDocumentDto!): KYCDocument!
   verifyOtp(input: VerifyOtpInput!): AuthResponse!
   verifyPhoneOtp(input: VerifyPhoneOtpInput!): MessageResponse!
   withdrawBid(id: String!): ShipmentBid!
 }
 
-type NINVerification {
-  createdAt: DateTime!
-  dateOfBirth: DateTime
-  failureReason: String
-  firstName: String
-  id: ID!
-  kycCaseId: String!
-  lastName: String
-  ninHash: String!
-  providerId: String!
-  rawResponse: JSON
-  requestedAt: DateTime
-  status: NinVerificationStatus!
-  updatedAt: DateTime!
-  vendor: String
-  vendorReference: String
-  verifiedAt: DateTime
-}
-
-enum NinVerificationStatus {
-  FAILED
-  PENDING
-  VERIFIED
+input MyKycChecksFilterDto {
+  checkType: String
+  limit: Int
+  status: String
 }
 
 type PaymentIntent {
@@ -628,10 +586,57 @@ enum ProfileStatus {
 type ProviderDashboardQuary {
   activeAssignments: [Shipment!]!
   completedShipments: [Shipment!]!
-  kycCases: [KYCCase!]!
+  kycStatus: ProviderKycStatus
   myShipmentDashboard: ShipmentDashboard!
   myWallet: WalletAccount
   vehicles: [Vehicle!]!
+}
+
+type ProviderKycCheck {
+  checkType: String!
+  confidence: Float
+  createdAt: DateTime!
+  expiresAt: DateTime
+  failedAt: DateTime
+  id: ID!
+  initiatedByProfileId: String
+  maskedIdentifier: String
+  message: String
+  normalizedData: JSON
+  profileId: String
+  providerId: String!
+  responseCode: String
+  status: String!
+  updatedAt: DateTime!
+  vehicleId: String
+  vendor: String!
+  vendorReference: String
+  verifiedAt: DateTime
+}
+
+type ProviderKycStatus {
+  createdAt: DateTime!
+  faceConfidence: Float
+  faceStatus: String!
+  faceVerifiedAt: DateTime
+  failureSummary: String
+  id: ID!
+  kycLevel: Int!
+  lastCheckAt: DateTime
+  lastVendorSyncAt: DateTime
+  maskedNin: String
+  maskedPhone: String
+  ninStatus: String!
+  ninVerifiedAt: DateTime
+  overallStatus: String!
+  phoneStatus: String!
+  phoneVerifiedAt: DateTime
+  providerId: String!
+  updatedAt: DateTime!
+  vehiclePlateStatus: String!
+  vehiclePlateVerifiedAt: DateTime
+  vehicleVinStatus: String!
+  vehicleVinVerifiedAt: DateTime
 }
 
 type Query {
@@ -643,7 +648,8 @@ type Query {
   adminLiveShipments: [Shipment!]!
   adminMarketplaceBoard: [Shipment!]!
   adminOverview: AdminOverview!
-  adminProviderKyc(providerId: String!): [KYCCase!]!
+  adminProviderKyc(providerId: String!): ProviderKycStatus
+  adminProviderKycChecks(providerId: String!): [ProviderKycCheck!]!
   adminProviders: [AdminProviderOverview!]!
   adminSlaRules: [SLARule!]!
   allowedShipmentCurrencies: [String!]!
@@ -653,8 +659,6 @@ type Query {
   freightRequestBids(shipmentId: String!): [ShipmentBid!]!
   getProviderDashboardQuary: ProviderDashboardQuary!
   invoice(id: String!): Invoice
-  kycCase(id: String!): KYCCase
-  kycCases: [KYCCase!]!
   marketplaceShipments(filter: MarketplaceShipmentsFilterDto): MarketplaceShipmentsResult!
   me: Profile
   myBids: [ShipmentBid!]!
@@ -662,6 +666,8 @@ type Query {
   myDisputes: [DisputeCase!]!
   myFreightRequests: [Shipment!]!
   myInvoices: [Invoice!]!
+  myKycChecks(filter: MyKycChecksFilterDto): [ProviderKycCheck!]!
+  myKycStatus: ProviderKycStatus
   mySavedFundingCards: [WalletCardMethod!]!
   mySavedWithdrawalAccounts: [WalletSavedBankAccount!]!
   myShipmentDashboard: ShipmentDashboard!
@@ -1001,6 +1007,32 @@ enum SlaRuleScope {
   VEHICLE_CATEGORY
 }
 
+input StartNinFaceVerificationDto {
+  dateOfBirth: String!
+  faceMediaId: String!
+  firstName: String
+  lastName: String
+  numberNin: String!
+  providerId: String
+}
+
+input StartPhoneVerificationDto {
+  phoneNumber: String!
+  providerId: String
+}
+
+input StartVehiclePlateVerificationDto {
+  plateNumber: String
+  providerId: String
+  vehicleId: String
+}
+
+input StartVehicleVinVerificationDto {
+  providerId: String
+  vehicleId: String
+  vin: String
+}
+
 enum State {
   ABUJA
   LAGOS
@@ -1046,6 +1078,12 @@ enum SupportTicketStatus {
   IN_PROGRESS
   OPEN
   RESOLVED
+}
+
+input SyncKycStatusDto {
+  checkId: String
+  providerId: String
+  vendorReference: String
 }
 
 type Transaction {
@@ -1160,15 +1198,6 @@ input UpdateSupportTicketStatusDto {
   ticketId: String!
 }
 
-input UploadKYCDocumentDto {
-  docType: String!
-  kycCaseId: String!
-  mimeType: String
-  storageBucket: String!
-  storagePath: String!
-  uploadedBy: String
-}
-
 type UserAddress {
   address: String!
   city: String!
@@ -1197,12 +1226,17 @@ type Vehicle {
   color: String
   createdAt: DateTime!
   id: ID!
+  lastVerificationAt: DateTime
   make: String
   model: String
   plateNumber: String
+  plateVerificationStatus: String
   providerId: String!
   status: VehicleStatus!
   updatedAt: DateTime!
+  verificationFailureReason: String
+  vin: String
+  vinVerificationStatus: String
 }
 
 enum VehicleCategory {
@@ -1215,15 +1249,6 @@ enum VehicleStatus {
   ACTIVE
   INACTIVE
   MAINTENANCE
-}
-
-input VerifyNINDto {
-  dateOfBirth: DateTime
-  firstName: String
-  kycCaseId: String
-  lastName: String
-  ninHash: String
-  providerId: String
 }
 
 input VerifyOtpInput {

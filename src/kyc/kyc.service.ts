@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   ForbiddenException,
@@ -6,363 +7,439 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma, ProviderKycCase, Vehicle as PrismaVehicle } from '@prisma/client';
-import axios, { AxiosError, AxiosInstance } from 'axios';
-import { createHash } from 'crypto';
+import {
+  Prisma,
+  ProviderKycCheck as PrismaProviderKycCheck,
+  ProviderKycMedia as PrismaProviderKycMedia,
+  ProviderKycProfile as PrismaProviderKycProfile,
+  Vehicle as PrismaVehicle,
+} from '@prisma/client';
+import axios from 'axios';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { SupabaseService } from '../auth/supabase/supabase.service';
 import { PrismaService } from '../database/prisma.service';
 import {
+  CreateKycUploadUrlDto,
   CreateVehicleDto,
-  KYCCase,
-  KYCCaseStatus,
-  KYCDocument,
-  NINVerification,
-  NINVerificationStatus,
-  UploadKYCDocumentDto,
+  KycUploadUrl,
+  MyKycChecksFilterDto,
+  ProviderKycCheck,
+  ProviderKycStatus,
+  StartNinFaceVerificationDto,
+  StartPhoneVerificationDto,
+  StartVehiclePlateVerificationDto,
+  StartVehicleVinVerificationDto,
+  SyncKycStatusDto,
   UserType,
-  VerifyNINDto,
   Vehicle,
   VehicleStatus,
 } from '../graphql';
+import { PremblyClient } from './prembly.client';
 
-type PremblyVerificationResult = {
-  sessionId: string;
-  verificationUrl: string;
+type KycCheckType = 'nin_face' | 'phone' | 'vehicle_plate' | 'vehicle_vin';
+type KycCheckStatus = 'unverified' | 'pending' | 'verified' | 'failed';
+
+type NormalizedCheckResult = {
+  checkType: KycCheckType;
+  status: KycCheckStatus;
+  responseCode?: string;
+  confidence?: number;
   message?: string;
-  rawResponse: unknown;
+  vendorReference?: string;
+  maskedIdentifier?: string;
+  normalizedData?: Prisma.InputJsonValue;
+  rawResponse?: Prisma.InputJsonValue;
+  verifiedAt?: Date;
+  failedAt?: Date;
+};
+
+type CreateCheckOptions = {
+  mediaId?: string;
+  vehicleId?: string;
+  rawRequest?: Record<string, unknown>;
 };
 
 @Injectable()
 export class KycService {
   private readonly logger = new Logger(KycService.name);
-  private readonly premblyClient: AxiosInstance;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
-  ) {
-    this.premblyClient = axios.create({
-      baseURL:
-        this.configService.get<string>('PREMBLY_WIDGET_BASE_URL')?.trim() ||
-        this.configService.get<string>('PREMBLY_BASE_URL')?.trim() ||
-        'https://backend.prembly.com',
-      timeout: Number(this.configService.get('PREMBLY_REQUEST_TIMEOUT_MS') ?? 15000),
-    });
+    private readonly supabaseService: SupabaseService,
+    private readonly premblyClient: PremblyClient,
+  ) {}
+
+  async myKycStatus(profileId: string): Promise<ProviderKycStatus | null> {
+    const providerId = await this.resolveProviderIdForProfile(profileId);
+    if (!providerId) {
+      return null;
+    }
+
+    const profile = await this.refreshProviderKycProfile(providerId);
+
+    return this.toGraphqlKycStatus(profile);
   }
 
-  async getKycCases(profileId: string): Promise<KYCCase[]> {
+  async myKycChecks(
+    profileId: string,
+    filter?: MyKycChecksFilterDto,
+  ): Promise<ProviderKycCheck[]> {
     const providerId = await this.resolveProviderIdForProfile(profileId);
     if (!providerId) {
       return [];
     }
 
-    const kycCases = await this.prisma.runWithRetry('KycService.getKycCases', () =>
-      this.prisma.providerKycCase.findMany({
+    const normalizedType = this.normalizeCheckTypeInput(filter?.checkType);
+    const normalizedStatus = this.normalizeStatusInput(filter?.status);
+    const limit = Math.min(Math.max(filter?.limit ?? 30, 1), 100);
+
+    const checks = await this.prisma.runWithRetry('KycService.myKycChecks', () =>
+      this.prisma.providerKycCheck.findMany({
         where: {
           providerId,
+          ...(normalizedType ? { checkType: normalizedType } : {}),
+          ...(normalizedStatus ? { status: normalizedStatus } : {}),
         },
         orderBy: {
-          updatedAt: 'desc',
+          createdAt: 'desc',
         },
+        take: limit,
       }),
     );
 
-    return kycCases.map((kycCase) => this.toGraphqlKycCase(kycCase));
+    return checks.map((check) => this.toGraphqlKycCheck(check));
   }
 
-  async getKycCase(profileId: string, id: string): Promise<KYCCase | null> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-    if (!providerId) {
-      return null;
-    }
-
-    const kycCase = await this.prisma.runWithRetry('KycService.getKycCase', () =>
-      this.prisma.providerKycCase.findFirst({
-        where: {
-          id,
-          providerId,
-        },
-      }),
-    );
-
-    if (!kycCase) {
-      return null;
-    }
-
-    return this.toGraphqlKycCase(kycCase);
-  }
-
-  async createKycCase(profileId: string, providerIdArg?: string): Promise<KYCCase> {
-    const providerId = await this.requireAuthorizedProviderId(profileId, providerIdArg);
-    const profile = await this.requireProfile(profileId);
-
-    const existing = await this.prisma.runWithRetry(
-      'KycService.createKycCase.findExisting',
-      () =>
-        this.prisma.providerKycCase.findFirst({
-          where: {
-            providerId,
-            status: {
-              in: ['draft', 'pending', 'submitted', 'needs_more_info'],
-            },
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-        }),
-    );
-
-    if (existing) {
-      return this.toGraphqlKycCase(existing);
-    }
-
-    const created = await this.prisma.runWithRetry('KycService.createKycCase.create', () =>
-      this.prisma.providerKycCase.create({
-        data: {
-          providerId,
-          status: 'draft',
-          phoneVerified: profile.phoneVerified,
-          kycLevel: profile.phoneVerified ? 1 : 0,
-        },
-      }),
-    );
-
-    return this.toGraphqlKycCase(created);
-  }
-
-  async submitKycCase(profileId: string, id: string): Promise<KYCCase> {
-    const providerId = await this.requireAuthorizedProviderId(profileId);
-    await this.requireOwnedKycCase(providerId, id);
-
-    const updated = await this.prisma.runWithRetry('KycService.submitKycCase', () =>
-      this.prisma.providerKycCase.update({
-        where: {
-          id,
-        },
-        data: {
-          status: 'submitted',
-          submittedAt: new Date(),
-          lastVerificationAttempt: new Date(),
-        },
-      }),
-    );
-
-    return this.toGraphqlKycCase(updated);
-  }
-
-  async reviewKycCase(
+  async createKycUploadUrl(
     profileId: string,
-    id: string,
-    approved: boolean,
-  ): Promise<KYCCase> {
-    const role = await this.requireUserRole(profileId);
-
-    if (role !== UserType.ADMIN) {
-      const providerId = await this.requireAuthorizedProviderId(profileId);
-      await this.requireOwnedKycCase(providerId, id);
-    } else {
-      const existingCase = await this.prisma.runWithRetry(
-        'KycService.reviewKycCase.adminFind',
-        () =>
-          this.prisma.providerKycCase.findUnique({
-            where: {
-              id,
-            },
-            select: {
-              id: true,
-            },
-          }),
-      );
-
-      if (!existingCase) {
-        throw new NotFoundException('KYC case not found');
-      }
-    }
-
-    const updated = await this.prisma.runWithRetry('KycService.reviewKycCase', () =>
-      this.prisma.providerKycCase.update({
-        where: {
-          id,
-        },
-        data: {
-          status: approved ? 'approved' : 'rejected',
-          reviewedBy: profileId,
-          reviewedAt: new Date(),
-          rejectionReason: approved ? null : 'Rejected during KYC review',
-          kycLevel: approved ? 3 : undefined,
-          lastVerificationAttempt: new Date(),
-        },
-      }),
-    );
-
-    return this.toGraphqlKycCase(updated);
-  }
-
-  async uploadKycDocument(
-    profileId: string,
-    input: UploadKYCDocumentDto,
-  ): Promise<KYCDocument> {
-    const providerId = await this.requireAuthorizedProviderId(profileId);
-    const kycCase = await this.requireOwnedKycCase(providerId, input.kycCaseId);
-
-    const normalizedDocType = input.docType.trim().toLowerCase();
-    const normalizedBucket = input.storageBucket.trim();
-    const normalizedPath = input.storagePath.trim();
-
-    if (!normalizedDocType || !normalizedBucket || !normalizedPath) {
-      throw new BadRequestException('docType, storageBucket, and storagePath are required');
-    }
-
-    try {
-      const document = await this.prisma.runWithRetry('KycService.uploadKycDocument', () =>
-        this.prisma.$transaction(async (tx) => {
-          const createdDocument = await tx.kycDocument.create({
-            data: {
-              kycCaseId: kycCase.id,
-              docType: normalizedDocType,
-              storageBucket: normalizedBucket,
-              storagePath: normalizedPath,
-              mimeType: input.mimeType?.trim() || undefined,
-              uploadedBy: input.uploadedBy ?? profileId,
-              status: 'uploaded',
-            },
-          });
-
-          const nextKycLevel = this.resolveKycLevel({
-            ...kycCase,
-            documentsVerified: true,
-          });
-
-          await tx.providerKycCase.update({
-            where: { id: kycCase.id },
-            data: {
-              documentsVerified: true,
-              kycLevel: nextKycLevel,
-              lastVerificationAttempt: new Date(),
-            },
-          });
-
-          return createdDocument;
-        }),
-      );
-
-      return this.toGraphqlKycDocument(document);
-    } catch (error) {
-      if (this.isUniqueConstraintError(error)) {
-        throw new BadRequestException('This document path has already been uploaded');
-      }
-
-      throw error;
-    }
-  }
-
-  async initiateNinVerification(
-    profileId: string,
-    input: VerifyNINDto,
-  ): Promise<NINVerification> {
-    const profile = await this.requireProfile(profileId);
-    const providerId = await this.requireAuthorizedProviderId(profileId, input.providerId);
-    const kycCase = await this.getOrCreateKycCaseForProvider(
-      providerId,
+    input: CreateKycUploadUrlDto,
+  ): Promise<KycUploadUrl> {
+    const providerId = await this.requireAuthorizedProviderId(
       profileId,
-      profile,
-      input.kycCaseId,
+      input.providerId,
     );
 
-    const firstName = profile.firstName?.trim();
-    const lastName = profile.lastName?.trim();
-
-    if (!firstName || !lastName) {
+    const mimeType = input.mimeType?.trim();
+    if (mimeType && !this.getAllowedMimeTypes().includes(mimeType)) {
       throw new BadRequestException(
-        'Profile first and last name are required before starting KYC verification',
+        `Unsupported mime type ${mimeType}. Allowed: ${this.getAllowedMimeTypes().join(', ')}`,
       );
     }
 
-    const verification = await this.initiatePremblyWidgetSession({
-      firstName,
-      lastName,
-      email: profile.email,
+    const maxFileBytes = this.getMaxKycFileSizeBytes();
+    const sizeBytes = this.parseOptionalBigInt(input.sizeBytes);
+    if (sizeBytes !== undefined && sizeBytes > maxFileBytes) {
+      throw new BadRequestException(
+        `KYC upload is too large. Maximum allowed size is ${maxFileBytes.toString()} bytes`,
+      );
+    }
+
+    const bucket =
+      this.configService.get<string>('PREMBLY_KYC_BUCKET')?.trim() ||
+      'kyc-verifications';
+    const expiresInSeconds = Math.max(
+      Number(
+        this.configService.get<string>('PREMBLY_KYC_UPLOAD_URL_TTL_SECONDS') ??
+          900,
+      ),
+      60,
+    );
+
+    const storagePath = this.buildKycStoragePath(providerId, input.fileName);
+    const supabase = this.supabaseService.getClient() as any;
+    const storage = supabase.storage.from(bucket);
+    const uploadResult = await storage.createSignedUploadUrl(storagePath);
+
+    if (uploadResult.error || !uploadResult.data) {
+      throw new BadRequestException(
+        uploadResult.error?.message ?? 'Unable to create KYC upload URL',
+      );
+    }
+
+    const uploadUrl =
+      this.readString(uploadResult.data.signedUrl) ??
+      this.readString(uploadResult.data.signed_url) ??
+      this.readString(uploadResult.data.url);
+
+    if (!uploadUrl) {
+      throw new BadRequestException('Supabase upload URL was not returned');
+    }
+
+    const media = await this.prisma.runWithRetry(
+      'KycService.createKycUploadUrl',
+      () =>
+        this.prisma.providerKycMedia.create({
+          data: {
+            providerId,
+            storageBucket: bucket,
+            storagePath,
+            mimeType,
+            sizeBytes,
+            uploadState: 'pending_upload',
+            uploadedByProfileId: profileId,
+          },
+        }),
+    );
+
+    return {
+      mediaId: media.id,
+      storageBucket: media.storageBucket,
+      storagePath: media.storagePath,
+      uploadUrl,
+      expiresAt: new Date(Date.now() + expiresInSeconds * 1000),
+    };
+  }
+
+  async startNinFaceVerification(
+    profileId: string,
+    input: StartNinFaceVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    const providerId = await this.requireAuthorizedProviderId(
+      profileId,
+      input.providerId,
+    );
+    const media = await this.requireProviderMedia(providerId, input.faceMediaId);
+    const imageBase64 = await this.fetchMediaAsBase64(
+      media.storageBucket,
+      media.storagePath,
+    );
+
+    const response = await this.premblyClient.ninWithFace({
+      image: imageBase64,
+      numberNin: input.numberNin,
+      dateOfBirth: input.dateOfBirth,
     });
 
-    const ninHash = this.hashNin(`prembly-session:${verification.sessionId}`);
-    const status = NINVerificationStatus.PENDING;
-
-    const record = await this.prisma.runWithRetry(
-      'KycService.initiateNinVerification',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const createdVerification = await tx.ninVerification.create({
-            data: {
-              kycCaseId: kycCase.id,
-              providerId,
-              ninHash,
-              status,
-              vendor: 'prembly',
-              vendorReference: verification.sessionId,
-              firstName,
-              lastName,
-              dateOfBirth: null,
-              requestedAt: new Date(),
-              verifiedAt: null,
-              failureReason: null,
-              rawResponse:
-                this.toJsonValue({
-                  ...this.toObject(verification.rawResponse),
-                  verificationUrl: verification.verificationUrl,
-                }) as unknown as Prisma.InputJsonValue,
-            },
-          });
-
-          await tx.providerKycCase.update({
-            where: {
-              id: kycCase.id,
-            },
-            data: {
-              lastVerificationAttempt: new Date(),
-              status: 'submitted',
-              submittedAt: kycCase.submittedAt ?? new Date(),
-            },
-          });
-
-          return createdVerification;
-        }),
+    const normalized = this.normalizeNinFaceResult(input.numberNin, response);
+    const check = await this.createCheckAndRefreshProfile(
+      providerId,
+      profileId,
+      normalized,
+      {
+        mediaId: media.id,
+        rawRequest: {
+          numberNin: input.numberNin,
+          dateOfBirth: input.dateOfBirth,
+          faceMediaId: input.faceMediaId,
+        },
+      },
     );
 
-    return this.toGraphqlNinVerification(record);
+    return this.toGraphqlKycCheck(check);
+  }
+
+  async startPhoneVerification(
+    profileId: string,
+    input: StartPhoneVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    const providerId = await this.requireAuthorizedProviderId(
+      profileId,
+      input.providerId,
+    );
+
+    const response = await this.premblyClient.verifyPhone({
+      phoneNumber: input.phoneNumber,
+    });
+
+    const normalized = this.normalizePhoneResult(input.phoneNumber, response);
+    const check = await this.createCheckAndRefreshProfile(
+      providerId,
+      profileId,
+      normalized,
+      {
+        rawRequest: {
+          phoneNumber: input.phoneNumber,
+        },
+      },
+    );
+
+    return this.toGraphqlKycCheck(check);
+  }
+
+  async startVehiclePlateVerification(
+    profileId: string,
+    input: StartVehiclePlateVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    const providerId = await this.requireAuthorizedProviderId(
+      profileId,
+      input.providerId,
+    );
+    const vehicle = await this.resolveProviderVehicle(providerId, input.vehicleId);
+
+    const plateNumber =
+      input.plateNumber?.trim().toUpperCase() ??
+      vehicle?.plateNumber?.trim().toUpperCase();
+    if (!plateNumber) {
+      throw new BadRequestException(
+        'plateNumber is required when selected vehicle has no plate number',
+      );
+    }
+
+    const response = await this.premblyClient.verifyPlate({
+      plateNumber,
+    });
+
+    const normalized = this.normalizePlateResult(plateNumber, response);
+    const check = await this.createCheckAndRefreshProfile(
+      providerId,
+      profileId,
+      normalized,
+      {
+        vehicleId: vehicle?.id,
+        rawRequest: {
+          vehicleId: vehicle?.id,
+          plateNumber,
+        },
+      },
+    );
+
+    if (vehicle) {
+      await this.updateVehicleVerificationSnapshot(vehicle.id, {
+        plateNumber,
+        plateVerificationStatus: normalized.status,
+        verifiedAt: normalized.verifiedAt,
+        failedAt: normalized.failedAt,
+        message: normalized.message,
+      });
+    }
+
+    return this.toGraphqlKycCheck(check);
+  }
+
+  async startVehicleVinVerification(
+    profileId: string,
+    input: StartVehicleVinVerificationDto,
+  ): Promise<ProviderKycCheck> {
+    if (!this.isVinVerificationEnabled()) {
+      throw new BadRequestException(
+        'VIN verification is not configured for this environment',
+      );
+    }
+
+    const providerId = await this.requireAuthorizedProviderId(
+      profileId,
+      input.providerId,
+    );
+    const vehicle = await this.resolveProviderVehicle(providerId, input.vehicleId);
+
+    const vin =
+      input.vin?.trim().toUpperCase() ?? vehicle?.vin?.trim().toUpperCase();
+
+    if (!vin) {
+      throw new BadRequestException('vin is required for VIN verification');
+    }
+
+    const response = await this.premblyClient.verifyVin({ vin });
+    const normalized = this.normalizeVinResult(vin, response);
+
+    const check = await this.createCheckAndRefreshProfile(
+      providerId,
+      profileId,
+      normalized,
+      {
+        vehicleId: vehicle?.id,
+        rawRequest: {
+          vehicleId: vehicle?.id,
+          vin,
+        },
+      },
+    );
+
+    if (vehicle) {
+      await this.updateVehicleVerificationSnapshot(vehicle.id, {
+        vin,
+        vinVerificationStatus: normalized.status,
+        verifiedAt: normalized.verifiedAt,
+        failedAt: normalized.failedAt,
+        message: normalized.message,
+      });
+    }
+
+    return this.toGraphqlKycCheck(check);
+  }
+
+  async syncKycStatus(
+    profileId: string,
+    input: SyncKycStatusDto,
+  ): Promise<ProviderKycCheck[]> {
+    const providerId = await this.requireAuthorizedProviderId(
+      profileId,
+      input.providerId,
+    );
+
+    if (!this.isStatusPollingEnabled()) {
+      throw new BadRequestException(
+        'KYC status polling is not configured for this environment',
+      );
+    }
+
+    const targets = await this.resolveSyncTargets(providerId, input);
+    if (!targets.length) {
+      return [];
+    }
+
+    const updatedChecks: ProviderKycCheck[] = [];
+
+    for (const target of targets) {
+      if (!target.vendorReference) {
+        this.logger.warn(
+          `Skipping status sync for check ${target.id} because vendor reference is missing`,
+        );
+        continue;
+      }
+
+      const statusResponse = await this.premblyClient.fetchStatus({
+        reference: target.vendorReference,
+      });
+
+      const normalized = this.normalizeResultByCheckType(
+        target.checkType as KycCheckType,
+        statusResponse,
+        target.maskedIdentifier ?? undefined,
+      );
+
+      const check = await this.updateCheckAndRefreshProfile(target.id, normalized, {
+        rawResponse: statusResponse,
+      });
+      updatedChecks.push(this.toGraphqlKycCheck(check));
+    }
+
+    return updatedChecks;
   }
 
   async createVehicle(profileId: string, input: CreateVehicleDto): Promise<Vehicle> {
-    const providerId = await this.requireAuthorizedProviderId(profileId, input.providerId);
-    const normalizedPlateNumber = input.plateNumber?.trim().toUpperCase() || undefined;
+    const providerId = await this.requireAuthorizedProviderId(
+      profileId,
+      input.providerId,
+    );
 
-    try {
-      const vehicle = await this.prisma.runWithRetry('KycService.createVehicle', () =>
-        this.prisma.vehicle.create({
-          data: {
-            providerId,
-            category: input.category,
-            plateNumber: normalizedPlateNumber,
-            make: input.make?.trim() || undefined,
-            model: input.model?.trim() || undefined,
-            color: input.color?.trim() || undefined,
-            capacityKg: input.capacityKg,
-            capacityVolumeCm3: this.parseOptionalBigInt(input.capacityVolumeCm3),
-            status: VehicleStatus.ACTIVE,
-          },
-        }),
-      );
+    const created = await this.prisma.runWithRetry('KycService.createVehicle', () =>
+      this.prisma.vehicle.create({
+        data: {
+          providerId,
+          category: input.category,
+          plateNumber: input.plateNumber?.trim().toUpperCase(),
+          vin: input.vin?.trim().toUpperCase(),
+          make: input.make?.trim(),
+          model: input.model?.trim(),
+          color: input.color?.trim(),
+          capacityKg: input.capacityKg,
+          capacityVolumeCm3: this.parseOptionalBigInt(input.capacityVolumeCm3),
+          status: VehicleStatus.ACTIVE,
+        },
+      }),
+    );
 
-      return this.toGraphqlVehicle(vehicle);
-    } catch (error) {
-      if (this.isUniqueConstraintError(error)) {
-        throw new BadRequestException('A vehicle with this plate number already exists');
-      }
-
-      throw error;
-    }
+    return this.toGraphqlVehicle(created);
   }
 
   async getVehicles(profileId: string): Promise<Vehicle[]> {
-    const providerId = await this.requireAuthorizedProviderId(profileId);
+    const providerId = await this.resolveProviderIdForProfile(profileId);
+    if (!providerId) {
+      return [];
+    }
+
     const vehicles = await this.prisma.runWithRetry('KycService.getVehicles', () =>
       this.prisma.vehicle.findMany({
         where: {
@@ -377,202 +454,757 @@ export class KycService {
     return vehicles.map((vehicle) => this.toGraphqlVehicle(vehicle));
   }
 
-  private async initiatePremblyWidgetSession(input: {
-    firstName: string;
-    lastName: string;
-    email: string;
-  }): Promise<PremblyVerificationResult> {
-    const widgetId =
-      this.configService.get<string>('PREMBLY_WIDGET_ID')?.trim() ||
-      this.configService.get<string>('PREMBLY_APP_ID')?.trim();
-    const widgetKey =
-      this.configService.get<string>('PREMBLY_WIDGET_KEY')?.trim() ||
-      this.configService.get<string>('PREMBLY_API_KEY')?.trim();
-    const endpoint =
-      this.configService.get<string>('PREMBLY_WIDGET_INITIATE_ENDPOINT')?.trim() ||
-      '/api/v1/checker-widget/sdk/sessions/initiate/';
+  async handlePremblyWebhook(
+    payload: Record<string, unknown>,
+    rawBody: string,
+    signature?: string,
+  ): Promise<void> {
+    this.assertWebhookSignature(rawBody, signature);
 
-    if (!widgetId || !widgetKey) {
-      throw new BadRequestException(
-        'Prembly widget is unavailable. Configure PREMBLY_WIDGET_ID/PREMBLY_WIDGET_KEY (or PREMBLY_APP_ID/PREMBLY_API_KEY)',
+    const vendorReference = this.extractVendorReference(payload);
+    if (!vendorReference) {
+      this.logger.warn('Ignoring Prembly webhook without vendor reference');
+      return;
+    }
+
+    const existingCheck = await this.prisma.runWithRetry(
+      'KycService.handlePremblyWebhook.findCheck',
+      () =>
+        this.prisma.providerKycCheck.findUnique({
+          where: {
+            vendorReference,
+          },
+        }),
+    );
+
+    if (!existingCheck) {
+      this.logger.warn(
+        `Ignoring Prembly webhook for unknown reference ${vendorReference}`,
+      );
+      return;
+    }
+
+    const normalized = this.normalizeResultByCheckType(
+      existingCheck.checkType as KycCheckType,
+      payload,
+      existingCheck.maskedIdentifier ?? undefined,
+    );
+
+    await this.updateCheckAndRefreshProfile(existingCheck.id, normalized, {
+      rawResponse: payload,
+    });
+
+    this.logger.log(
+      `Processed Prembly webhook reference=${vendorReference} checkId=${existingCheck.id}`,
+    );
+  }
+
+  async getProviderKycStatusForAdmin(
+    providerId: string,
+  ): Promise<ProviderKycStatus | null> {
+    const provider = await this.prisma.runWithRetry(
+      'KycService.getProviderKycStatusForAdmin.provider',
+      () =>
+        this.prisma.provider.findUnique({
+          where: { id: providerId },
+          select: { id: true },
+        }),
+    );
+
+    if (!provider) {
+      return null;
+    }
+
+    const profile = await this.refreshProviderKycProfile(providerId);
+
+    return this.toGraphqlKycStatus(profile);
+  }
+
+  async getProviderKycChecksForAdmin(providerId: string): Promise<ProviderKycCheck[]> {
+    const checks = await this.prisma.runWithRetry(
+      'KycService.getProviderKycChecksForAdmin',
+      () =>
+        this.prisma.providerKycCheck.findMany({
+          where: { providerId },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        }),
+    );
+
+    return checks.map((check) => this.toGraphqlKycCheck(check));
+  }
+
+  async cleanupExpiredRawPayloads(referenceDate = new Date()): Promise<number> {
+    const result = await this.prisma.runWithRetry(
+      'KycService.cleanupExpiredRawPayloads',
+      () =>
+        this.prisma.providerKycCheck.updateMany({
+          where: {
+            expiresAt: {
+              lt: referenceDate,
+            },
+          },
+          data: {
+            rawRequest: Prisma.DbNull,
+            rawResponse: Prisma.DbNull,
+          },
+        }),
+    );
+
+    if (result.count > 0) {
+      this.logger.log(`Purged raw KYC payloads for ${result.count} expired check(s)`);
+    }
+
+    return result.count;
+  }
+
+  private async createCheckAndRefreshProfile(
+    providerId: string,
+    initiatedByProfileId: string,
+    normalized: NormalizedCheckResult,
+    options: CreateCheckOptions,
+  ): Promise<PrismaProviderKycCheck> {
+    const profile = await this.ensureProviderKycProfile(providerId);
+    const expiresAt = this.getRawPayloadExpiryTimestamp();
+
+    const data: Prisma.ProviderKycCheckUncheckedCreateInput = {
+      providerId,
+      profileId: profile.id,
+      vehicleId: options.vehicleId,
+      checkType: normalized.checkType,
+      status: normalized.status,
+      vendor: 'prembly',
+      vendorReference: normalized.vendorReference,
+      responseCode: normalized.responseCode,
+      confidence: normalized.confidence,
+      message: normalized.message,
+      maskedIdentifier: normalized.maskedIdentifier,
+      normalizedData: normalized.normalizedData,
+      rawRequest: options.rawRequest
+        ? (this.toJsonValue(options.rawRequest) as Prisma.InputJsonValue)
+        : undefined,
+      rawResponse: normalized.rawResponse,
+      expiresAt,
+      verifiedAt: normalized.verifiedAt,
+      failedAt: normalized.failedAt,
+      initiatedByProfileId,
+    };
+
+    let check: PrismaProviderKycCheck;
+
+    if (normalized.vendorReference) {
+      const existing = await this.prisma.runWithRetry(
+        'KycService.createCheckAndRefreshProfile.findVendorReference',
+        () =>
+          this.prisma.providerKycCheck.findUnique({
+            where: {
+              vendorReference: normalized.vendorReference,
+            },
+          }),
+      );
+
+      if (existing && existing.providerId === providerId) {
+        check = await this.prisma.runWithRetry(
+          'KycService.createCheckAndRefreshProfile.updateVendorReference',
+          () =>
+            this.prisma.providerKycCheck.update({
+              where: {
+                id: existing.id,
+              },
+              data: {
+                status: normalized.status,
+                responseCode: normalized.responseCode,
+                confidence: normalized.confidence,
+                message: normalized.message,
+                maskedIdentifier: normalized.maskedIdentifier,
+                normalizedData: normalized.normalizedData,
+                rawRequest: options.rawRequest
+                  ? (this.toJsonValue(options.rawRequest) as Prisma.InputJsonValue)
+                  : undefined,
+                rawResponse: normalized.rawResponse,
+                expiresAt,
+                verifiedAt: normalized.verifiedAt,
+                failedAt: normalized.failedAt,
+                initiatedByProfileId,
+                vehicleId: options.vehicleId ?? existing.vehicleId,
+              },
+            }),
+        );
+      } else {
+        check = await this.prisma.runWithRetry(
+          'KycService.createCheckAndRefreshProfile.createWithVendorReference',
+          () =>
+            this.prisma.providerKycCheck.create({
+              data,
+            }),
+        );
+      }
+    } else {
+      check = await this.prisma.runWithRetry(
+        'KycService.createCheckAndRefreshProfile.create',
+        () =>
+          this.prisma.providerKycCheck.create({
+            data,
+          }),
       );
     }
 
-    try {
-      const requestPayload = {
-        first_name: input.firstName,
-        last_name: input.lastName,
-        email: input.email,
-        widget_id: widgetId,
-        widget_key: widgetKey,
-      };
-
-      const { data } = await this.premblyClient.post(endpoint, requestPayload, {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const normalizedPayload = this.toObject(data);
-      const dataObject = this.toObject(normalizedPayload.data);
-      const sessionObject = this.toObject(dataObject.session);
-      const apiMessage =
-        this.readString(normalizedPayload.message) ??
-        undefined;
-      const succeeded = this.toBoolean(normalizedPayload.status);
-
-      if (!succeeded) {
-        throw new BadRequestException(apiMessage ?? 'Unable to initiate Prembly verification');
-      }
-
-      const sessionId =
-        this.readString(sessionObject.session_id) ??
-        this.readString(sessionObject.id);
-
-      if (!sessionId) {
-        throw new BadRequestException('Prembly session did not return a session_id');
-      }
-
-      const verificationUrl = this.buildPremblyVerificationUrl(sessionId);
-
-      return {
-        sessionId,
-        verificationUrl,
-        message: apiMessage ?? 'Session initiated successfully',
-        rawResponse: data,
-      };
-    } catch (error) {
-      const axiosError = error as AxiosError<{ message?: string }>;
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-
-      const message =
-        axiosError.response?.data?.message ??
-        axiosError.message ??
-        'Prembly session initiation failed';
-      this.logger.warn(`Prembly widget initiation failed: ${message}`);
-      throw new BadRequestException(message);
+    if (options.mediaId) {
+      await this.prisma.runWithRetry(
+        'KycService.createCheckAndRefreshProfile.attachMedia',
+        () =>
+          this.prisma.providerKycMedia.update({
+            where: { id: options.mediaId },
+            data: {
+              checkId: check.id,
+              uploadState: 'attached',
+            },
+          }),
+      );
     }
+
+    await this.refreshProviderKycProfile(providerId);
+    return check;
   }
 
-  private buildPremblyVerificationUrl(sessionId: string): string {
-    const configuredBase =
-      this.configService.get<string>('PREMBLY_WIDGET_PUBLIC_URL')?.trim() ||
-      'https://dv7wajvnnyl16.cloudfront.net/';
-    const baseUrl = configuredBase.endsWith('/')
-      ? configuredBase
-      : `${configuredBase}/`;
+  private async updateCheckAndRefreshProfile(
+    checkId: string,
+    normalized: NormalizedCheckResult,
+    options?: {
+      rawResponse?: Record<string, unknown>;
+    },
+  ): Promise<PrismaProviderKycCheck> {
+    const check = await this.prisma.runWithRetry(
+      'KycService.updateCheckAndRefreshProfile.update',
+      () =>
+        this.prisma.providerKycCheck.update({
+          where: { id: checkId },
+          data: {
+            status: normalized.status,
+            responseCode: normalized.responseCode,
+            confidence: normalized.confidence,
+            message: normalized.message,
+            maskedIdentifier: normalized.maskedIdentifier,
+            normalizedData: normalized.normalizedData,
+            rawResponse: options?.rawResponse
+              ? (this.toJsonValue(options.rawResponse) as Prisma.InputJsonValue)
+              : normalized.rawResponse,
+            expiresAt: options?.rawResponse
+              ? this.getRawPayloadExpiryTimestamp()
+              : undefined,
+            verifiedAt: normalized.verifiedAt,
+            failedAt: normalized.failedAt,
+            vendorReference: normalized.vendorReference,
+          },
+        }),
+    );
 
-    return `${baseUrl}?session=${encodeURIComponent(sessionId)}`;
+    await this.refreshProviderKycProfile(check.providerId);
+    return check;
   }
 
-  private resolveKycLevel(input: {
-    phoneVerified: boolean;
-    ninVerified: boolean;
-    documentsVerified: boolean;
-    vehicleVerified: boolean;
-  }): number {
-    if (
-      input.phoneVerified &&
-      input.ninVerified &&
-      input.documentsVerified &&
-      input.vehicleVerified
-    ) {
-      return 3;
-    }
-
-    if (input.ninVerified) {
-      return 2;
-    }
-
-    if (input.phoneVerified || input.documentsVerified || input.vehicleVerified) {
-      return 1;
-    }
-
-    return 0;
-  }
-
-  private hashNin(nin: string): string {
-    return createHash('sha256').update(nin).digest('hex');
-  }
-
-  private toBoolean(value: unknown): boolean {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-
-    if (typeof value === 'string') {
-      return ['true', 'yes', '1', 'success'].includes(value.trim().toLowerCase());
-    }
-
-    if (typeof value === 'number') {
-      return value === 1;
-    }
-
-    return false;
-  }
-
-  private readString(value: unknown): string | undefined {
-    if (typeof value !== 'string') {
-      return undefined;
-    }
-
-    const trimmed = value.trim();
-    return trimmed.length ? trimmed : undefined;
-  }
-
-  private toObject(value: unknown): Record<string, unknown> {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return {};
-    }
-
-    return value as Record<string, unknown>;
-  }
-
-  private parseOptionalBigInt(value?: bigint): bigint | undefined {
-    if (value === null || value === undefined) {
-      return undefined;
-    }
-
-    try {
-      return BigInt(value);
-    } catch {
-      throw new BadRequestException('capacityVolumeCm3 must be a valid integer value');
-    }
-  }
-
-  private async requireAuthorizedProviderId(
-    profileId: string,
-    providerIdArg?: string,
-  ): Promise<string> {
-    const providerIdFromInput = providerIdArg?.trim();
-    if (providerIdFromInput) {
-      return this.assertProviderAccess(profileId, providerIdFromInput);
-    }
-
-    const resolvedProviderId = await this.resolveProviderIdForProfile(profileId);
-    if (resolvedProviderId) {
-      return this.assertProviderAccess(profileId, resolvedProviderId);
-    }
-
-    const provisionedProviderId = await this.provisionProviderAccount(profileId);
-    return this.assertProviderAccess(profileId, provisionedProviderId);
-  }
-
-  private async assertProviderAccess(
-    profileId: string,
+  private async refreshProviderKycProfile(
     providerId: string,
-  ): Promise<string> {
-    const authorized = await this.prisma.runWithRetry(
-      'KycService.assertProviderAccess',
+  ): Promise<PrismaProviderKycProfile> {
+    const checks = await this.prisma.runWithRetry(
+      'KycService.refreshProviderKycProfile.checks',
+      () =>
+        this.prisma.providerKycCheck.findMany({
+          where: {
+            providerId,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        }),
+    );
+
+    const latestByType = new Map<KycCheckType, PrismaProviderKycCheck>();
+    for (const check of checks) {
+      const checkType = this.normalizeCheckTypeInput(check.checkType);
+      if (!checkType || latestByType.has(checkType)) {
+        continue;
+      }
+      latestByType.set(checkType, check);
+    }
+
+    const ninCheck = latestByType.get('nin_face');
+    const phoneCheck = latestByType.get('phone');
+    const plateCheck = latestByType.get('vehicle_plate');
+    const vinCheck = latestByType.get('vehicle_vin');
+
+    const ninStatus = this.normalizeStoredStatus(ninCheck?.status);
+    const faceStatus = ninStatus;
+    const phoneStatus = this.normalizeStoredStatus(phoneCheck?.status);
+    const vehiclePlateStatus = this.normalizeStoredStatus(plateCheck?.status);
+    const vehicleVinStatus = this.normalizeStoredStatus(vinCheck?.status);
+
+    const requiredStatuses: KycCheckStatus[] = [
+      ninStatus,
+      phoneStatus,
+      vehiclePlateStatus,
+    ];
+
+    const overallStatus = this.calculateOverallStatus(requiredStatuses);
+    const kycLevel = this.calculateKycLevel({
+      ninStatus,
+      faceStatus,
+      phoneStatus,
+      vehiclePlateStatus,
+      vehicleVinStatus,
+    });
+
+    const failedMessages = [ninCheck, phoneCheck, plateCheck, vinCheck]
+      .filter((check) => check && this.normalizeStoredStatus(check.status) === 'failed')
+      .map((check) => `${this.humanizeCheckType(check!.checkType)}: ${check!.message ?? 'failed'}`);
+
+    const profile = await this.prisma.runWithRetry(
+      'KycService.refreshProviderKycProfile.upsert',
+      () =>
+        this.prisma.providerKycProfile.upsert({
+          where: {
+            providerId,
+          },
+          create: {
+            providerId,
+            overallStatus,
+            kycLevel,
+            ninStatus,
+            phoneStatus,
+            faceStatus,
+            vehiclePlateStatus,
+            vehicleVinStatus,
+            ninVerifiedAt:
+              ninStatus === 'verified' ? (ninCheck?.verifiedAt ?? new Date()) : null,
+            phoneVerifiedAt:
+              phoneStatus === 'verified'
+                ? (phoneCheck?.verifiedAt ?? new Date())
+                : null,
+            faceVerifiedAt:
+              faceStatus === 'verified' ? (ninCheck?.verifiedAt ?? new Date()) : null,
+            vehiclePlateVerifiedAt:
+              vehiclePlateStatus === 'verified'
+                ? (plateCheck?.verifiedAt ?? new Date())
+                : null,
+            vehicleVinVerifiedAt:
+              vehicleVinStatus === 'verified' ? (vinCheck?.verifiedAt ?? new Date()) : null,
+            faceConfidence: ninCheck?.confidence ?? undefined,
+            maskedNin: ninCheck?.maskedIdentifier ?? null,
+            maskedPhone: phoneCheck?.maskedIdentifier ?? null,
+            failureSummary: failedMessages.length ? failedMessages.join(' | ') : null,
+            lastVendorSyncAt: new Date(),
+            lastCheckAt: checks[0]?.createdAt ?? null,
+          },
+          update: {
+            overallStatus,
+            kycLevel,
+            ninStatus,
+            phoneStatus,
+            faceStatus,
+            vehiclePlateStatus,
+            vehicleVinStatus,
+            ninVerifiedAt:
+              ninStatus === 'verified' ? (ninCheck?.verifiedAt ?? new Date()) : null,
+            phoneVerifiedAt:
+              phoneStatus === 'verified'
+                ? (phoneCheck?.verifiedAt ?? new Date())
+                : null,
+            faceVerifiedAt:
+              faceStatus === 'verified' ? (ninCheck?.verifiedAt ?? new Date()) : null,
+            vehiclePlateVerifiedAt:
+              vehiclePlateStatus === 'verified'
+                ? (plateCheck?.verifiedAt ?? new Date())
+                : null,
+            vehicleVinVerifiedAt:
+              vehicleVinStatus === 'verified' ? (vinCheck?.verifiedAt ?? new Date()) : null,
+            faceConfidence: ninCheck?.confidence ?? null,
+            maskedNin: ninCheck?.maskedIdentifier ?? null,
+            maskedPhone: phoneCheck?.maskedIdentifier ?? null,
+            failureSummary: failedMessages.length ? failedMessages.join(' | ') : null,
+            lastVendorSyncAt: new Date(),
+            lastCheckAt: checks[0]?.createdAt ?? null,
+          },
+        }),
+    );
+
+    return profile;
+  }
+
+  private calculateOverallStatus(requiredStatuses: KycCheckStatus[]): KycCheckStatus {
+    if (requiredStatuses.every((status) => status === 'verified')) {
+      return 'verified';
+    }
+
+    if (requiredStatuses.some((status) => status === 'failed')) {
+      return 'failed';
+    }
+
+    if (
+      requiredStatuses.some(
+        (status) => status === 'pending' || status === 'verified',
+      )
+    ) {
+      return 'pending';
+    }
+
+    return 'unverified';
+  }
+
+  private calculateKycLevel(input: {
+    ninStatus: KycCheckStatus;
+    faceStatus: KycCheckStatus;
+    phoneStatus: KycCheckStatus;
+    vehiclePlateStatus: KycCheckStatus;
+    vehicleVinStatus: KycCheckStatus;
+  }): number {
+    let level = 0;
+
+    if (input.ninStatus === 'verified' && input.faceStatus === 'verified') {
+      level += 1;
+    }
+    if (input.phoneStatus === 'verified') {
+      level += 1;
+    }
+    if (input.vehiclePlateStatus === 'verified') {
+      level += 1;
+    }
+    if (input.vehicleVinStatus === 'verified') {
+      level += 1;
+    }
+
+    return level;
+  }
+
+  private normalizeNinFaceResult(
+    nin: string,
+    response: Record<string, unknown>,
+    existingMasked?: string,
+  ): NormalizedCheckResult {
+    const dataObject = this.readObject(response.data);
+    const root = dataObject ?? response;
+
+    const statusFlag = this.readBoolean(root.status);
+    const detail = this.readString(root.detail) ?? this.readString(root.message);
+    const responseCode =
+      this.readString(root.response_code) ??
+      this.readString(root.responseCode) ??
+      undefined;
+
+    const ninData = this.readObject(root.nin_data) ?? {};
+    const nestedFace = this.readObject(ninData.face_data);
+    const topFace = this.readObject(root.face_data);
+    const faceData = nestedFace ?? topFace ?? {};
+
+    const faceStatus =
+      this.readBoolean(faceData.status) ??
+      (this.readString(faceData.status)?.toLowerCase() === 'verified' ? true : null);
+    const confidence = this.readNumber(faceData.confidence);
+
+    const responseSuccessCode = responseCode === '00' || responseCode === undefined;
+    const isVerified = Boolean(statusFlag) && responseSuccessCode && faceStatus !== false;
+
+    const vendorReference =
+      this.readString(this.readObject(root.verification)?.reference) ??
+      this.readString(ninData.trackingId) ??
+      this.readString(root.reference) ??
+      undefined;
+
+    const maskedNin =
+      existingMasked ??
+      this.maskNin(this.readString(ninData.nin) ?? nin);
+
+    const normalizedData: Record<string, unknown> = {
+      source: 'prembly',
+      firstName: this.readString(ninData.firstname),
+      middleName: this.readString(ninData.middlename),
+      lastName: this.readString(ninData.surname),
+      gender: this.readString(ninData.gender),
+      dateOfBirth:
+        this.readString(ninData.birthdate) ??
+        this.readString((ninData as Record<string, unknown>).date_of_birth),
+      faceMessage: this.readString(faceData.message),
+      faceResponseCode: this.readString(faceData.response_code),
+      reference: vendorReference,
+    };
+
+    const status: KycCheckStatus = isVerified
+      ? 'verified'
+      : statusFlag
+        ? 'pending'
+        : 'failed';
+
+    return {
+      checkType: 'nin_face',
+      status,
+      responseCode,
+      confidence: confidence ?? undefined,
+      message: detail ?? this.readString(faceData.message) ?? undefined,
+      vendorReference,
+      maskedIdentifier: maskedNin,
+      normalizedData: this.toJsonValue(normalizedData) as Prisma.InputJsonValue,
+      rawResponse: this.toJsonValue(response) as Prisma.InputJsonValue,
+      verifiedAt: status === 'verified' ? new Date() : undefined,
+      failedAt: status === 'failed' ? new Date() : undefined,
+    };
+  }
+
+  private normalizePhoneResult(
+    phoneNumber: string,
+    response: Record<string, unknown>,
+    existingMasked?: string,
+  ): NormalizedCheckResult {
+    const dataObject = this.readObject(response.data);
+    const root = dataObject ?? response;
+
+    const statusFlag = this.readBoolean(root.status);
+    const verification = this.readObject(root.verification);
+    const verificationStatus = this.readString(verification?.status)?.toUpperCase();
+    const responseCode =
+      this.readString(root.response_code) ??
+      this.readString(root.responseCode) ??
+      undefined;
+
+    const isVerified =
+      verificationStatus === 'VERIFIED' ||
+      (Boolean(statusFlag) && (responseCode === '00' || !responseCode));
+
+    const vendorReference =
+      this.readString(verification?.reference) ??
+      this.readString(root.reference) ??
+      undefined;
+
+    const status: KycCheckStatus = isVerified
+      ? 'verified'
+      : statusFlag
+        ? 'pending'
+        : 'failed';
+
+    const message =
+      this.readString(root.detail) ??
+      this.readString(root.message) ??
+      this.readString(verification?.message) ??
+      undefined;
+
+    return {
+      checkType: 'phone',
+      status,
+      responseCode,
+      message,
+      vendorReference,
+      maskedIdentifier: existingMasked ?? this.maskPhone(phoneNumber),
+      normalizedData: this.toJsonValue({
+        source: 'prembly',
+        reference: vendorReference,
+      }) as Prisma.InputJsonValue,
+      rawResponse: this.toJsonValue(response) as Prisma.InputJsonValue,
+      verifiedAt: status === 'verified' ? new Date() : undefined,
+      failedAt: status === 'failed' ? new Date() : undefined,
+    };
+  }
+
+  private normalizePlateResult(
+    plateNumber: string,
+    response: Record<string, unknown>,
+    existingMasked?: string,
+  ): NormalizedCheckResult {
+    const dataObject = this.readObject(response.data);
+    const root = dataObject ?? response;
+    const verification = this.readObject(root.verification);
+
+    const statusFlag = this.readBoolean(root.status);
+    const responseCode =
+      this.readString(root.response_code) ??
+      this.readString(root.responseCode) ??
+      undefined;
+    const verificationStatus = this.readString(verification?.status)?.toUpperCase();
+
+    const isVerified =
+      verificationStatus === 'VERIFIED' ||
+      (Boolean(statusFlag) && (responseCode === '00' || !responseCode));
+
+    const vendorReference =
+      this.readString(verification?.reference) ??
+      this.readString(root.reference) ??
+      undefined;
+
+    const status: KycCheckStatus = isVerified
+      ? 'verified'
+      : statusFlag
+        ? 'pending'
+        : 'failed';
+
+    const message =
+      this.readString(root.detail) ??
+      this.readString(root.message) ??
+      this.readString(verification?.message) ??
+      undefined;
+
+    return {
+      checkType: 'vehicle_plate',
+      status,
+      responseCode,
+      message,
+      vendorReference,
+      maskedIdentifier: existingMasked ?? this.maskPlate(plateNumber),
+      normalizedData: this.toJsonValue({
+        source: 'prembly',
+        vehicleNumber:
+          this.readString(this.readObject(root.data)?.vehicle_number) ??
+          plateNumber,
+        vehicleName: this.readString(this.readObject(root.data)?.vehicle_name),
+        vehicleColor: this.readString(this.readObject(root.data)?.vehicle_color),
+        reference: vendorReference,
+      }) as Prisma.InputJsonValue,
+      rawResponse: this.toJsonValue(response) as Prisma.InputJsonValue,
+      verifiedAt: status === 'verified' ? new Date() : undefined,
+      failedAt: status === 'failed' ? new Date() : undefined,
+    };
+  }
+
+  private normalizeVinResult(
+    vin: string,
+    response: Record<string, unknown>,
+    existingMasked?: string,
+  ): NormalizedCheckResult {
+    const dataObject = this.readObject(response.data);
+    const root = dataObject ?? response;
+    const verification = this.readObject(root.verification);
+
+    const statusFlag = this.readBoolean(root.status);
+    const responseCode =
+      this.readString(root.response_code) ??
+      this.readString(root.responseCode) ??
+      undefined;
+    const verificationStatus = this.readString(verification?.status)?.toUpperCase();
+
+    const isVerified =
+      verificationStatus === 'VERIFIED' ||
+      (Boolean(statusFlag) && (responseCode === '00' || !responseCode));
+
+    const vendorReference =
+      this.readString(verification?.reference) ??
+      this.readString(root.reference) ??
+      undefined;
+
+    const status: KycCheckStatus = isVerified
+      ? 'verified'
+      : statusFlag
+        ? 'pending'
+        : 'failed';
+
+    return {
+      checkType: 'vehicle_vin',
+      status,
+      responseCode,
+      message:
+        this.readString(root.detail) ??
+        this.readString(root.message) ??
+        this.readString(verification?.message) ??
+        undefined,
+      vendorReference,
+      maskedIdentifier: existingMasked ?? this.maskVin(vin),
+      normalizedData: this.toJsonValue({
+        source: 'prembly',
+        vin: this.readString(this.readObject(root.data)?.vin) ?? vin,
+        reference: vendorReference,
+      }) as Prisma.InputJsonValue,
+      rawResponse: this.toJsonValue(response) as Prisma.InputJsonValue,
+      verifiedAt: status === 'verified' ? new Date() : undefined,
+      failedAt: status === 'failed' ? new Date() : undefined,
+    };
+  }
+
+  private normalizeResultByCheckType(
+    checkType: KycCheckType,
+    response: Record<string, unknown>,
+    existingMasked?: string,
+  ): NormalizedCheckResult {
+    if (checkType === 'nin_face') {
+      return this.normalizeNinFaceResult('', response, existingMasked);
+    }
+
+    if (checkType === 'phone') {
+      return this.normalizePhoneResult('', response, existingMasked);
+    }
+
+    if (checkType === 'vehicle_plate') {
+      return this.normalizePlateResult('', response, existingMasked);
+    }
+
+    return this.normalizeVinResult('', response, existingMasked);
+  }
+
+  private async resolveSyncTargets(
+    providerId: string,
+    input: SyncKycStatusDto,
+  ): Promise<PrismaProviderKycCheck[]> {
+    if (input.checkId) {
+      const check = await this.prisma.runWithRetry(
+        'KycService.resolveSyncTargets.checkId',
+        () =>
+          this.prisma.providerKycCheck.findFirst({
+            where: {
+              id: input.checkId,
+              providerId,
+            },
+          }),
+      );
+
+      if (!check) {
+        throw new NotFoundException(`KYC check ${input.checkId} not found`);
+      }
+
+      return [check];
+    }
+
+    if (input.vendorReference?.trim()) {
+      const reference = input.vendorReference.trim();
+      const check = await this.prisma.runWithRetry(
+        'KycService.resolveSyncTargets.vendorReference',
+        () =>
+          this.prisma.providerKycCheck.findFirst({
+            where: {
+              providerId,
+              vendorReference: reference,
+            },
+          }),
+      );
+
+      if (!check) {
+        throw new NotFoundException(
+          `KYC check with reference ${reference} not found`,
+        );
+      }
+
+      return [check];
+    }
+
+    return this.prisma.runWithRetry('KycService.resolveSyncTargets.pending', () =>
+      this.prisma.providerKycCheck.findMany({
+        where: {
+          providerId,
+          status: {
+            in: ['pending'],
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 20,
+      }),
+    );
+  }
+
+  private async resolveProviderIdForProfile(profileId: string): Promise<string | null> {
+    const provider = await this.prisma.runWithRetry(
+      'KycService.resolveProviderIdForProfile',
       () =>
         this.prisma.provider.findFirst({
           where: {
-            id: providerId,
             OR: [
-              { profileId },
+              {
+                profileId,
+              },
               {
                 members: {
                   some: {
@@ -586,180 +1218,88 @@ export class KycService {
           select: {
             id: true,
           },
+          orderBy: {
+            createdAt: 'desc',
+          },
         }),
     );
 
-    if (!authorized) {
-      throw new ForbiddenException('You do not have access to this provider');
-    }
-
-    return authorized.id;
+    return provider?.id ?? null;
   }
 
-  private async provisionProviderAccount(profileId: string): Promise<string> {
-    const profile = await this.requireProfile(profileId);
-    const defaultBusinessName = this.buildDefaultProviderBusinessName(profile);
-
-    try {
-      const provider = await this.prisma.runWithRetry(
-        'KycService.provisionProviderAccount.createProvider',
+  private async requireAuthorizedProviderId(
+    profileId: string,
+    requestedProviderId?: string,
+  ): Promise<string> {
+    if (requestedProviderId?.trim()) {
+      const providerId = requestedProviderId.trim();
+      const hasAccess = await this.prisma.runWithRetry(
+        'KycService.requireAuthorizedProviderId.requested',
         () =>
-          this.prisma.$transaction(async (tx) => {
-            const createdProvider = await tx.provider.create({
-              data: {
-                businessName: defaultBusinessName,
-                profileId,
-                status: 'pending',
-              },
-              select: {
-                id: true,
-              },
-            });
-
-            await tx.providerMember.create({
-              data: {
-                providerId: createdProvider.id,
-                profileId,
-                role: 'owner',
-                status: 'active',
-              },
-            });
-
-            return createdProvider;
+          this.prisma.provider.findFirst({
+            where: {
+              id: providerId,
+              OR: [
+                { profileId },
+                {
+                  members: {
+                    some: {
+                      profileId,
+                      status: 'active',
+                    },
+                  },
+                },
+              ],
+            },
+            select: { id: true },
           }),
       );
 
-      this.logger.log(
-        `Auto-provisioned provider account ${provider.id} for profile ${profileId}`,
-      );
-      return provider.id;
-    } catch (error) {
-      if (!this.isUniqueConstraintError(error)) {
-        throw error;
+      if (hasAccess) {
+        return providerId;
       }
+
+      const role = await this.getUserRole(profileId);
+      if (role === UserType.ADMIN) {
+        const providerExists = await this.prisma.runWithRetry(
+          'KycService.requireAuthorizedProviderId.admin',
+          () =>
+            this.prisma.provider.findUnique({
+              where: { id: providerId },
+              select: { id: true },
+            }),
+        );
+
+        if (!providerExists) {
+          throw new NotFoundException(`Provider ${providerId} not found`);
+        }
+
+        return providerId;
+      }
+
+      throw new ForbiddenException('You are not allowed to access this provider');
     }
 
-    const existingProviderId = await this.resolveProviderIdForProfile(profileId);
-    if (!existingProviderId) {
-      throw new ForbiddenException('Unable to create provider profile for this user');
+    const resolved = await this.resolveProviderIdForProfile(profileId);
+    if (!resolved) {
+      const role = await this.getUserRole(profileId);
+      if (role === UserType.ADMIN) {
+        throw new BadRequestException(
+          'providerId is required for this operation when executed as admin',
+        );
+      }
+
+      throw new ForbiddenException('Provider account is required for this operation');
     }
 
-    await this.prisma.runWithRetry(
-      'KycService.provisionProviderAccount.ensureProviderMember',
-      () =>
-        this.prisma.providerMember.upsert({
-          where: {
-            providerId_profileId: {
-              providerId: existingProviderId,
-              profileId,
-            },
-          },
-          update: {
-            role: 'owner',
-            status: 'active',
-          },
-          create: {
-            providerId: existingProviderId,
-            profileId,
-            role: 'owner',
-            status: 'active',
-          },
-        }),
-    );
-
-    this.logger.log(
-      `Attached profile ${profileId} to existing provider ${existingProviderId}`,
-    );
-    return existingProviderId;
+    return resolved;
   }
 
-  private buildDefaultProviderBusinessName(profile: {
-    email: string;
-    firstName: string | null;
-    lastName: string | null;
-  }): string {
-    const fullName = [profile.firstName?.trim(), profile.lastName?.trim()]
-      .filter((value): value is string => Boolean(value))
-      .join(' ');
-
-    if (fullName) {
-      return `${fullName} Logistics`;
-    }
-
-    const emailPrefix = profile.email.split('@')[0]?.trim();
-    if (emailPrefix) {
-      return `${emailPrefix} Logistics`;
-    }
-
-    return 'Oyana Provider';
-  }
-
-  private async resolveProviderIdForProfile(profileId: string): Promise<string | null> {
-    const provider = await this.prisma.runWithRetry(
-      'KycService.resolveProviderIdForProfile.provider',
-      () =>
-        this.prisma.provider.findFirst({
-          where: { profileId },
-          select: { id: true },
-        }),
-    );
-
-    if (provider?.id) {
-      return provider.id;
-    }
-
-    const providerMember = await this.prisma.runWithRetry(
-      'KycService.resolveProviderIdForProfile.providerMember',
-      () =>
-        this.prisma.providerMember.findFirst({
-          where: {
-            profileId,
-            status: 'active',
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          select: {
-            providerId: true,
-          },
-        }),
-    );
-
-    return providerMember?.providerId ?? null;
-  }
-
-  private async requireProfile(profileId: string) {
-    const profile = await this.prisma.runWithRetry('KycService.requireProfile', () =>
+  private async getUserRole(profileId: string): Promise<UserType> {
+    const profile = await this.prisma.runWithRetry('KycService.getUserRole', () =>
       this.prisma.profile.findUnique({
-        where: {
-          id: profileId,
-        },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phoneVerified: true,
-        },
-      }),
-    );
-
-    if (!profile) {
-      throw new NotFoundException('Profile not found');
-    }
-
-    return profile;
-  }
-
-  private async requireUserRole(profileId: string): Promise<UserType> {
-    const profile = await this.prisma.runWithRetry('KycService.requireUserRole', () =>
-      this.prisma.profile.findUnique({
-        where: {
-          id: profileId,
-        },
-        select: {
-          userType: true,
-        },
+        where: { id: profileId },
+        select: { userType: true },
       }),
     );
 
@@ -770,224 +1310,413 @@ export class KycService {
     return profile.userType as UserType;
   }
 
-  private async getOrCreateKycCaseForProvider(
+  private async ensureProviderKycProfile(
     providerId: string,
-    profileId: string,
-    profile: {
-      phoneVerified: boolean;
-    },
-    preferredKycCaseId?: string,
-  ): Promise<ProviderKycCase> {
-    if (preferredKycCaseId?.trim()) {
-      return this.requireOwnedKycCase(providerId, preferredKycCaseId.trim());
-    }
+  ): Promise<PrismaProviderKycProfile> {
+    return this.prisma.runWithRetry('KycService.ensureProviderKycProfile', async () => {
+      const existing = await this.prisma.providerKycProfile.findUnique({
+        where: {
+          providerId,
+        },
+      });
 
-    const existingCase = await this.prisma.runWithRetry(
-      'KycService.getOrCreateKycCaseForProvider.findExisting',
-      () =>
-        this.prisma.providerKycCase.findFirst({
-          where: {
-            providerId,
-            status: {
-              in: ['draft', 'pending', 'submitted', 'needs_more_info'],
-            },
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-        }),
-    );
+      if (existing) {
+        return existing;
+      }
 
-    if (existingCase) {
-      return existingCase;
-    }
-
-    return this.prisma.runWithRetry(
-      'KycService.getOrCreateKycCaseForProvider.create',
-      () =>
-        this.prisma.providerKycCase.create({
-          data: {
-            providerId,
-            status: 'draft',
-            phoneVerified: profile.phoneVerified,
-            kycLevel: profile.phoneVerified ? 1 : 0,
-          },
-        }),
-    );
+      return this.prisma.providerKycProfile.create({
+        data: {
+          providerId,
+        },
+      });
+    });
   }
 
-  private async requireOwnedKycCase(
+  private async requireProviderMedia(
     providerId: string,
-    kycCaseId: string,
-  ): Promise<ProviderKycCase> {
-    const kycCase = await this.prisma.runWithRetry('KycService.requireOwnedKycCase', () =>
-      this.prisma.providerKycCase.findFirst({
+    mediaId: string,
+  ): Promise<PrismaProviderKycMedia> {
+    const media = await this.prisma.runWithRetry('KycService.requireProviderMedia', () =>
+      this.prisma.providerKycMedia.findFirst({
         where: {
-          id: kycCaseId,
+          id: mediaId,
           providerId,
         },
       }),
     );
 
-    if (!kycCase) {
-      throw new NotFoundException('KYC case not found');
+    if (!media) {
+      throw new NotFoundException(`KYC media ${mediaId} not found`);
     }
 
-    return kycCase;
+    return media;
   }
 
-  private normalizeKycCaseStatus(status: string): KYCCaseStatus {
-    const normalizedStatus = status.toLowerCase();
-
-    if (normalizedStatus === 'pending') {
-      return KYCCaseStatus.DRAFT;
+  private async resolveProviderVehicle(
+    providerId: string,
+    vehicleId?: string,
+  ): Promise<PrismaVehicle | null> {
+    if (!vehicleId?.trim()) {
+      return null;
     }
+
+    const vehicle = await this.prisma.runWithRetry(
+      'KycService.resolveProviderVehicle',
+      () =>
+        this.prisma.vehicle.findFirst({
+          where: {
+            id: vehicleId.trim(),
+            providerId,
+          },
+        }),
+    );
+
+    if (!vehicle) {
+      throw new NotFoundException(`Vehicle ${vehicleId} not found`);
+    }
+
+    return vehicle;
+  }
+
+  private async fetchMediaAsBase64(bucket: string, path: string): Promise<string> {
+    const supabase = this.supabaseService.getClient() as any;
+    const storage = supabase.storage.from(bucket);
+
+    const signedResult = await storage.createSignedUrl(path, 90);
+    if (signedResult.error || !signedResult.data) {
+      throw new BadRequestException(
+        signedResult.error?.message ?? 'Unable to fetch KYC media',
+      );
+    }
+
+    const signedUrl =
+      this.readString(signedResult.data.signedUrl) ??
+      this.readString(signedResult.data.signed_url) ??
+      this.readString(signedResult.data.url);
+
+    if (!signedUrl) {
+      throw new BadRequestException('Signed media URL was not returned');
+    }
+
+    const response = await axios.get<ArrayBuffer>(signedUrl, {
+      responseType: 'arraybuffer',
+    });
+
+    const body = response.data;
+    const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
+    if (buffer.length === 0) {
+      throw new BadRequestException('Uploaded media is empty');
+    }
+
+    return buffer.toString('base64');
+  }
+
+  private async updateVehicleVerificationSnapshot(
+    vehicleId: string,
+    input: {
+      plateNumber?: string;
+      vin?: string;
+      plateVerificationStatus?: string;
+      vinVerificationStatus?: string;
+      verifiedAt?: Date;
+      failedAt?: Date;
+      message?: string;
+    },
+  ): Promise<void> {
+    await this.prisma.runWithRetry('KycService.updateVehicleVerificationSnapshot', () =>
+      this.prisma.vehicle.update({
+        where: {
+          id: vehicleId,
+        },
+        data: {
+          plateNumber: input.plateNumber,
+          vin: input.vin,
+          plateVerificationStatus: input.plateVerificationStatus,
+          vinVerificationStatus: input.vinVerificationStatus,
+          lastVerificationAt: input.verifiedAt ?? input.failedAt ?? new Date(),
+          verificationFailureReason:
+            input.failedAt || input.plateVerificationStatus === 'failed' || input.vinVerificationStatus === 'failed'
+              ? (input.message ?? 'Vehicle verification failed')
+              : null,
+        },
+      }),
+    );
+  }
+
+  private isVinVerificationEnabled(): boolean {
+    const vinEndpoint = this.configService.get<string>('PREMBLY_VIN_ENDPOINT')?.trim();
+    return Boolean(vinEndpoint);
+  }
+
+  private isStatusPollingEnabled(): boolean {
+    const statusEndpoint = this.configService
+      .get<string>('PREMBLY_STATUS_ENDPOINT')
+      ?.trim();
+    return Boolean(statusEndpoint);
+  }
+
+  private assertWebhookSignature(rawBody: string, signature?: string): void {
+    const secret = this.configService.get<string>('PREMBLY_WEBHOOK_SECRET')?.trim();
+
+    if (!secret) {
+      return;
+    }
+
+    if (!signature || !signature.trim()) {
+      throw new ForbiddenException('Invalid Prembly webhook signature');
+    }
+
+    const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
+    const received = signature.trim().replace(/^sha256=/i, '');
+
+    if (expected.length !== received.length) {
+      throw new ForbiddenException('Invalid Prembly webhook signature');
+    }
+
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    const receivedBuffer = Buffer.from(received, 'utf8');
+
+    if (!timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      throw new ForbiddenException('Invalid Prembly webhook signature');
+    }
+  }
+
+  private extractVendorReference(payload: Record<string, unknown>): string | null {
+    const data = this.readObject(payload.data);
+    const verification = this.readObject(payload.verification);
+    const dataVerification = this.readObject(data?.verification);
+
+    return (
+      this.readString(payload.reference) ??
+      this.readString(verification?.reference) ??
+      this.readString(data?.reference) ??
+      this.readString(dataVerification?.reference) ??
+      null
+    );
+  }
+
+  private buildKycStoragePath(providerId: string, rawFileName: string): string {
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const cleanFileName = this.sanitizeFileName(rawFileName);
+    const random = Math.random().toString(36).slice(2, 10);
+
+    return `providers/${providerId}/${year}/${month}/${Date.now()}-${random}-${cleanFileName}`;
+  }
+
+  private sanitizeFileName(fileName: string): string {
+    const trimmed = fileName.trim();
+    if (!trimmed) {
+      return 'selfie.jpg';
+    }
+
+    const nameOnly = trimmed.replace(/[/\\]/g, '_');
+    const asciiOnly = nameOnly.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    return asciiOnly.length > 0 ? asciiOnly.slice(-120) : 'selfie.jpg';
+  }
+
+  private parseOptionalBigInt(value: unknown): bigint | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value === 'bigint') {
+      return value;
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return BigInt(Math.trunc(value));
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      try {
+        return BigInt(value.trim());
+      } catch {
+        return undefined;
+      }
+    }
+
+    return undefined;
+  }
+
+  private getAllowedMimeTypes(): string[] {
+    const configured = this.configService
+      .get<string>('PREMBLY_KYC_ALLOWED_MIME_TYPES')
+      ?.trim();
+
+    if (!configured) {
+      return ['image/jpeg', 'image/png', 'image/webp'];
+    }
+
+    return configured
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  private getMaxKycFileSizeBytes(): bigint {
+    const configured = this.configService
+      .get<string>('PREMBLY_KYC_MAX_FILE_SIZE_BYTES')
+      ?.trim();
+
+    if (!configured) {
+      return BigInt(5 * 1024 * 1024);
+    }
+
+    try {
+      return BigInt(configured);
+    } catch {
+      return BigInt(5 * 1024 * 1024);
+    }
+  }
+
+  private getRawPayloadExpiryTimestamp(): Date {
+    const retentionDays = Number(
+      this.configService.get<string>('PREMBLY_RAW_PAYLOAD_RETENTION_DAYS') ?? 180,
+    );
+
+    const safeDays = Number.isFinite(retentionDays) && retentionDays > 0 ? retentionDays : 180;
+    return new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000);
+  }
+
+  private normalizeStoredStatus(status: string | null | undefined): KycCheckStatus {
+    const normalized = status?.trim().toLowerCase();
 
     if (
-      Object.values(KYCCaseStatus).includes(normalizedStatus as KYCCaseStatus)
+      normalized === 'unverified' ||
+      normalized === 'pending' ||
+      normalized === 'verified' ||
+      normalized === 'failed'
     ) {
-      return normalizedStatus as KYCCaseStatus;
+      return normalized;
     }
 
-    return KYCCaseStatus.DRAFT;
+    if (normalized === 'success') {
+      return 'verified';
+    }
+
+    if (normalized === 'error' || normalized === 'rejected') {
+      return 'failed';
+    }
+
+    return 'unverified';
   }
 
-  private normalizeNinStatus(status: string): NINVerificationStatus {
-    const normalized = status.toLowerCase();
+  private normalizeStatusInput(input?: string): KycCheckStatus | undefined {
+    if (!input?.trim()) {
+      return undefined;
+    }
 
+    const normalized = input.trim().toLowerCase();
     if (
-      Object.values(NINVerificationStatus).includes(
-        normalized as NINVerificationStatus,
-      )
+      normalized === 'unverified' ||
+      normalized === 'pending' ||
+      normalized === 'verified' ||
+      normalized === 'failed'
     ) {
-      return normalized as NINVerificationStatus;
+      return normalized;
     }
 
-    return NINVerificationStatus.PENDING;
+    throw new BadRequestException(
+      'Invalid check status filter. Use one of: unverified, pending, verified, failed',
+    );
   }
 
-  private normalizeVehicleStatus(status: string): VehicleStatus {
-    const normalized = status.toLowerCase();
-
-    if (Object.values(VehicleStatus).includes(normalized as VehicleStatus)) {
-      return normalized as VehicleStatus;
+  private normalizeCheckTypeInput(input?: string): KycCheckType | undefined {
+    if (!input?.trim()) {
+      return undefined;
     }
 
-    return VehicleStatus.ACTIVE;
-  }
+    const normalized = input.trim().toLowerCase().replace(/-/g, '_');
 
-  private toGraphqlKycCase(kycCase: ProviderKycCase): KYCCase {
-    return {
-      id: kycCase.id,
-      providerId: kycCase.providerId,
-      status: this.normalizeKycCaseStatus(kycCase.status),
-      kycLevel: kycCase.kycLevel,
-      ninVerified: kycCase.ninVerified,
-      phoneVerified: kycCase.phoneVerified,
-      faceVerified: kycCase.faceVerified,
-      vehicleVerified: kycCase.vehicleVerified,
-      documentsVerified: kycCase.documentsVerified,
-      submittedAt: kycCase.submittedAt ?? undefined,
-      rejectionReason: kycCase.rejectionReason ?? undefined,
-      reviewedBy: kycCase.reviewedBy ?? undefined,
-      reviewedAt: kycCase.reviewedAt ?? undefined,
-      lastVerificationAttempt: kycCase.lastVerificationAttempt ?? undefined,
-      createdAt: kycCase.createdAt,
-      updatedAt: kycCase.updatedAt,
-    };
-  }
-
-  private toGraphqlKycDocument(document: {
-    id: string;
-    kycCaseId: string;
-    docType: string;
-    storageBucket: string;
-    storagePath: string;
-    mimeType: string | null;
-    status: string;
-    uploadedBy: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }): KYCDocument {
-    return {
-      id: document.id,
-      kycCaseId: document.kycCaseId,
-      docType: document.docType,
-      storageBucket: document.storageBucket,
-      storagePath: document.storagePath,
-      mimeType: document.mimeType ?? undefined,
-      status: document.status,
-      uploadedBy: document.uploadedBy ?? undefined,
-      createdAt: document.createdAt,
-      updatedAt: document.updatedAt,
-    };
-  }
-
-  private toGraphqlNinVerification(verification: {
-    id: string;
-    kycCaseId: string;
-    providerId: string;
-    ninHash: string;
-    firstName: string | null;
-    lastName: string | null;
-    dateOfBirth: Date | null;
-    vendor: string | null;
-    vendorReference: string | null;
-    status: string;
-    requestedAt: Date | null;
-    verifiedAt: Date | null;
-    failureReason: string | null;
-    rawResponse: Prisma.JsonValue | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }): NINVerification {
-    return {
-      id: verification.id,
-      kycCaseId: verification.kycCaseId,
-      providerId: verification.providerId,
-      ninHash: verification.ninHash,
-      firstName: verification.firstName ?? undefined,
-      lastName: verification.lastName ?? undefined,
-      dateOfBirth: verification.dateOfBirth ?? undefined,
-      vendor: verification.vendor ?? undefined,
-      vendorReference: verification.vendorReference ?? undefined,
-      status: this.normalizeNinStatus(verification.status),
-      requestedAt: verification.requestedAt ?? undefined,
-      verifiedAt: verification.verifiedAt ?? undefined,
-      failureReason: verification.failureReason ?? undefined,
-      rawResponse: verification.rawResponse ?? undefined,
-      createdAt: verification.createdAt,
-      updatedAt: verification.updatedAt,
-    };
-  }
-
-  private toGraphqlVehicle(vehicle: PrismaVehicle): Vehicle {
-    return {
-      id: vehicle.id,
-      providerId: vehicle.providerId,
-      category: vehicle.category as Vehicle['category'],
-      plateNumber: vehicle.plateNumber ?? undefined,
-      make: vehicle.make ?? undefined,
-      model: vehicle.model ?? undefined,
-      color: vehicle.color ?? undefined,
-      capacityKg: vehicle.capacityKg ?? undefined,
-      capacityVolumeCm3: vehicle.capacityVolumeCm3 ?? undefined,
-      status: this.normalizeVehicleStatus(vehicle.status),
-      createdAt: vehicle.createdAt,
-      updatedAt: vehicle.updatedAt,
-    };
-  }
-
-  private isUniqueConstraintError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') {
-      return false;
+    if (normalized === 'nin_face') {
+      return 'nin_face';
+    }
+    if (normalized === 'phone') {
+      return 'phone';
+    }
+    if (normalized === 'vehicle_plate' || normalized === 'plate') {
+      return 'vehicle_plate';
+    }
+    if (normalized === 'vehicle_vin' || normalized === 'vin') {
+      return 'vehicle_vin';
     }
 
-    const candidate = error as { code?: string };
-    return candidate.code === 'P2002';
+    throw new BadRequestException(
+      'Invalid check type filter. Use: nin_face, phone, vehicle_plate, vehicle_vin',
+    );
+  }
+
+  private humanizeCheckType(checkType: string): string {
+    if (checkType === 'nin_face') {
+      return 'NIN + Face';
+    }
+    if (checkType === 'vehicle_plate') {
+      return 'Vehicle Plate';
+    }
+    if (checkType === 'vehicle_vin') {
+      return 'Vehicle VIN';
+    }
+    return 'Phone';
+  }
+
+  private readString(value: unknown): string | null {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+
+    return null;
+  }
+
+  private readNumber(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    return null;
+  }
+
+  private readBoolean(value: unknown): boolean | null {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') {
+        return true;
+      }
+      if (normalized === 'false') {
+        return false;
+      }
+    }
+
+    return null;
+  }
+
+  private readObject(value: unknown): Record<string, unknown> | null {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    return null;
   }
 
   private toJsonValue(value: unknown): unknown {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
     if (typeof value === 'bigint') {
       return value.toString();
     }
@@ -1000,7 +1729,7 @@ export class KycService {
       return value.map((item) => this.toJsonValue(item));
     }
 
-    if (value && typeof value === 'object') {
+    if (typeof value === 'object') {
       return Object.entries(value as Record<string, unknown>).reduce<
         Record<string, unknown>
       >((accumulator, [key, item]) => {
@@ -1010,5 +1739,127 @@ export class KycService {
     }
 
     return value;
+  }
+
+  private maskNin(nin: string): string {
+    const trimmed = nin.trim();
+    if (!trimmed) {
+      return '***';
+    }
+    if (trimmed.length <= 4) {
+      return `***${trimmed}`;
+    }
+    return `${'*'.repeat(Math.max(trimmed.length - 4, 3))}${trimmed.slice(-4)}`;
+  }
+
+  private maskPhone(phone: string): string {
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      return '***';
+    }
+    if (trimmed.length <= 4) {
+      return `***${trimmed}`;
+    }
+    return `${trimmed.slice(0, 3)}${'*'.repeat(Math.max(trimmed.length - 5, 3))}${trimmed.slice(-2)}`;
+  }
+
+  private maskPlate(plate: string): string {
+    const trimmed = plate.trim().toUpperCase();
+    if (!trimmed) {
+      return '***';
+    }
+    if (trimmed.length <= 3) {
+      return `${trimmed[0] ?? '*'}**`;
+    }
+    return `${trimmed.slice(0, 3)}***`;
+  }
+
+  private maskVin(vin: string): string {
+    const trimmed = vin.trim().toUpperCase();
+    if (!trimmed) {
+      return '***';
+    }
+    if (trimmed.length <= 6) {
+      return `${trimmed.slice(0, 2)}***${trimmed.slice(-1)}`;
+    }
+    return `${trimmed.slice(0, 3)}${'*'.repeat(trimmed.length - 6)}${trimmed.slice(-3)}`;
+  }
+
+  private toGraphqlKycStatus(profile: PrismaProviderKycProfile): ProviderKycStatus {
+    return {
+      id: profile.id,
+      providerId: profile.providerId,
+      overallStatus: profile.overallStatus,
+      kycLevel: profile.kycLevel,
+      ninStatus: profile.ninStatus,
+      phoneStatus: profile.phoneStatus,
+      faceStatus: profile.faceStatus,
+      vehiclePlateStatus: profile.vehiclePlateStatus,
+      vehicleVinStatus: profile.vehicleVinStatus,
+      ninVerifiedAt: profile.ninVerifiedAt ?? undefined,
+      phoneVerifiedAt: profile.phoneVerifiedAt ?? undefined,
+      faceVerifiedAt: profile.faceVerifiedAt ?? undefined,
+      vehiclePlateVerifiedAt: profile.vehiclePlateVerifiedAt ?? undefined,
+      vehicleVinVerifiedAt: profile.vehicleVinVerifiedAt ?? undefined,
+      faceConfidence: profile.faceConfidence ? Number(profile.faceConfidence) : undefined,
+      maskedNin: profile.maskedNin ?? undefined,
+      maskedPhone: profile.maskedPhone ?? undefined,
+      failureSummary: profile.failureSummary ?? undefined,
+      lastVendorSyncAt: profile.lastVendorSyncAt ?? undefined,
+      lastCheckAt: profile.lastCheckAt ?? undefined,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    };
+  }
+
+  private toGraphqlKycCheck(check: PrismaProviderKycCheck): ProviderKycCheck {
+    return {
+      id: check.id,
+      providerId: check.providerId,
+      profileId: check.profileId ?? undefined,
+      vehicleId: check.vehicleId ?? undefined,
+      checkType: check.checkType,
+      status: check.status,
+      vendor: check.vendor,
+      vendorReference: check.vendorReference ?? undefined,
+      responseCode: check.responseCode ?? undefined,
+      confidence: check.confidence ? Number(check.confidence) : undefined,
+      message: check.message ?? undefined,
+      maskedIdentifier: check.maskedIdentifier ?? undefined,
+      normalizedData: check.normalizedData as Record<string, unknown> | undefined,
+      expiresAt: check.expiresAt ?? undefined,
+      verifiedAt: check.verifiedAt ?? undefined,
+      failedAt: check.failedAt ?? undefined,
+      initiatedByProfileId: check.initiatedByProfileId ?? undefined,
+      createdAt: check.createdAt,
+      updatedAt: check.updatedAt,
+    };
+  }
+
+  private toGraphqlVehicle(vehicle: PrismaVehicle): Vehicle {
+    const normalizedStatus =
+      vehicle.status && Object.values(VehicleStatus).includes(vehicle.status as VehicleStatus)
+        ? (vehicle.status as VehicleStatus)
+        : VehicleStatus.ACTIVE;
+
+    return {
+      id: vehicle.id,
+      providerId: vehicle.providerId,
+      category: vehicle.category as Vehicle['category'],
+      plateNumber: vehicle.plateNumber ?? undefined,
+      vin: vehicle.vin ?? undefined,
+      make: vehicle.make ?? undefined,
+      model: vehicle.model ?? undefined,
+      color: vehicle.color ?? undefined,
+      capacityKg: vehicle.capacityKg ?? undefined,
+      capacityVolumeCm3: vehicle.capacityVolumeCm3 ?? undefined,
+      plateVerificationStatus: vehicle.plateVerificationStatus ?? undefined,
+      vinVerificationStatus: vehicle.vinVerificationStatus ?? undefined,
+      lastVerificationAt: vehicle.lastVerificationAt ?? undefined,
+      verificationFailureReason: vehicle.verificationFailureReason ?? undefined,
+      status: normalizedStatus,
+      createdAt: vehicle.createdAt,
+      updatedAt: vehicle.updatedAt,
+    };
   }
 }

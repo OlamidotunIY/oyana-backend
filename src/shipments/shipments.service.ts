@@ -9,8 +9,7 @@ import {
   AddShipmentItemDto,
   CancelShipmentDto,
   CreateShipmentDto,
-  KYCCase,
-  KYCCaseStatus,
+  ProviderKycStatus,
   ProviderDashboardQuary,
   Shipment,
   ShipmentActorRole,
@@ -542,7 +541,7 @@ export class ShipmentsService {
           recentShipments: [],
         },
         myWallet: wallet,
-        kycCases: [],
+        kycStatus: null,
         activeAssignments: [],
         completedShipments: [],
         vehicles: [],
@@ -557,7 +556,7 @@ export class ShipmentsService {
       recentShipments,
       activeAssignments,
       completedShipments,
-      kycCases,
+      kycStatus,
       vehicles,
     ] = await Promise.all([
       this.prisma.runWithRetry(
@@ -696,14 +695,11 @@ export class ShipmentsService {
           }),
       ),
       this.prisma.runWithRetry(
-        'ShipmentsService.getProviderDashboardQuary.kycCases',
+        'ShipmentsService.getProviderDashboardQuary.kycStatus',
         () =>
-          this.prisma.providerKycCase.findMany({
+          this.prisma.providerKycProfile.findUnique({
             where: {
               providerId,
-            },
-            orderBy: {
-              updatedAt: 'desc',
             },
           }),
       ),
@@ -754,7 +750,7 @@ export class ShipmentsService {
         })),
       },
       myWallet: wallet,
-      kycCases: kycCases.map((kycCase) => this.toGraphqlKycCase(kycCase)),
+      kycStatus: kycStatus ? this.toGraphqlProviderKycStatus(kycStatus) : null,
       activeAssignments: activeAssignments.map((shipment) =>
         this.toGraphqlShipment(shipment),
       ),
@@ -1450,59 +1446,53 @@ export class ShipmentsService {
     };
   }
 
-  private normalizeKycCaseStatus(status: string): KYCCaseStatus {
-    const normalizedStatus = status.toLowerCase();
-
-    if (normalizedStatus === 'pending') {
-      return KYCCaseStatus.DRAFT;
-    }
-
-    if (
-      Object.values(KYCCaseStatus).includes(
-        normalizedStatus as KYCCaseStatus,
-      )
-    ) {
-      return normalizedStatus as KYCCaseStatus;
-    }
-
-    return KYCCaseStatus.DRAFT;
-  }
-
-  private toGraphqlKycCase(kycCase: {
+  private toGraphqlProviderKycStatus(status: {
     id: string;
     providerId: string;
-    status: string;
+    overallStatus: string;
     kycLevel: number;
-    ninVerified: boolean;
-    phoneVerified: boolean;
-    faceVerified: boolean;
-    vehicleVerified: boolean;
-    documentsVerified: boolean;
-    submittedAt: Date | null;
-    rejectionReason: string | null;
-    reviewedBy: string | null;
-    reviewedAt: Date | null;
-    lastVerificationAttempt: Date | null;
+    ninStatus: string;
+    phoneStatus: string;
+    faceStatus: string;
+    vehiclePlateStatus: string;
+    vehicleVinStatus: string;
+    ninVerifiedAt: Date | null;
+    phoneVerifiedAt: Date | null;
+    faceVerifiedAt: Date | null;
+    vehiclePlateVerifiedAt: Date | null;
+    vehicleVinVerifiedAt: Date | null;
+    faceConfidence: Prisma.Decimal | null;
+    maskedNin: string | null;
+    maskedPhone: string | null;
+    failureSummary: string | null;
+    lastVendorSyncAt: Date | null;
+    lastCheckAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
-  }): KYCCase {
+  }): ProviderKycStatus {
     return {
-      id: kycCase.id,
-      providerId: kycCase.providerId,
-      status: this.normalizeKycCaseStatus(kycCase.status),
-      kycLevel: kycCase.kycLevel,
-      ninVerified: kycCase.ninVerified,
-      phoneVerified: kycCase.phoneVerified,
-      faceVerified: kycCase.faceVerified,
-      vehicleVerified: kycCase.vehicleVerified,
-      documentsVerified: kycCase.documentsVerified,
-      submittedAt: kycCase.submittedAt ?? undefined,
-      rejectionReason: kycCase.rejectionReason ?? undefined,
-      reviewedBy: kycCase.reviewedBy ?? undefined,
-      reviewedAt: kycCase.reviewedAt ?? undefined,
-      lastVerificationAttempt: kycCase.lastVerificationAttempt ?? undefined,
-      createdAt: kycCase.createdAt,
-      updatedAt: kycCase.updatedAt,
+      id: status.id,
+      providerId: status.providerId,
+      overallStatus: status.overallStatus,
+      kycLevel: status.kycLevel,
+      ninStatus: status.ninStatus,
+      phoneStatus: status.phoneStatus,
+      faceStatus: status.faceStatus,
+      vehiclePlateStatus: status.vehiclePlateStatus,
+      vehicleVinStatus: status.vehicleVinStatus,
+      ninVerifiedAt: status.ninVerifiedAt ?? undefined,
+      phoneVerifiedAt: status.phoneVerifiedAt ?? undefined,
+      faceVerifiedAt: status.faceVerifiedAt ?? undefined,
+      vehiclePlateVerifiedAt: status.vehiclePlateVerifiedAt ?? undefined,
+      vehicleVinVerifiedAt: status.vehicleVinVerifiedAt ?? undefined,
+      faceConfidence: status.faceConfidence ? Number(status.faceConfidence) : undefined,
+      maskedNin: status.maskedNin ?? undefined,
+      maskedPhone: status.maskedPhone ?? undefined,
+      failureSummary: status.failureSummary ?? undefined,
+      lastVendorSyncAt: status.lastVendorSyncAt ?? undefined,
+      lastCheckAt: status.lastCheckAt ?? undefined,
+      createdAt: status.createdAt,
+      updatedAt: status.updatedAt,
     };
   }
 
@@ -1585,14 +1575,31 @@ export class ShipmentsService {
         : VehicleStatus.ACTIVE;
 
     return {
-      ...vehicle,
+      id: vehicle.id,
+      providerId: vehicle.providerId,
+      category: vehicle.category as Vehicle['category'],
       plateNumber: vehicle.plateNumber ?? undefined,
+      vin: (vehicle as unknown as { vin?: string | null }).vin ?? undefined,
       make: vehicle.make ?? undefined,
       model: vehicle.model ?? undefined,
       color: vehicle.color ?? undefined,
       capacityKg: vehicle.capacityKg ?? undefined,
       capacityVolumeCm3: vehicle.capacityVolumeCm3 ?? undefined,
+      plateVerificationStatus:
+        (vehicle as unknown as { plateVerificationStatus?: string | null })
+          .plateVerificationStatus ?? undefined,
+      vinVerificationStatus:
+        (vehicle as unknown as { vinVerificationStatus?: string | null })
+          .vinVerificationStatus ?? undefined,
+      lastVerificationAt:
+        (vehicle as unknown as { lastVerificationAt?: Date | null }).lastVerificationAt ??
+        undefined,
+      verificationFailureReason:
+        (vehicle as unknown as { verificationFailureReason?: string | null })
+          .verificationFailureReason ?? undefined,
       status,
+      createdAt: vehicle.createdAt,
+      updatedAt: vehicle.updatedAt,
     };
   }
 

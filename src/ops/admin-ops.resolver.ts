@@ -15,8 +15,9 @@ import {
   DispatchBatch,
   FlagFraudCaseDto,
   FraudFlag,
-  KYCCase,
   PlatformConfig,
+  ProviderKycCheck,
+  ProviderKycStatus,
   Refund,
   Shipment,
   SLARule,
@@ -66,12 +67,20 @@ export class AdminOpsResolver {
     return this.adminOpsService.adminProviders(user.id);
   }
 
-  @Query(() => [KYCCase])
+  @Query(() => ProviderKycStatus, { nullable: true })
   async adminProviderKyc(
     @CurrentUser() user: SupabaseUser,
     @Args('providerId') providerId: string,
-  ): Promise<KYCCase[]> {
+  ): Promise<ProviderKycStatus | null> {
     return this.adminOpsService.adminProviderKyc(user.id, providerId);
+  }
+
+  @Query(() => [ProviderKycCheck])
+  async adminProviderKycChecks(
+    @CurrentUser() user: SupabaseUser,
+    @Args('providerId') providerId: string,
+  ): Promise<ProviderKycCheck[]> {
+    return this.adminOpsService.adminProviderKycChecks(user.id, providerId);
   }
 
   @Query(() => [DisputeCase])

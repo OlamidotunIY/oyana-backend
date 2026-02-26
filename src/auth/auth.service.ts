@@ -350,18 +350,14 @@ export class AuthService {
       throw new UnauthorizedException(error?.message ?? 'Invalid OTP');
     }
 
-    await this.prisma.runWithRetry('AuthService.verifyPhoneOtp.updateProfile', async () =>
-      this.prisma.$transaction(async (tx) => {
-        await tx.profile.update({
-          where: { id: profileId },
-          data: {
-            phoneE164: input.phoneE164,
-            phoneVerified: true,
-            phoneVerifiedAt: new Date(),
-          },
-        });
-
-        await this.markProviderPhoneVerified(profileId, tx);
+    await this.prisma.runWithRetry('AuthService.verifyPhoneOtp.updateProfile', () =>
+      this.prisma.profile.update({
+        where: { id: profileId },
+        data: {
+          phoneE164: input.phoneE164,
+          phoneVerified: true,
+          phoneVerifiedAt: new Date(),
+        },
       }),
     );
 
@@ -376,70 +372,6 @@ export class AuthService {
       message: 'Phone number verified successfully',
       success: true,
     };
-  }
-
-  private async markProviderPhoneVerified(
-    profileId: string,
-    tx: Prisma.TransactionClient,
-  ): Promise<void> {
-    const providers = await tx.provider.findMany({
-      where: {
-        OR: [
-          {
-            profileId,
-          },
-          {
-            members: {
-              some: {
-                profileId,
-                status: 'active',
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!providers.length) {
-      return;
-    }
-
-    for (const provider of providers) {
-      const latestKycCase = await tx.providerKycCase.findFirst({
-        where: {
-          providerId: provider.id,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      });
-
-      if (!latestKycCase) {
-        await tx.providerKycCase.create({
-          data: {
-            providerId: provider.id,
-            status: 'pending',
-            phoneVerified: true,
-            kycLevel: 1,
-          },
-        });
-        continue;
-      }
-
-      await tx.providerKycCase.update({
-        where: {
-          id: latestKycCase.id,
-        },
-        data: {
-          phoneVerified: true,
-          kycLevel: latestKycCase.kycLevel >= 1 ? latestKycCase.kycLevel : 1,
-          lastVerificationAttempt: new Date(),
-        },
-      });
-    }
   }
 
   private async recordPhoneVerificationAttempt(
