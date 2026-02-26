@@ -25,7 +25,8 @@ model Profile {
   walletAccounts            WalletAccount[]      @relation("ProfileWallet")
   ratingsMade               Rating[]
   shipmentBidAwards         ShipmentBidAward[]
-  documentUploads           KycDocument[]
+  initiatedKycChecks        ProviderKycCheck[]   @relation("ProviderKycCheckInitiator")
+  uploadedKycMedia          ProviderKycMedia[]   @relation("ProviderKycMediaUploader")
   podUploads                PodUpload[]
   shipmentAssignmentsDriver ShipmentAssignment[]
   refundsInitiated          Refund[]             @relation("RefundInitiator")
