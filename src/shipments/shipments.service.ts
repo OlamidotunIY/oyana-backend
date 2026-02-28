@@ -2,8 +2,11 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import { PrismaService } from '../database/prisma.service';
 import {
   AddShipmentItemDto,
@@ -20,6 +23,7 @@ import {
   ShipmentMilestone,
   ShipmentMilestoneStatus,
   ShipmentMilestoneType,
+  ShipmentMode,
   ShipmentQueryFilter,
   ShipmentScheduleType,
   ShipmentStatus,
@@ -42,9 +46,16 @@ import {
   normalizeProfileRoles,
   resolveProfileRole,
 } from '../auth/utils/roles.util';
+import {
+  DISPATCH_QUEUE_NAME,
+  DISPATCH_SHIPMENT_JOB,
+  type DispatchShipmentJobPayload,
+} from '../queue/queue.constants';
 
 @Injectable()
 export class ShipmentsService {
+  private readonly logger = new Logger(ShipmentsService.name);
+
   private static readonly ACTIVE_STATUSES: ShipmentStatus[] = [
     ShipmentStatus.DRAFT,
     ShipmentStatus.CREATED,
@@ -122,7 +133,11 @@ export class ShipmentsService {
 
   private readonly defaultCommissionRateBps: number;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue(DISPATCH_QUEUE_NAME)
+    private readonly dispatchQueue: Queue<DispatchShipmentJobPayload>,
+  ) {
     const commissionRate = parseInt(
       process.env.DEFAULT_SHIPMENT_COMMISSION_RATE_BPS ?? '1000',
       10,
@@ -814,6 +829,8 @@ export class ShipmentsService {
         }),
     );
 
+    await this.enqueueDispatchShipmentIfRequired(shipment);
+
     return this.toGraphqlShipment(shipment);
   }
 
@@ -1117,6 +1134,69 @@ export class ShipmentsService {
     );
 
     return this.toGraphqlShipmentItem(createdItem);
+  }
+
+  private async enqueueDispatchShipmentIfRequired(
+    shipment: PrismaShipment,
+  ): Promise<void> {
+    if (shipment.mode !== ShipmentMode.DISPATCH) {
+      return;
+    }
+
+    const now = new Date();
+    const dispatchJob = this.buildDispatchShipmentJob(shipment, now);
+    if (!dispatchJob) {
+      return;
+    }
+
+    try {
+      await this.dispatchQueue.add(
+        DISPATCH_SHIPMENT_JOB,
+        {
+          shipmentId: shipment.id,
+          trigger: dispatchJob.trigger,
+        },
+        {
+          jobId: `${DISPATCH_SHIPMENT_JOB}:${shipment.id}:${dispatchJob.trigger}`,
+          ...(dispatchJob.delayMs > 0 ? { delay: dispatchJob.delayMs } : {}),
+        },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(
+        `Failed to enqueue dispatch job for shipment ${shipment.id}: ${message}`,
+      );
+    }
+  }
+
+  private buildDispatchShipmentJob(
+    shipment: PrismaShipment,
+    now: Date,
+  ): { trigger: 'created' | 'scheduled'; delayMs: number } | null {
+    if (
+      shipment.scheduleType === ShipmentScheduleType.SCHEDULED &&
+      shipment.scheduledAt
+    ) {
+      const delayMs = shipment.scheduledAt.getTime() - now.getTime();
+      if (delayMs > 0) {
+        return {
+          trigger: 'scheduled',
+          delayMs,
+        };
+      }
+    }
+
+    if (
+      shipment.scheduleType === ShipmentScheduleType.INSTANT ||
+      shipment.scheduleType === ShipmentScheduleType.SCHEDULED
+    ) {
+      return {
+        trigger: 'created',
+        delayMs: 0,
+      };
+    }
+
+    return null;
   }
 
   private async resolveProviderIdForProfile(
@@ -1445,20 +1525,6 @@ export class ShipmentsService {
   private async getOrCreateWalletAccount(
     profileId: string,
   ): Promise<WalletAccount | null> {
-    const wallet = await this.prisma.runWithRetry(
-      'ShipmentsService.getOrCreateWalletAccount.findWallet',
-      () =>
-        this.prisma.walletAccount.findFirst({
-          where: {
-            ownerProfileId: profileId,
-          },
-        }),
-    );
-
-    if (wallet) {
-      return this.toGraphqlWalletAccount(wallet);
-    }
-
     const profile = await this.prisma.runWithRetry(
       'ShipmentsService.getOrCreateWalletAccount.findProfile',
       () =>
@@ -1476,18 +1542,22 @@ export class ShipmentsService {
       return null;
     }
 
-    const createdWallet = await this.prisma.runWithRetry(
-      'ShipmentsService.getOrCreateWalletAccount.createWallet',
+    const wallet = await this.prisma.runWithRetry(
+      'ShipmentsService.getOrCreateWalletAccount.upsertWallet',
       () =>
-        this.prisma.walletAccount.create({
-          data: {
+        this.prisma.walletAccount.upsert({
+          where: {
+            ownerProfileId: profileId,
+          },
+          update: {},
+          create: {
             ownerProfileId: profileId,
             currency: this.getAllowedShipmentCurrencies()[0] ?? 'NGN',
           },
         }),
     );
 
-    return this.toGraphqlWalletAccount(createdWallet);
+    return this.toGraphqlWalletAccount(wallet);
   }
 
   private toGraphqlWalletAccount(wallet: {
