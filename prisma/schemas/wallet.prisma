@@ -20,7 +20,7 @@ model WalletAccount {
   bankAccounts   WalletSavedBankAccount[]
   withdrawals    WalletWithdrawal[]
 
-  @@index([ownerProfileId])
+  @@unique([ownerProfileId])
   @@map("wallet_accounts")
 }
 

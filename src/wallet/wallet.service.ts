@@ -1537,22 +1537,14 @@ export class WalletService {
     tx?: Prisma.TransactionClient,
   ): Promise<PrismaWalletAccount> {
     const prismaClient = tx ?? this.prisma;
+    await this.requireProfile(ownerId);
 
-    const existingWallet = await prismaClient.walletAccount.findFirst({
+    return prismaClient.walletAccount.upsert({
       where: {
         ownerProfileId: ownerId,
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    if (existingWallet) {
-      return existingWallet;
-    }
-
-    return prismaClient.walletAccount.create({
-      data: {
+      update: {},
+      create: {
         ownerProfileId: ownerId,
         currency: WALLET_CURRENCY,
       },
