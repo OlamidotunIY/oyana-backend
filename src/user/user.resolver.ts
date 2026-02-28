@@ -2,7 +2,10 @@ import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
 import { Profile } from '../graphql/types/core/profile.type';
-import { UpdateProfileInput } from '../graphql/dto/core/profile.dto';
+import {
+  ActivateRoleInput,
+  UpdateProfileInput,
+} from '../graphql/dto/core/profile.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -29,5 +32,15 @@ export class UserResolver {
     @Args('input') input: UpdateProfileInput,
   ): Promise<Profile> {
     return this.userService.updateProfile(user.id, input);
+  }
+
+  @Mutation(() => Profile)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  async activateRole(
+    @CurrentUser() user: SupabaseUser,
+    @Args('input') input: ActivateRoleInput,
+  ): Promise<Profile> {
+    return this.userService.activateRole(user.id, input);
   }
 }

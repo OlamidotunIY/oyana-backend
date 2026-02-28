@@ -41,9 +41,11 @@ export class AuthService {
 
   async signUp(input: SignUpInput): Promise<MessageResponse> {
     const supabase = this.supabaseService.getClient();
+    const roles = this.normalizeSignUpRoles(input.roles);
+    const isBusinessSignup = roles.includes(UserType.BUSINESS);
 
     // Validate business-specific fields
-    if (input.userType === UserType.BUSINESS) {
+    if (isBusinessSignup) {
       if (!input.phoneNumber) {
         throw new BadRequestException(
           'Phone number is required for business signup',
@@ -78,7 +80,7 @@ export class AuthService {
     const signupEvent = new UserSignedUpEvent(
       data.user.id,
       input.email,
-      input.userType,
+      roles,
       input.firstName,
       input.lastName,
       input.state,
@@ -95,6 +97,25 @@ export class AuthService {
         'Signup successful. Please check your email to verify your account.',
       success: true,
     };
+  }
+
+  private normalizeSignUpRoles(inputRoles?: UserType[] | null): UserType[] {
+    const requestedRoles =
+      inputRoles && inputRoles.length > 0
+        ? inputRoles
+        : [UserType.INDIVIDUAL];
+
+    if (requestedRoles.includes(UserType.ADMIN)) {
+      throw new BadRequestException('Admin role cannot be self-assigned');
+    }
+
+    const normalizedRoles = Array.from(new Set(requestedRoles));
+
+    if (normalizedRoles.includes(UserType.BUSINESS)) {
+      normalizedRoles.push(UserType.INDIVIDUAL);
+    }
+
+    return Array.from(new Set(normalizedRoles));
   }
 
   async signIn(
@@ -350,15 +371,17 @@ export class AuthService {
       throw new UnauthorizedException(error?.message ?? 'Invalid OTP');
     }
 
-    await this.prisma.runWithRetry('AuthService.verifyPhoneOtp.updateProfile', () =>
-      this.prisma.profile.update({
-        where: { id: profileId },
-        data: {
-          phoneE164: input.phoneE164,
-          phoneVerified: true,
-          phoneVerifiedAt: new Date(),
-        },
-      }),
+    await this.prisma.runWithRetry(
+      'AuthService.verifyPhoneOtp.updateProfile',
+      () =>
+        this.prisma.profile.update({
+          where: { id: profileId },
+          data: {
+            phoneE164: input.phoneE164,
+            phoneVerified: true,
+            phoneVerifiedAt: new Date(),
+          },
+        }),
     );
 
     await this.recordPhoneVerificationAttempt(
@@ -401,6 +424,24 @@ export class AuthService {
         }`,
       );
     }
+  }
+
+  async logout(response: ExpressResponse): Promise<MessageResponse> {
+    response.cookie('oyana-accessToken', '', {
+      httpOnly: true,
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+    });
+
+    response.cookie('oyana-refreshToken', '', {
+      httpOnly: true,
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+    });
+
+    return { message: 'Logged out successfully', success: true };
   }
 
   private setCookies(

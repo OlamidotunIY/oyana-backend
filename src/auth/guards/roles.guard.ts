@@ -11,10 +11,15 @@ import { PrismaService } from '../../database/prisma.service';
 import { UserType } from '../../graphql/enums';
 import { ROLES_KEY, type AppUserRole } from '../decorators/roles.decorator';
 import type { SupabaseUser } from '../supabase/supabase.types';
+import {
+  normalizeProfileRoles,
+  resolveProfileRole,
+} from '../utils/roles.util';
 
 type RequestWithUser = {
   user?: SupabaseUser;
   userRole?: UserType;
+  userRoles?: UserType[];
 };
 
 @Injectable()
@@ -49,7 +54,7 @@ export class RolesGuard implements CanActivate {
             id: request.user!.id,
           },
           select: {
-            userType: true,
+            roles: true,
           },
         }),
     );
@@ -58,7 +63,9 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Profile not found');
     }
 
-    request.userRole = profile.userType as UserType;
+    const userRoles = normalizeProfileRoles(profile);
+    request.userRoles = userRoles;
+    request.userRole = resolveProfileRole(profile, requiredRoles);
 
     if (!requiredRoles.includes(request.userRole)) {
       throw new ForbiddenException('Insufficient role permission');

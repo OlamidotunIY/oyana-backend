@@ -15,6 +15,7 @@ import {
   UpdateInvoiceStatusDto,
   UserType,
 } from '../graphql';
+import { resolveProfileRole } from '../auth/utils/roles.util';
 
 type InvoiceRow = {
   id: string;
@@ -273,13 +274,20 @@ export class InvoicesService {
     }
   }
 
-  private async requireUserRole(profileId: string): Promise<UserType> {
+  private async requireUserRole(
+    profileId: string,
+    preferredRoles: UserType[] = [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+      UserType.BUSINESS,
+    ],
+  ): Promise<UserType> {
     const profile = await this.prisma.profile.findUnique({
       where: {
         id: profileId,
       },
       select: {
-        userType: true,
+        roles: true,
       },
     });
 
@@ -287,7 +295,7 @@ export class InvoicesService {
       throw new NotFoundException('Profile not found');
     }
 
-    return profile.userType as UserType;
+    return resolveProfileRole(profile, preferredRoles);
   }
 
   private toInvoice(row: InvoiceRow, lineItems?: InvoiceLineItem[]): Invoice {

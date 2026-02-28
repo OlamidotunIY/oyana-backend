@@ -34,6 +34,7 @@ import {
   Vehicle,
   VehicleStatus,
 } from '../graphql';
+import { resolveProfileRole } from '../auth/utils/roles.util';
 import { PremblyClient } from './prembly.client';
 
 type KycCheckType = 'nin_face' | 'phone' | 'vehicle_plate' | 'vehicle_vin';
@@ -1299,7 +1300,7 @@ export class KycService {
     const profile = await this.prisma.runWithRetry('KycService.getUserRole', () =>
       this.prisma.profile.findUnique({
         where: { id: profileId },
-        select: { userType: true },
+        select: { roles: true },
       }),
     );
 
@@ -1307,7 +1308,11 @@ export class KycService {
       throw new NotFoundException('Profile not found');
     }
 
-    return profile.userType as UserType;
+    return resolveProfileRole(profile, [
+      UserType.ADMIN,
+      UserType.BUSINESS,
+      UserType.INDIVIDUAL,
+    ]);
   }
 
   private async ensureProviderKycProfile(

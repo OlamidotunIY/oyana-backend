@@ -27,6 +27,7 @@ import {
   UserType,
   VehicleCategory,
 } from '../graphql';
+import { resolveProfileRole } from '../auth/utils/roles.util';
 
 const DEFAULT_MARKETPLACE_TAKE = 20;
 const MAX_MARKETPLACE_TAKE = 50;
@@ -295,7 +296,10 @@ export class MarketPlaceService {
   }
 
   async myFreightRequests(profileId: string): Promise<Shipment[]> {
-    const role = await this.requireUserRole(profileId);
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
     const where: Prisma.ShipmentWhereInput = {
       mode: ShipmentMode.MARKETPLACE,
       ...(role === UserType.ADMIN ? {} : { customerProfileId: profileId }),
@@ -338,7 +342,10 @@ export class MarketPlaceService {
     profileId: string,
     shipmentId: string,
   ): Promise<ShipmentBid[]> {
-    const role = await this.requireUserRole(profileId);
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
     const shipment = await this.prisma.runWithRetry(
       'MarketPlaceService.freightRequestBids.shipment',
       () =>
@@ -625,7 +632,10 @@ export class MarketPlaceService {
     input: AwardShipmentBidDto,
   ): Promise<ShipmentBidAward> {
     const now = new Date();
-    const role = await this.requireUserRole(profileId);
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
 
     const award = await this.prisma.runWithRetry(
       'MarketPlaceService.awardShipmentBid.transaction',
@@ -788,7 +798,14 @@ export class MarketPlaceService {
     return providerMember?.providerId ?? null;
   }
 
-  private async requireUserRole(profileId: string): Promise<UserType> {
+  private async requireUserRole(
+    profileId: string,
+    preferredRoles: UserType[] = [
+      UserType.BUSINESS,
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ],
+  ): Promise<UserType> {
     const profile = await this.prisma.runWithRetry(
       'MarketPlaceService.requireUserRole.profile',
       () =>
@@ -797,7 +814,7 @@ export class MarketPlaceService {
             id: profileId,
           },
           select: {
-            userType: true,
+            roles: true,
           },
         }),
     );
@@ -806,7 +823,7 @@ export class MarketPlaceService {
       throw new NotFoundException('Profile not found');
     }
 
-    return profile.userType as UserType;
+    return resolveProfileRole(profile, preferredRoles);
   }
 
   private async getProviderVehicleCategories(

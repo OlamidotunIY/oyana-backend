@@ -7,6 +7,7 @@ import {
   IsEnum,
   IsOptional,
   ValidateIf,
+  IsArray,
 } from 'class-validator';
 import { UserType, State } from '../../enums';
 
@@ -21,9 +22,11 @@ export class SignUpInput {
   @MinLength(6)
   password: string;
 
-  @Field(() => UserType)
-  @IsEnum(UserType)
-  userType: UserType;
+  @Field(() => [UserType], { nullable: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(UserType, { each: true })
+  roles?: UserType[];
 
   // Common fields for both individual and business
   @Field()
@@ -47,19 +50,25 @@ export class SignUpInput {
 
   // Business-specific fields
   @Field({ nullable: true })
-  @ValidateIf((o) => o.userType === UserType.BUSINESS)
+  @ValidateIf((o: SignUpInput) =>
+    (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
+  )
   @IsNotEmpty()
   @IsString()
   phoneNumber?: string;
 
   @Field({ nullable: true })
-  @ValidateIf((o) => o.userType === UserType.BUSINESS)
+  @ValidateIf((o: SignUpInput) =>
+    (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
+  )
   @IsNotEmpty()
   @IsString()
   businessName?: string;
 
   @Field({ nullable: true })
-  @ValidateIf((o) => o.userType === UserType.BUSINESS)
+  @ValidateIf((o: SignUpInput) =>
+    (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
+  )
   @IsNotEmpty()
   @IsString()
   businessAddress?: string;

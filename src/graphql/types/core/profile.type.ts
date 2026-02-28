@@ -14,8 +14,8 @@ export class Profile {
   @Field()
   email: string;
 
-  @Field(() => UserType)
-  userType: UserType;
+  @Field(() => [UserType])
+  roles: UserType[];
 
   @Field(() => String, { nullable: true })
   firstName: string | null;
@@ -37,6 +37,15 @@ export class Profile {
 
   @Field(() => String, { nullable: true })
   referralCode: string | null;
+
+  @Field(() => String, { nullable: true })
+  businessName?: string | null;
+
+  @Field(() => String, { nullable: true })
+  primaryAddress?: string | null;
+
+  @Field(() => String, { nullable: true })
+  city?: string | null;
 
   @Field(() => PreferredLanguage)
   preferredLanguage: PreferredLanguage;

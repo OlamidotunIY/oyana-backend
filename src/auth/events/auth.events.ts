@@ -12,18 +12,19 @@ export class AuthEventsListener {
 
   @OnEvent('user.signed-up')
   async handleUserSignedUp(event: UserSignedUpEvent) {
+    const normalizedRoles = Array.from(new Set(event.roles));
+    const isBusinessSignup = normalizedRoles.includes(UserType.BUSINESS);
+
     this.logger.log(
-      `Handling user signup event for ${event.email} (${event.userType})`,
+      `Handling user signup event for ${event.email} (${normalizedRoles.join(',')})`,
     );
 
     try {
-      // Create profile for the user
-
       await this.prisma.profile.create({
         data: {
           id: event.userId,
           email: event.email,
-          userType: event.userType,
+          roles: normalizedRoles,
           firstName: event.firstName,
           lastName: event.lastName,
           state: event.state,
@@ -35,7 +36,7 @@ export class AuthEventsListener {
       this.logger.log(`Profile created for user ${event.userId}`);
 
       // Create provider account for business/provider signups
-      if (event.userType === UserType.BUSINESS) {
+      if (isBusinessSignup) {
         if (!event.businessName) {
           this.logger.warn(
             `Business name not provided for business signup: ${event.userId}`,

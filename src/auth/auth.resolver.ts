@@ -96,7 +96,11 @@ export class AuthResolver {
   async refreshToken(
     @Args('refreshToken', { type: () => String, nullable: true })
     refreshToken: string | null,
-    @Context() context: { req?: { cookies?: Record<string, string> }; res: ExpressResponse },
+    @Context()
+    context: {
+      req?: { cookies?: Record<string, string> };
+      res: ExpressResponse;
+    },
   ): Promise<AuthResponse> {
     const resolvedRefreshToken =
       refreshToken ?? context.req?.cookies?.['oyana-refreshToken'];
@@ -106,5 +110,12 @@ export class AuthResolver {
     }
 
     return this.authService.refreshToken(resolvedRefreshToken, context.res);
+  }
+
+  @Mutation(() => MessageResponse)
+  async logout(
+    @Context() context: { res: ExpressResponse },
+  ): Promise<MessageResponse> {
+    return this.authService.logout(context.res);
   }
 }

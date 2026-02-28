@@ -46,7 +46,7 @@ async function seedProfilesForExistingUsers() {
       data: {
         id: authUser.id,
         email: authUser.email,
-        userType: 'individual', // Default to individual
+        roles: ['individual'],
         firstName: firstName,
         lastName: 'User', // Default last name
         state: 'Lagos', // Default state

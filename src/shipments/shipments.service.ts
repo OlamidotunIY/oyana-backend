@@ -38,6 +38,10 @@ import type {
   Shipment as PrismaShipment,
   Vehicle as PrismaVehicle,
 } from '@prisma/client';
+import {
+  normalizeProfileRoles,
+  resolveProfileRole,
+} from '../auth/utils/roles.util';
 
 @Injectable()
 export class ShipmentsService {
@@ -145,7 +149,10 @@ export class ShipmentsService {
     filter?: ShipmentQueryFilter,
   ): Promise<Shipment[]> {
     const now = new Date();
-    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const viewerRole = await this.requireUserRole(viewerProfileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
     const viewerWhere = await this.buildViewerShipmentWhereFilter(
       viewerProfileId,
       viewerRole,
@@ -246,7 +253,7 @@ export class ShipmentsService {
     viewerProfileId: string,
     id: string,
   ): Promise<Shipment | null> {
-    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const viewerRoles = await this.requireUserRoles(viewerProfileId);
     const shipment = await this.prisma.runWithRetry(
       'ShipmentsService.getShipmentByIdForViewer',
       () =>
@@ -273,9 +280,9 @@ export class ShipmentsService {
       return null;
     }
 
-    const hasAccess = await this.canAccessShipment(
+    const hasAccess = await this.canAccessShipmentForRoles(
       viewerProfileId,
-      viewerRole,
+      viewerRoles,
       shipment.id,
       shipment.customerProfileId,
     );
@@ -815,7 +822,10 @@ export class ShipmentsService {
     id: string,
     input: UpdateShipmentDto,
   ): Promise<Shipment> {
-    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const viewerRole = await this.requireUserRole(viewerProfileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
     const existingShipment = await this.prisma.runWithRetry(
       'ShipmentsService.updateShipment.findUnique',
       () =>
@@ -946,7 +956,10 @@ export class ShipmentsService {
     viewerProfileId: string,
     input: CancelShipmentDto,
   ): Promise<Shipment> {
-    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const viewerRole = await this.requireUserRole(viewerProfileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
     const shipment = await this.prisma.runWithRetry(
       'ShipmentsService.cancelShipment.findShipment',
       () =>
@@ -1025,7 +1038,10 @@ export class ShipmentsService {
     viewerProfileId: string,
     input: AddShipmentItemDto,
   ): Promise<ShipmentItem> {
-    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const viewerRole = await this.requireUserRole(viewerProfileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
     const shipment = await this.prisma.runWithRetry(
       'ShipmentsService.addShipmentItem.shipment',
       () =>
@@ -1143,7 +1159,14 @@ export class ShipmentsService {
     return providerMember?.providerId ?? null;
   }
 
-  private async requireUserRole(profileId: string): Promise<UserType> {
+  private async requireUserRole(
+    profileId: string,
+    preferredRoles: UserType[] = [
+      UserType.INDIVIDUAL,
+      UserType.BUSINESS,
+      UserType.ADMIN,
+    ],
+  ): Promise<UserType> {
     const profile = await this.prisma.runWithRetry(
       'ShipmentsService.requireUserRole.profile',
       () =>
@@ -1152,7 +1175,7 @@ export class ShipmentsService {
             id: profileId,
           },
           select: {
-            userType: true,
+            roles: true,
           },
         }),
     );
@@ -1161,7 +1184,28 @@ export class ShipmentsService {
       throw new NotFoundException('Profile not found');
     }
 
-    return profile.userType as UserType;
+    return resolveProfileRole(profile, preferredRoles);
+  }
+
+  private async requireUserRoles(profileId: string): Promise<UserType[]> {
+    const profile = await this.prisma.runWithRetry(
+      'ShipmentsService.requireUserRoles.profile',
+      () =>
+        this.prisma.profile.findUnique({
+          where: {
+            id: profileId,
+          },
+          select: {
+            roles: true,
+          },
+        }),
+    );
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return normalizeProfileRoles(profile);
   }
 
   private async buildViewerShipmentWhereFilter(
@@ -1276,11 +1320,33 @@ export class ShipmentsService {
     return Boolean(providerShipment);
   }
 
+  private async canAccessShipmentForRoles(
+    profileId: string,
+    roles: UserType[],
+    shipmentId: string,
+    customerProfileId: string,
+  ): Promise<boolean> {
+    for (const role of roles) {
+      const hasAccess = await this.canAccessShipment(
+        profileId,
+        role,
+        shipmentId,
+        customerProfileId,
+      );
+
+      if (hasAccess) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private async assertViewerCanAccessShipment(
     viewerProfileId: string,
     shipmentId: string,
   ): Promise<void> {
-    const viewerRole = await this.requireUserRole(viewerProfileId);
+    const viewerRoles = await this.requireUserRoles(viewerProfileId);
 
     const shipment = await this.prisma.runWithRetry(
       'ShipmentsService.assertViewerCanAccessShipment.shipment',
@@ -1300,9 +1366,9 @@ export class ShipmentsService {
       throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
     }
 
-    const hasAccess = await this.canAccessShipment(
+    const hasAccess = await this.canAccessShipmentForRoles(
       viewerProfileId,
-      viewerRole,
+      viewerRoles,
       shipment.id,
       shipment.customerProfileId,
     );

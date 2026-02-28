@@ -29,6 +29,7 @@ import {
   UpdateSlaRuleDto,
   UserType,
 } from '../graphql';
+import { hasAnyProfileRole } from '../auth/utils/roles.util';
 
 type FraudFlagRow = {
   id: string;
@@ -636,7 +637,7 @@ export class AdminOpsService {
         id: profileId,
       },
       select: {
-        userType: true,
+        roles: true,
       },
     });
 
@@ -644,7 +645,7 @@ export class AdminOpsService {
       throw new NotFoundException('Profile not found');
     }
 
-    if (profile.userType !== UserType.ADMIN) {
+    if (!hasAnyProfileRole(profile, [UserType.ADMIN])) {
       throw new ForbiddenException('Admin role is required');
     }
   }

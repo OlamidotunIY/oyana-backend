@@ -2,6 +2,11 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+input ActivateRoleInput {
+  businessName: String
+  targetRole: UserType!
+}
+
 input AddDisputeCommentDto {
   disputeId: String!
   message: String!
@@ -452,6 +457,7 @@ type MessageResponse {
 }
 
 type Mutation {
+  activateRole(input: ActivateRoleInput!): Profile!
   addDisputeComment(input: AddDisputeCommentDto!): DisputeEvent!
   addShipmentItem(input: AddShipmentItemDto!): ShipmentItem!
   approveRefund(input: ApproveRefundDto!): Refund!
@@ -476,6 +482,7 @@ type Mutation {
   createWalletWithdrawal(input: CreateWalletWithdrawalInput!): WalletWithdrawal!
   flagFraudCase(input: FlagFraudCaseDto!): FraudFlag!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
+  logout: MessageResponse!
   markEnRoutePickup(shipmentId: String!): Shipment!
   refreshToken(refreshToken: String): AuthResponse!
   replySupportTicket(input: ReplySupportTicketDto!): SupportTicketMessage!
@@ -560,6 +567,8 @@ enum PreferredLanguage {
 }
 
 type Profile {
+  businessName: String
+  city: String
   createdAt: DateTime!
   email: String!
   firstName: String
@@ -570,11 +579,12 @@ type Profile {
   phoneVerified: Boolean!
   phoneVerifiedAt: DateTime
   preferredLanguage: PreferredLanguage!
+  primaryAddress: String
   referralCode: String
+  roles: [UserType!]!
   state: State!
   status: ProfileStatus!
   updatedAt: DateTime!
-  userType: UserType!
 }
 
 enum ProfileStatus {
@@ -997,8 +1007,8 @@ input SignUpInput {
   password: String!
   phoneNumber: String
   referralCode: String
+  roles: [UserType!]
   state: State!
-  userType: UserType!
 }
 
 enum SlaRuleScope {

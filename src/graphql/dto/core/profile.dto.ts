@@ -8,7 +8,7 @@ import {
   Matches,
   IsEnum,
 } from 'class-validator';
-import { PreferredLanguage, UserStatus } from '../../enums';
+import { PreferredLanguage, UserStatus, UserType } from '../../enums';
 
 @InputType()
 export class CreateProfileInput {
@@ -81,4 +81,18 @@ export class UpdateProfileInput {
   @IsOptional()
   @IsEnum(UserStatus, { message: 'Status must be a valid user status' })
   status?: UserStatus;
+}
+
+@InputType()
+export class ActivateRoleInput {
+  @Field(() => UserType)
+  @IsEnum(UserType, { message: 'Target role must be a valid role' })
+  targetRole: UserType;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MinLength(2, { message: 'Business name must be at least 2 characters long' })
+  @MaxLength(120, { message: 'Business name must not exceed 120 characters' })
+  businessName?: string;
 }

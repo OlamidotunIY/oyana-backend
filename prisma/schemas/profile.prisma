@@ -1,7 +1,7 @@
 model Profile {
   id                String        @id @db.Uuid // Same as auth.users.id
   email             String        @unique
-  userType          UserType      @map("user_type")
+  roles             UserType[]    @default([individual]) @map("user_roles")
   firstName         String?       @map("first_name")
   lastName          String?       @map("last_name")
   phoneE164         String?       @unique @map("phone_e164")
