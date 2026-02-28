@@ -42,6 +42,15 @@ export class Profile {
   businessName?: string | null;
 
   @Field(() => String, { nullable: true })
+  providerId?: string | null;
+
+  @Field(() => Boolean, { nullable: true })
+  providerIsAvailable?: boolean | null;
+
+  @Field(() => Date, { nullable: true })
+  providerAvailabilityUpdatedAt?: Date | null;
+
+  @Field(() => String, { nullable: true })
   primaryAddress?: string | null;
 
   @Field(() => String, { nullable: true })

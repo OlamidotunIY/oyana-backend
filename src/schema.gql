@@ -492,6 +492,7 @@ type Mutation {
   resolveDispute(input: ResolveDisputeDto!): DisputeCase!
   respondToDispatchOffer(input: UpdateDispatchOfferDto!): DispatchOffer!
   sendDispatchOffer(input: CreateDispatchOfferDto!): DispatchOffer!
+  setProviderAvailability(input: SetProviderAvailabilityInput!): Profile!
   signIn(input: SignInInput!): AuthResponse!
   signUp(input: SignUpInput!): MessageResponse!
   startNinFaceVerification(input: StartNinFaceVerificationDto!): ProviderKycCheck!
@@ -580,6 +581,9 @@ type Profile {
   phoneVerifiedAt: DateTime
   preferredLanguage: PreferredLanguage!
   primaryAddress: String
+  providerAvailabilityUpdatedAt: DateTime
+  providerId: String
+  providerIsAvailable: Boolean
   referralCode: String
   roles: [UserType!]!
   state: State!
@@ -789,6 +793,10 @@ input SearchAddressInput {
   limit: Int
   query: String!
   sessionToken: String
+}
+
+input SetProviderAvailabilityInput {
+  isAvailable: Boolean!
 }
 
 type Shipment {

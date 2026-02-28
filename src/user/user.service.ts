@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,6 +8,7 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
   ActivateRoleInput,
+  SetProviderAvailabilityInput,
   UpdateProfileInput,
 } from '../graphql/dto/core/profile.dto';
 import { PreferredLanguage, UserType } from '../graphql/enums';
@@ -29,7 +31,21 @@ type ProfileRecord = {
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  contactForProviders: Array<{ businessName: string }>;
+  contactForProviders: Array<{
+    id: string;
+    businessName: string;
+    isAvailable: boolean;
+    availabilityUpdatedAt: Date | null;
+  }>;
+  providerMembers: Array<{
+    role: string;
+    provider: {
+      id: string;
+      businessName: string;
+      isAvailable: boolean;
+      availabilityUpdatedAt: Date | null;
+    } | null;
+  }>;
   userAddresses: Array<{ address: string; city: string }>;
 };
 
@@ -47,6 +63,8 @@ export class UserService {
 
   private toGraphqlProfile(profile: ProfileRecord): Profile {
     const providerContact = profile.contactForProviders[0] ?? null;
+    const membershipProvider = profile.providerMembers[0]?.provider ?? null;
+    const activeProvider = providerContact ?? membershipProvider;
     const latestAddress = profile.userAddresses[0] ?? null;
 
     return {
@@ -65,7 +83,11 @@ export class UserService {
       lastLoginAt: profile.lastLoginAt,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
-      businessName: providerContact?.businessName ?? null,
+      businessName: activeProvider?.businessName ?? null,
+      providerId: activeProvider?.id ?? null,
+      providerIsAvailable: activeProvider?.isAvailable ?? null,
+      providerAvailabilityUpdatedAt:
+        activeProvider?.availabilityUpdatedAt ?? null,
       primaryAddress: latestAddress?.address ?? null,
       city: latestAddress?.city ?? null,
     };
@@ -93,9 +115,32 @@ export class UserService {
           updatedAt: true,
           contactForProviders: {
             select: {
+              id: true,
               businessName: true,
+              isAvailable: true,
+              availabilityUpdatedAt: true,
             },
             take: 1,
+          },
+          providerMembers: {
+            where: {
+              status: 'active',
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+            take: 1,
+            select: {
+              role: true,
+              provider: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  isAvailable: true,
+                  availabilityUpdatedAt: true,
+                },
+              },
+            },
           },
           userAddresses: {
             select: {
@@ -140,9 +185,32 @@ export class UserService {
           updatedAt: true,
           contactForProviders: {
             select: {
+              id: true,
               businessName: true,
+              isAvailable: true,
+              availabilityUpdatedAt: true,
             },
             take: 1,
+          },
+          providerMembers: {
+            where: {
+              status: 'active',
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+            take: 1,
+            select: {
+              role: true,
+              provider: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  isAvailable: true,
+                  availabilityUpdatedAt: true,
+                },
+              },
+            },
           },
           userAddresses: {
             select: {
@@ -221,9 +289,32 @@ export class UserService {
           updatedAt: true,
           contactForProviders: {
             select: {
+              id: true,
               businessName: true,
+              isAvailable: true,
+              availabilityUpdatedAt: true,
             },
             take: 1,
+          },
+          providerMembers: {
+            where: {
+              status: 'active',
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+            take: 1,
+            select: {
+              role: true,
+              provider: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  isAvailable: true,
+                  availabilityUpdatedAt: true,
+                },
+              },
+            },
           },
           userAddresses: {
             select: {
@@ -315,9 +406,32 @@ export class UserService {
           updatedAt: true,
           contactForProviders: {
             select: {
+              id: true,
               businessName: true,
+              isAvailable: true,
+              availabilityUpdatedAt: true,
             },
             take: 1,
+          },
+          providerMembers: {
+            where: {
+              status: 'active',
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+            take: 1,
+            select: {
+              role: true,
+              provider: {
+                select: {
+                  id: true,
+                  businessName: true,
+                  isAvailable: true,
+                  availabilityUpdatedAt: true,
+                },
+              },
+            },
           },
           userAddresses: {
             select: {
@@ -340,6 +454,70 @@ export class UserService {
     });
 
     return this.toGraphqlProfile(updatedProfile);
+  }
+
+  async setProviderAvailability(
+    profileId: string,
+    input: SetProviderAvailabilityInput,
+  ): Promise<Profile> {
+    const ownerProvider = await this.prisma.runWithRetry(
+      'UserService.setProviderAvailability.ownerProvider',
+      () =>
+        this.prisma.provider.findFirst({
+          where: {
+            profileId,
+          },
+          select: {
+            id: true,
+          },
+        }),
+    );
+
+    const ownerMembership = await this.prisma.runWithRetry(
+      'UserService.setProviderAvailability.ownerMembership',
+      () =>
+        this.prisma.providerMember.findFirst({
+          where: {
+            profileId,
+            status: 'active',
+            role: 'owner',
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          select: {
+            providerId: true,
+          },
+        }),
+    );
+
+    const providerId = ownerProvider?.id ?? ownerMembership?.providerId;
+    if (!providerId) {
+      throw new ForbiddenException(
+        'Only provider owners can update provider availability',
+      );
+    }
+
+    await this.prisma.runWithRetry(
+      'UserService.setProviderAvailability.updateProvider',
+      () =>
+        this.prisma.provider.update({
+          where: {
+            id: providerId,
+          },
+          data: {
+            isAvailable: input.isAvailable,
+            availabilityUpdatedAt: new Date(),
+          },
+        }),
+    );
+
+    const profile = await this.findProfileById(profileId);
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return profile;
   }
 
   private async ensureProviderForProfile(

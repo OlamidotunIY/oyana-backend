@@ -4,6 +4,7 @@ import { UserService } from './user.service';
 import { Profile } from '../graphql/types/core/profile.type';
 import {
   ActivateRoleInput,
+  SetProviderAvailabilityInput,
   UpdateProfileInput,
 } from '../graphql/dto/core/profile.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -42,5 +43,15 @@ export class UserResolver {
     @Args('input') input: ActivateRoleInput,
   ): Promise<Profile> {
     return this.userService.activateRole(user.id, input);
+  }
+
+  @Mutation(() => Profile)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
+  async setProviderAvailability(
+    @CurrentUser() user: SupabaseUser,
+    @Args('input') input: SetProviderAvailabilityInput,
+  ): Promise<Profile> {
+    return this.userService.setProviderAvailability(user.id, input);
   }
 }

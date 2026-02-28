@@ -7,6 +7,8 @@ model Provider {
   businessName            String   @map("business_name")
   profileId               String?  @unique @map("contact_profile_id") @db.Uuid
   status                  String   @default("pending")
+  isAvailable             Boolean  @default(false) @map("is_available")
+  availabilityUpdatedAt   DateTime? @map("availability_updated_at") @db.Timestamptz(6)
   minWalletThresholdMinor BigInt   @default(0) @map("min_wallet_threshold_minor")
   ratingAvg               Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
   ratingCount             Int      @default(0) @map("rating_count")

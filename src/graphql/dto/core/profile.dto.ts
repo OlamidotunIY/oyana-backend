@@ -1,5 +1,6 @@
 import { InputType, Field } from '@nestjs/graphql';
 import {
+  IsBoolean,
   IsUUID,
   IsString,
   IsOptional,
@@ -95,4 +96,11 @@ export class ActivateRoleInput {
   @MinLength(2, { message: 'Business name must be at least 2 characters long' })
   @MaxLength(120, { message: 'Business name must not exceed 120 characters' })
   businessName?: string;
+}
+
+@InputType()
+export class SetProviderAvailabilityInput {
+  @Field(() => Boolean)
+  @IsBoolean({ message: 'isAvailable must be a boolean value' })
+  isAvailable: boolean;
 }
