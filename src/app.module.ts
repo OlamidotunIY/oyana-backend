@@ -18,6 +18,7 @@ import { AddressModule } from './address/address.module';
 import { GqlAuthGuard } from './auth/guards/gql-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { OpsModule } from './ops/ops.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { OpsModule } from './ops/ops.module';
     }),
     EventEmitterModule.forRoot(),
     DatabaseModule,
+    QueueModule,
     SupabaseModule,
     AuthModule,
     GqlConfig,
