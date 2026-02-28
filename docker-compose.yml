@@ -1,25 +1,4 @@
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:16-alpine
-    container_name: oyana-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-oyana_db}
-    ports:
-      - '${POSTGRES_PORT:-5432}:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - oyana-network
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Redis for GraphQL subscriptions
   redis:
     image: redis:7-alpine
@@ -46,14 +25,13 @@ services:
     container_name: oyana-backend
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3500}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-oyana_db}?schema=public
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       SUPABASE_URL: ${SUPABASE_URL}
@@ -79,13 +57,12 @@ services:
     container_name: oyana-worker
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-oyana_db}?schema=public
+      DATABASE_URL: ${DATABASE_URL}
+      DIRECT_URL: ${DIRECT_URL}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       SUPABASE_URL: ${SUPABASE_URL}
@@ -104,5 +81,4 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_data:
   redis_data:

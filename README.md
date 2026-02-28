@@ -31,26 +31,28 @@
 $ yarn install
 ```
 
-## Docker Setup (Recommended)
+## Docker Setup
 
-For a complete containerized setup with PostgreSQL and Redis, see [README.Docker.md](./README.Docker.md).
+Docker Compose runs:
+1. `backend` (API)
+2. `worker` (BullMQ jobs)
+3. `redis`
 
-**Quick start with Docker:**
+PostgreSQL is external (Supabase) and must be set in `.env`:
 
 ```bash
-# Copy environment file
-$ cp .env.docker .env.docker.local
+DATABASE_URL="postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://...db.[PROJECT_REF].supabase.co:5432/postgres"
+```
 
-# Edit .env.docker.local with your Supabase credentials
+Quick start:
 
-# Start all services (PostgreSQL, Redis, Backend)
-$ docker compose --env-file .env.docker.local up -d
-
-# View logs
+```bash
+$ docker compose up -d --build
 $ docker compose logs -f backend
 ```
 
-The backend will be available at http://localhost:3500
+The API will be available at http://localhost:3500
 
 ## Compile and run the project
 

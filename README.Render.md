@@ -22,6 +22,7 @@ Use the same core variables for both services:
 
 ```
 DATABASE_URL=your-supabase-connection-string
+DIRECT_URL=your-supabase-direct-connection-string
 SUPABASE_URL=your-supabase-url
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
