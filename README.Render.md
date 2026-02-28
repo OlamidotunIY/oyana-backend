@@ -4,15 +4,25 @@
 
 ### Setup in Render Dashboard
 
-1. **Create a new Web Service**
+1. **Create 2 services in Render:**
+   - API web service (`oyana-backend`)
+   - Worker service (`oyana-backend-worker`)
 2. **Connect your GitHub repository**
-3. **Configure the service:**
+3. **Configure the API service:**
    - **Name**: oyana-backend
    - **Environment**: Docker
    - **Dockerfile Path**: `./Dockerfile.render`
    - **Docker Build Context**: `./`
+   - **Start Command**: `node dist/src/main.js`
 
-4. **Add Environment Variables:**
+4. **Configure the worker service:**
+   - **Name**: oyana-backend-worker
+   - **Environment**: Docker
+   - **Dockerfile Path**: `./Dockerfile.render`
+   - **Docker Build Context**: `./`
+   - **Start Command**: `node dist/src/worker.js`
+
+5. **Add Environment Variables (same values for both services):**
 
    ```
    DATABASE_URL=your-supabase-connection-string
@@ -22,9 +32,15 @@
    CORS_ORIGIN=https://your-frontend-domain.com
    NODE_ENV=production
    PORT=3500
+   REDIS_HOST=your-redis-host
+   REDIS_PORT=6379
+   DISPATCH_RECONCILE_INTERVAL_SECONDS=120
+   DISPATCH_WORKER_BATCH_SIZE=100
+   PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED=true
+   PREMBLY_RAW_PAYLOAD_CLEANUP_INTERVAL_MINUTES=360
    ```
 
-5. **Health Check Path** (optional): `/health` or `/graphql`
+6. **Health Check Path** (API only, optional): `/health` or `/graphql`
 
 ### Deploy
 
@@ -84,6 +100,11 @@ In Render dashboard:
 
 - **Build Command**: `npm ci && npx prisma generate && npx prisma migrate deploy && npm run build`
 - **Start Command**: `node dist/main.js`
+
+For worker service, use:
+
+- **Build Command**: `npm ci && npx prisma generate && npm run build`
+- **Start Command**: `node dist/src/worker.js`
 
 ## Logs
 
