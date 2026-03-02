@@ -8,9 +8,21 @@ RUN apk add --no-cache openssl libc6-compat
 # Dependencies stage
 FROM base AS dependencies
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
-RUN cp -R node_modules /prod_node_modules
-RUN npm ci
+# Harden npm against transient network failures in container builds.
+RUN npm config set fetch-retries 5 \
+  && npm config set fetch-retry-factor 2 \
+  && npm config set fetch-retry-mintimeout 20000 \
+  && npm config set fetch-retry-maxtimeout 120000 \
+  && npm config set prefer-offline true
+RUN for attempt in 1 2 3; do \
+    npm ci --no-audit && break; \
+    if [ "${attempt}" = "3" ]; then \
+      echo "npm ci failed after 3 attempts"; \
+      exit 1; \
+    fi; \
+    echo "npm ci failed on attempt ${attempt}, retrying..."; \
+    sleep 5; \
+  done
 
 # Build stage
 FROM base AS build
@@ -31,8 +43,10 @@ RUN ls -la dist/ && echo "Build completed successfully"
 FROM base AS production
 ENV NODE_ENV=production
 
-# Copy production dependencies
-COPY --from=dependencies /prod_node_modules ./node_modules
+# Copy dependencies and prune dev packages for runtime
+COPY package*.json ./
+COPY --from=dependencies /app/node_modules ./node_modules
+RUN npm prune --omit=dev && npm cache clean --force
 
 # Copy built application
 COPY --from=build /app/dist ./dist
@@ -41,27 +55,18 @@ COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy Prisma schema for migrations
 COPY prisma ./prisma
-COPY package*.json ./
+COPY prisma.config.js ./prisma.config.js
 COPY tsconfig.json ./
 COPY tsconfig.build.json ./
 
 # Verify files are in place
 RUN ls -la dist/ || echo "Warning: dist directory not found"
 
-# Create a non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001
-
-# Change ownership of app directory
-RUN chown -R nestjs:nodejs /app
-
-USER nestjs
-
 EXPOSE 3500
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
-  CMD node -e "require('http').get('http://localhost:3500/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+  CMD node -e "require('http').get('http://localhost:3500/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
 CMD ["node", "dist/src/main.js"]

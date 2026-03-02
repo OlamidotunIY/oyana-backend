@@ -18,6 +18,8 @@ services:
 
   # NestJS Backend
   backend:
+    image: oyana-backend:local
+    pull_policy: never
     build:
       context: .
       dockerfile: Dockerfile
@@ -46,16 +48,16 @@ services:
       - oyana-network
     volumes:
       - ./prisma:/app/prisma
-    command: sh -c "npx prisma migrate deploy && node dist/src/main.js"
+    command: node dist/src/main.js
 
   # BullMQ Worker (dispatch + maintenance)
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
+    image: oyana-backend:local
+    pull_policy: never
     container_name: oyana-worker
     restart: unless-stopped
+    healthcheck:
+      disable: true
     depends_on:
       redis:
         condition: service_healthy
