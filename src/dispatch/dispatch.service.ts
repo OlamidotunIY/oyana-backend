@@ -36,6 +36,8 @@ import {
 } from '../graphql';
 
 const DEFAULT_DISPATCH_WORKER_BATCH_SIZE = 100;
+const DEFAULT_DISPATCH_RECONCILE_DB_MAX_RETRIES = 4;
+const DEFAULT_DISPATCH_RECONCILE_DB_BASE_DELAY_MS = 500;
 const DISPATCH_ACCEPT_CONFLICT_MESSAGE =
   'Dispatch offer can no longer be accepted because shipment is already assigned';
 
@@ -44,10 +46,16 @@ type EligibleDispatchProvider = {
   vehicleId: string;
 };
 
+type DbRetryOptions = {
+  maxRetries?: number;
+  baseDelayMs?: number;
+};
+
 @Injectable()
 export class DispatchService {
   private readonly logger = new Logger(DispatchService.name);
   private readonly dispatchWorkerBatchSize: number;
+  private readonly dispatchReconcileDbRetryOptions: DbRetryOptions;
 
   constructor(private readonly prisma: PrismaService) {
     this.dispatchWorkerBatchSize = this.parsePositiveInt(
@@ -55,6 +63,18 @@ export class DispatchService {
       DEFAULT_DISPATCH_WORKER_BATCH_SIZE,
       1,
     );
+    this.dispatchReconcileDbRetryOptions = {
+      maxRetries: this.parsePositiveInt(
+        process.env.DISPATCH_RECONCILE_DB_MAX_RETRIES,
+        DEFAULT_DISPATCH_RECONCILE_DB_MAX_RETRIES,
+        0,
+      ),
+      baseDelayMs: this.parsePositiveInt(
+        process.env.DISPATCH_RECONCILE_DB_BASE_DELAY_MS,
+        DEFAULT_DISPATCH_RECONCILE_DB_BASE_DELAY_MS,
+        1,
+      ),
+    };
   }
 
   async dispatchBatches(): Promise<DispatchBatch[]> {
@@ -95,6 +115,7 @@ export class DispatchService {
   async dispatchShipmentIfEligible(
     shipmentId: string,
     trigger: DispatchShipmentJobTrigger,
+    retryOptions?: DbRetryOptions,
   ): Promise<boolean> {
     return this.prisma.runWithRetry(
       'DispatchService.dispatchShipmentIfEligible',
@@ -141,7 +162,13 @@ export class DispatchService {
             return false;
           }
 
-          if (!this.isShipmentDueForDispatch(shipment.scheduleType, shipment.scheduledAt, now)) {
+          if (
+            !this.isShipmentDueForDispatch(
+              shipment.scheduleType,
+              shipment.scheduledAt,
+              now,
+            )
+          ) {
             return false;
           }
 
@@ -217,6 +244,7 @@ export class DispatchService {
 
           return true;
         }),
+      retryOptions,
     );
   }
 
@@ -232,6 +260,7 @@ export class DispatchService {
             id: true,
           },
         }),
+      this.dispatchReconcileDbRetryOptions,
     );
 
     let dispatchedCount = 0;
@@ -239,6 +268,7 @@ export class DispatchService {
       const dispatched = await this.dispatchShipmentIfEligible(
         dueShipment.id,
         'reconcile',
+        this.dispatchReconcileDbRetryOptions,
       );
       if (dispatched) {
         dispatchedCount += 1;
