@@ -19,6 +19,26 @@ input AddShipmentItemDto {
   weightKg: Float
 }
 
+input AdminDashboardFilterDto {
+  fleetLimit: Int
+  fleetSearch: String
+  from: DateTime
+  interval: AdminDashboardInterval
+  shipmentMode: ShipmentMode
+  to: DateTime
+}
+
+enum AdminDashboardInterval {
+  DAILY
+  HOURLY
+}
+
+enum AdminFleetStatus {
+  DELAYED
+  IN_TRANSIT
+  STATIONARY
+}
+
 type AddressSuggestion {
   description: String!
   mainText: String
@@ -34,6 +54,70 @@ type AdminFinanceSummary {
   pendingRefundCount: Int!
   totalEscrowMinor: BigInt!
   totalWalletBalanceMinor: BigInt!
+}
+
+type AdminDashboard {
+  activeFleet: [AdminDashboardFleetRow!]!
+  deliveryPerformance: [AdminDashboardPerformancePoint!]!
+  fleetMap: [AdminDashboardFleetPoint!]!
+  generatedAt: DateTime!
+  interval: AdminDashboardInterval!
+  notifications: [AdminDashboardNotificationMetric!]!
+  orderStatus: [AdminDashboardOrderStatusMetric!]!
+  overview: AdminDashboardOverview!
+  rangeFrom: DateTime!
+  rangeTo: DateTime!
+  wallet: AdminDashboardWalletSummary!
+}
+
+type AdminDashboardFleetPoint {
+  label: String!
+  lat: Float!
+  lng: Float!
+  shipmentId: String!
+  status: AdminFleetStatus!
+  trackingCode: String!
+}
+
+type AdminDashboardFleetRow {
+  etaMinutes: Int
+  from: String
+  shipmentId: String!
+  status: AdminFleetStatus!
+  to: String
+  trackingCode: String!
+}
+
+type AdminDashboardNotificationMetric {
+  audience: NotificationAudience!
+  totalCount: Int!
+  unreadCount: Int!
+}
+
+type AdminDashboardOrderStatusMetric {
+  count: Int!
+  key: String!
+  label: String!
+}
+
+type AdminDashboardOverview {
+  activeTrucks: Int!
+  avgDeliveryMinutes: Int!
+  onTimeDeliveryRate: Float!
+  totalShipmentsToday: Int!
+}
+
+type AdminDashboardPerformancePoint {
+  bucketStart: DateTime!
+  delayed: Int!
+  delivered: Int!
+  label: String!
+}
+
+type AdminDashboardWalletSummary {
+  balanceMinor: BigInt!
+  currency: String!
+  escrowMinor: BigInt!
 }
 
 type AdminOverview {
@@ -383,6 +467,12 @@ enum FraudTargetType {
   WALLET
 }
 
+enum NotificationAudience {
+  ADMIN
+  CUSTOMER
+  PROVIDER
+}
+
 type Invoice {
   createdAt: DateTime!
   currency: String!
@@ -655,6 +745,7 @@ type ProviderKycStatus {
 
 type Query {
   adminConfig: [PlatformConfig!]!
+  adminDashboard(input: AdminDashboardFilterDto): AdminDashboard!
   adminDispatchQueue: [DispatchBatch!]!
   adminDisputes: [DisputeCase!]!
   adminFinanceSummary: AdminFinanceSummary!

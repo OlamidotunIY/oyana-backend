@@ -12,12 +12,15 @@ import {
   DisputeCase,
   DisputeEvent,
   DisputeEventType,
+  NotificationAudience,
+  NotificationCategory,
   DisputeStatus,
   ResolveDisputeDto,
   ShipmentActorRole,
   UserType,
 } from '../graphql';
 import { resolveProfileRole } from '../auth/utils/roles.util';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type DisputeCaseRow = {
   id: string;
@@ -49,7 +52,10 @@ type DisputeEventRow = {
 
 @Injectable()
 export class DisputesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async myDisputes(profileId: string): Promise<DisputeCase[]> {
     const role = await this.requireUserRole(profileId);
@@ -160,6 +166,33 @@ export class DisputesService {
         }),
     );
 
+    await this.notifications.createNotification({
+      recipientProfileId: profileId,
+      audience: this.toNotificationAudience(role),
+      category: NotificationCategory.DISPUTE,
+      title: `Dispute ${caseRow.dispute_number} opened`,
+      body: input.reason.trim(),
+      entityType: 'dispute_case',
+      entityId: caseRow.id,
+      metadata: {
+        status: caseRow.status,
+        category: input.category.trim(),
+      },
+    });
+
+    await this.notifications.notifyAdmins({
+      category: NotificationCategory.DISPUTE,
+      title: `New dispute ${caseRow.dispute_number}`,
+      body: input.reason.trim(),
+      entityType: 'dispute_case',
+      entityId: caseRow.id,
+      metadata: {
+        ownerProfileId: profileId,
+        shipmentId: input.shipmentId,
+        invoiceId: input.invoiceId,
+      },
+    });
+
     return this.toDisputeCase(caseRow);
   }
 
@@ -172,7 +205,7 @@ export class DisputesService {
     }
 
     const role = await this.requireUserRole(profileId);
-    await this.requireDisputeAccess(profileId, role, input.disputeId);
+    const dispute = await this.requireDisputeAccess(profileId, role, input.disputeId);
     const actorRole = this.toActorRole(role);
     const now = new Date();
 
@@ -211,6 +244,32 @@ export class DisputesService {
           return inserted;
         }),
     );
+
+    if (dispute.owner_profile_id !== profileId) {
+      const ownerRole = await this.requireUserRole(dispute.owner_profile_id);
+      await this.notifications.createNotification({
+        recipientProfileId: dispute.owner_profile_id,
+        audience: this.toNotificationAudience(ownerRole),
+        category: NotificationCategory.DISPUTE,
+        title: `Comment on dispute ${dispute.dispute_number}`,
+        body: input.message.trim(),
+        entityType: 'dispute_case',
+        entityId: dispute.id,
+      });
+    }
+
+    if (role !== UserType.ADMIN) {
+      await this.notifications.notifyAdmins({
+        category: NotificationCategory.DISPUTE,
+        title: `New dispute comment ${dispute.dispute_number}`,
+        body: input.message.trim(),
+        entityType: 'dispute_case',
+        entityId: dispute.id,
+        metadata: {
+          authorProfileId: profileId,
+        },
+      });
+    }
 
     return this.toDisputeEvent(event);
   }
@@ -272,6 +331,20 @@ export class DisputesService {
           return disputeRows;
         }),
     );
+
+    const ownerRole = await this.requireUserRole(updated.owner_profile_id);
+    await this.notifications.createNotification({
+      recipientProfileId: updated.owner_profile_id,
+      audience: this.toNotificationAudience(ownerRole),
+      category: NotificationCategory.DISPUTE,
+      title: `Dispute ${updated.dispute_number} ${status}`,
+      body: input.resolutionSummary.trim(),
+      entityType: 'dispute_case',
+      entityId: updated.id,
+      metadata: {
+        status,
+      },
+    });
 
     return this.toDisputeCase(updated);
   }
@@ -384,6 +457,18 @@ export class DisputesService {
       return ShipmentActorRole.PROVIDER;
     }
     return ShipmentActorRole.CUSTOMER;
+  }
+
+  private toNotificationAudience(role: UserType): NotificationAudience {
+    if (role === UserType.ADMIN) {
+      return NotificationAudience.ADMIN;
+    }
+
+    if (role === UserType.BUSINESS) {
+      return NotificationAudience.PROVIDER;
+    }
+
+    return NotificationAudience.CUSTOMER;
   }
 
   private toDisputeCase(row: DisputeCaseRow, events?: DisputeEvent[]): DisputeCase {

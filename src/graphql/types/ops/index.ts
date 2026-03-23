@@ -9,3 +9,4 @@ export * from './platform-config.type';
 export * from './admin-overview.type';
 export * from './admin-finance-summary.type';
 export * from './admin-provider-overview.type';
+export * from './admin-dashboard.type';

@@ -8,6 +8,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
   CreateSupportTicketDto,
+  NotificationAudience,
+  NotificationCategory,
   ReplySupportTicketDto,
   ShipmentActorRole,
   SupportTicket,
@@ -18,6 +20,7 @@ import {
   UserType,
 } from '../graphql';
 import { resolveProfileRole } from '../auth/utils/roles.util';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type SupportTicketRow = {
   id: string;
@@ -47,7 +50,10 @@ type SupportTicketMessageRow = {
 
 @Injectable()
 export class SupportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async mySupportTickets(profileId: string): Promise<SupportTicket[]> {
     const role = await this.requireUserRole(profileId);
@@ -166,6 +172,32 @@ export class SupportService {
         }),
     );
 
+    await this.notifications.createNotification({
+      recipientProfileId: profileId,
+      audience: this.toNotificationAudience(role),
+      category: NotificationCategory.SUPPORT,
+      title: `Ticket ${created.ticket.ticket_number} created`,
+      body: 'Your support ticket has been received and is awaiting review.',
+      entityType: 'support_ticket',
+      entityId: created.ticket.id,
+      metadata: {
+        status: created.ticket.status,
+        priority: created.ticket.priority,
+      },
+    });
+
+    await this.notifications.notifyAdmins({
+      category: NotificationCategory.SUPPORT,
+      title: `New support ticket ${created.ticket.ticket_number}`,
+      body: `${input.subject.trim()} (${priority})`,
+      entityType: 'support_ticket',
+      entityId: created.ticket.id,
+      metadata: {
+        ownerProfileId: profileId,
+        category: input.category.trim(),
+      },
+    });
+
     return this.toSupportTicket(created.ticket, [
       this.toSupportTicketMessage(created.message),
     ]);
@@ -180,7 +212,7 @@ export class SupportService {
     }
 
     const role = await this.requireUserRole(profileId);
-    await this.requireSupportTicketAccess(profileId, role, input.ticketId);
+    const ticket = await this.requireSupportTicketAccess(profileId, role, input.ticketId);
     const actorRole = this.toActorRole(role);
     const now = new Date();
 
@@ -218,6 +250,32 @@ export class SupportService {
         }),
     );
 
+    if (ticket.owner_profile_id !== profileId) {
+      const ownerRole = await this.requireUserRole(ticket.owner_profile_id);
+      await this.notifications.createNotification({
+        recipientProfileId: ticket.owner_profile_id,
+        audience: this.toNotificationAudience(ownerRole),
+        category: NotificationCategory.SUPPORT,
+        title: `Update on ticket ${ticket.ticket_number}`,
+        body: input.message.trim(),
+        entityType: 'support_ticket',
+        entityId: ticket.id,
+      });
+    }
+
+    if (role !== UserType.ADMIN) {
+      await this.notifications.notifyAdmins({
+        category: NotificationCategory.SUPPORT,
+        title: `Reply on ticket ${ticket.ticket_number}`,
+        body: input.message.trim(),
+        entityType: 'support_ticket',
+        entityId: ticket.id,
+        metadata: {
+          authorProfileId: profileId,
+        },
+      });
+    }
+
     return this.toSupportTicketMessage(message);
   }
 
@@ -254,6 +312,19 @@ export class SupportService {
           RETURNING *
         `),
     );
+
+    if (updated.owner_profile_id !== profileId) {
+      const ownerRole = await this.requireUserRole(updated.owner_profile_id);
+      await this.notifications.createNotification({
+        recipientProfileId: updated.owner_profile_id,
+        audience: this.toNotificationAudience(ownerRole),
+        category: NotificationCategory.SUPPORT,
+        title: `Ticket ${updated.ticket_number} status updated`,
+        body: `Status changed to ${updated.status}.`,
+        entityType: 'support_ticket',
+        entityId: updated.id,
+      });
+    }
 
     return this.toSupportTicket(updated);
   }
@@ -314,6 +385,18 @@ export class SupportService {
       return ShipmentActorRole.PROVIDER;
     }
     return ShipmentActorRole.CUSTOMER;
+  }
+
+  private toNotificationAudience(role: UserType): NotificationAudience {
+    if (role === UserType.ADMIN) {
+      return NotificationAudience.ADMIN;
+    }
+
+    if (role === UserType.BUSINESS) {
+      return NotificationAudience.PROVIDER;
+    }
+
+    return NotificationAudience.CUSTOMER;
   }
 
   private toSupportTicket(

@@ -269,6 +269,39 @@ export const FraudTargetType = {
 export type FraudTargetType =
   (typeof FraudTargetType)[keyof typeof FraudTargetType];
 
+export const NotificationAudience = {
+  CUSTOMER: 'customer',
+  PROVIDER: 'provider',
+  ADMIN: 'admin',
+} as const;
+export type NotificationAudience =
+  (typeof NotificationAudience)[keyof typeof NotificationAudience];
+
+export const NotificationCategory = {
+  SHIPMENT: 'shipment',
+  DISPATCH: 'dispatch',
+  SUPPORT: 'support',
+  DISPUTE: 'dispute',
+  SYSTEM: 'system',
+} as const;
+export type NotificationCategory =
+  (typeof NotificationCategory)[keyof typeof NotificationCategory];
+
+export const AdminDashboardInterval = {
+  HOURLY: 'hourly',
+  DAILY: 'daily',
+} as const;
+export type AdminDashboardInterval =
+  (typeof AdminDashboardInterval)[keyof typeof AdminDashboardInterval];
+
+export const AdminFleetStatus = {
+  IN_TRANSIT: 'in_transit',
+  DELAYED: 'delayed',
+  STATIONARY: 'stationary',
+} as const;
+export type AdminFleetStatus =
+  (typeof AdminFleetStatus)[keyof typeof AdminFleetStatus];
+
 // ============================================================================
 // WALLET ENUMS
 // ============================================================================
@@ -414,6 +447,10 @@ registerEnumType(InvoiceStatus, { name: 'InvoiceStatus' });
 registerEnumType(FraudSeverity, { name: 'FraudSeverity' });
 registerEnumType(FraudStatus, { name: 'FraudStatus' });
 registerEnumType(FraudTargetType, { name: 'FraudTargetType' });
+registerEnumType(NotificationAudience, { name: 'NotificationAudience' });
+registerEnumType(NotificationCategory, { name: 'NotificationCategory' });
+registerEnumType(AdminDashboardInterval, { name: 'AdminDashboardInterval' });
+registerEnumType(AdminFleetStatus, { name: 'AdminFleetStatus' });
 registerEnumType(TransactionStatus, { name: 'TransactionStatus' });
 registerEnumType(WalletAccountStatus, { name: 'WalletAccountStatus' });
 registerEnumType(TransactionDirection, { name: 'TransactionDirection' });

@@ -7,6 +7,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { SupabaseUser } from '../auth/supabase/supabase.types';
 import {
   AdminFinanceSummary,
+  AdminDashboard,
+  AdminDashboardFilterDto,
   AdminOverview,
   AdminProviderOverview,
   ApproveRefundDto,
@@ -33,6 +35,14 @@ import { AdminOpsService } from './admin-ops.service';
 @Roles(UserType.ADMIN)
 export class AdminOpsResolver {
   constructor(private readonly adminOpsService: AdminOpsService) {}
+
+  @Query(() => AdminDashboard)
+  async adminDashboard(
+    @CurrentUser() user: SupabaseUser,
+    @Args('input', { nullable: true }) input?: AdminDashboardFilterDto,
+  ): Promise<AdminDashboard> {
+    return this.adminOpsService.adminDashboard(user.id, input);
+  }
 
   @Query(() => AdminOverview)
   async adminOverview(@CurrentUser() user: SupabaseUser): Promise<AdminOverview> {

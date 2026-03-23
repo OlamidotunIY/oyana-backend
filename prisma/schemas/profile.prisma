@@ -49,6 +49,7 @@ model Profile {
   fraudFlagsAssigned        FraudFlag[]           @relation("FraudAssignedTo")
   fraudFlagsResolved        FraudFlag[]           @relation("FraudResolvedBy")
   platformConfigUpdates     PlatformConfig[]      @relation("PlatformConfigUpdater")
+  notifications             Notification[]        @relation("ProfileNotifications")
 
   @@map("profiles")
 }

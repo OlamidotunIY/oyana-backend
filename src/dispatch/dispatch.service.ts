@@ -33,7 +33,9 @@ import {
   ShipmentStatus,
   UpdateDispatchOfferDto,
   VehicleCategory,
+  NotificationCategory,
 } from '../graphql';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const DEFAULT_DISPATCH_WORKER_BATCH_SIZE = 100;
 const DEFAULT_DISPATCH_RECONCILE_DB_MAX_RETRIES = 4;
@@ -57,7 +59,10 @@ export class DispatchService {
   private readonly dispatchWorkerBatchSize: number;
   private readonly dispatchReconcileDbRetryOptions: DbRetryOptions;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {
     this.dispatchWorkerBatchSize = this.parsePositiveInt(
       process.env.DISPATCH_WORKER_BATCH_SIZE,
       DEFAULT_DISPATCH_WORKER_BATCH_SIZE,
@@ -117,7 +122,16 @@ export class DispatchService {
     trigger: DispatchShipmentJobTrigger,
     retryOptions?: DbRetryOptions,
   ): Promise<boolean> {
-    return this.prisma.runWithRetry(
+    let notificationContext:
+      | {
+          shipmentId: string;
+          trackingCode: string;
+          customerProfileId: string;
+          providerIds: string[];
+        }
+      | undefined;
+
+    const dispatched = await this.prisma.runWithRetry(
       'DispatchService.dispatchShipmentIfEligible',
       async () =>
         this.prisma.$transaction(async (tx) => {
@@ -128,6 +142,8 @@ export class DispatchService {
             },
             select: {
               id: true,
+              trackingCode: true,
+              customerProfileId: true,
               mode: true,
               status: true,
               scheduleType: true,
@@ -242,10 +258,51 @@ export class DispatchService {
             });
           }
 
+          notificationContext = {
+            shipmentId: shipment.id,
+            trackingCode: shipment.trackingCode,
+            customerProfileId: shipment.customerProfileId,
+            providerIds: eligibleProviders.map((provider) => provider.providerId),
+          };
+
           return true;
         }),
       retryOptions,
     );
+
+    if (dispatched && notificationContext) {
+      await this.notifications.notifyCustomer(
+        notificationContext.customerProfileId,
+        {
+          category: NotificationCategory.DISPATCH,
+          title: `Shipment ${notificationContext.trackingCode} is broadcasting`,
+          body: 'We are matching your shipment with available providers.',
+          entityType: 'shipment',
+          entityId: notificationContext.shipmentId,
+        },
+      );
+
+      await this.notifications.notifyAdmins({
+        category: NotificationCategory.DISPATCH,
+        title: `Dispatch started for ${notificationContext.trackingCode}`,
+        body: `Offers sent to ${notificationContext.providerIds.length} provider(s).`,
+        entityType: 'shipment',
+        entityId: notificationContext.shipmentId,
+      });
+
+      const providerIds = new Set(notificationContext.providerIds);
+      for (const providerId of providerIds) {
+        await this.notifications.notifyProviderTeam(providerId, {
+          category: NotificationCategory.DISPATCH,
+          title: 'New dispatch offer available',
+          body: `Shipment ${notificationContext.trackingCode} is ready for response.`,
+          entityType: 'shipment',
+          entityId: notificationContext.shipmentId,
+        });
+      }
+    }
+
+    return dispatched;
   }
 
   async dispatchDueShipments(): Promise<number> {
@@ -453,6 +510,16 @@ export class DispatchService {
       },
     );
 
+    await this.notifyShipmentProgress(
+      shipment.id,
+      shipment.trackingCode,
+      shipment.customerProfileId,
+      providerId,
+      NotificationCategory.DISPATCH,
+      'Driver is en route to pickup',
+      `Shipment ${shipment.trackingCode} is now en route for pickup.`,
+    );
+
     return this.toGraphqlShipment(shipment);
   }
 
@@ -495,6 +562,16 @@ export class DispatchService {
           },
         });
       },
+    );
+
+    await this.notifyShipmentProgress(
+      shipment.id,
+      shipment.trackingCode,
+      shipment.customerProfileId,
+      providerId,
+      NotificationCategory.DISPATCH,
+      'Shipment picked up',
+      `Shipment ${shipment.trackingCode} has been picked up.`,
     );
 
     return this.toGraphqlShipment(shipment);
@@ -559,6 +636,16 @@ export class DispatchService {
         }),
     );
 
+    await this.notifyShipmentProgress(
+      result.id,
+      result.trackingCode,
+      result.customerProfileId,
+      providerId,
+      NotificationCategory.DISPATCH,
+      'Shipment completed',
+      `Shipment ${result.trackingCode} has been completed.`,
+    );
+
     return this.toGraphqlShipment(result);
   }
 
@@ -598,6 +685,49 @@ export class DispatchService {
         }),
     );
 
+    const shipment = await this.prisma.shipment.findUnique({
+      where: {
+        id: updatedOffer.shipmentId,
+      },
+      select: {
+        trackingCode: true,
+        customerProfileId: true,
+      },
+    });
+
+    if (shipment) {
+      await this.notifications.notifyCustomer(shipment.customerProfileId, {
+        category: NotificationCategory.DISPATCH,
+        title: `Provider declined ${shipment.trackingCode}`,
+        body: 'A provider declined this dispatch offer. We are still matching.',
+        entityType: 'shipment',
+        entityId: updatedOffer.shipmentId,
+      });
+    }
+
+    await this.notifications.notifyProviderTeam(providerId, {
+      category: NotificationCategory.DISPATCH,
+      title: 'Dispatch offer declined',
+      body: shipment
+        ? `You declined shipment ${shipment.trackingCode}.`
+        : 'A dispatch offer was declined.',
+      entityType: 'dispatch_offer',
+      entityId: updatedOffer.id,
+    });
+
+    await this.notifications.notifyAdmins({
+      category: NotificationCategory.DISPATCH,
+      title: 'Dispatch offer declined',
+      body: shipment
+        ? `Provider declined shipment ${shipment.trackingCode}.`
+        : 'A dispatch offer was declined.',
+      entityType: 'dispatch_offer',
+      entityId: updatedOffer.id,
+      metadata: {
+        providerId,
+      },
+    });
+
     return this.toGraphqlDispatchOffer(updatedOffer);
   }
 
@@ -606,6 +736,13 @@ export class DispatchService {
     input: UpdateDispatchOfferDto,
   ): Promise<DispatchOffer> {
     const now = new Date();
+    let acceptanceContext:
+      | {
+          shipmentId: string;
+          trackingCode: string;
+          customerProfileId: string;
+        }
+      | undefined;
 
     const acceptedOffer = await this.prisma.runWithRetry(
       'DispatchService.acceptDispatchOffer.transaction',
@@ -672,6 +809,8 @@ export class DispatchService {
             },
             select: {
               id: true,
+              trackingCode: true,
+              customerProfileId: true,
               status: true,
               vehicleCategory: true,
               pricingCurrency: true,
@@ -857,11 +996,87 @@ export class DispatchService {
             },
           });
 
+          acceptanceContext = {
+            shipmentId: shipment.id,
+            trackingCode: shipment.trackingCode,
+            customerProfileId: shipment.customerProfileId,
+          };
+
           return updatedOffer;
         }),
     );
 
+    if (acceptanceContext) {
+      await this.notifications.notifyProviderTeam(providerId, {
+        category: NotificationCategory.DISPATCH,
+        title: 'Dispatch offer accepted',
+        body: `You accepted shipment ${acceptanceContext.trackingCode}.`,
+        entityType: 'shipment',
+        entityId: acceptanceContext.shipmentId,
+      });
+
+      await this.notifications.notifyCustomer(
+        acceptanceContext.customerProfileId,
+        {
+          category: NotificationCategory.DISPATCH,
+          title: `Shipment ${acceptanceContext.trackingCode} assigned`,
+          body: 'A provider has accepted your shipment.',
+          entityType: 'shipment',
+          entityId: acceptanceContext.shipmentId,
+        },
+      );
+
+      await this.notifications.notifyAdmins({
+        category: NotificationCategory.DISPATCH,
+        title: `Shipment ${acceptanceContext.trackingCode} assigned`,
+        body: 'A provider accepted the dispatch offer.',
+        entityType: 'shipment',
+        entityId: acceptanceContext.shipmentId,
+        metadata: {
+          providerId,
+          offerId: acceptedOffer.id,
+        },
+      });
+    }
+
     return this.toGraphqlDispatchOffer(acceptedOffer);
+  }
+
+  private async notifyShipmentProgress(
+    shipmentId: string,
+    trackingCode: string,
+    customerProfileId: string,
+    providerId: string,
+    category: NotificationCategory,
+    title: string,
+    body: string,
+  ): Promise<void> {
+    await this.notifications.notifyCustomer(customerProfileId, {
+      category,
+      title,
+      body,
+      entityType: 'shipment',
+      entityId: shipmentId,
+    });
+
+    await this.notifications.notifyProviderTeam(providerId, {
+      category,
+      title,
+      body,
+      entityType: 'shipment',
+      entityId: shipmentId,
+    });
+
+    await this.notifications.notifyAdmins({
+      category,
+      title: `${trackingCode}: ${title}`,
+      body,
+      entityType: 'shipment',
+      entityId: shipmentId,
+      metadata: {
+        providerId,
+      },
+    });
   }
 
   private canRespondToOffer(status: string): boolean {

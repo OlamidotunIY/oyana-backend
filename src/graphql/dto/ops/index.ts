@@ -13,3 +13,4 @@ export * from './create-sla-rule.dto';
 export * from './update-sla-rule.dto';
 export * from './approve-refund.dto';
 export * from './update-platform-config.dto';
+export * from './admin-dashboard-filter.dto';

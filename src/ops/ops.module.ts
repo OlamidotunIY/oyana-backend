@@ -7,8 +7,10 @@ import { InvoicesResolver } from './invoices.resolver';
 import { InvoicesService } from './invoices.service';
 import { SupportResolver } from './support.resolver';
 import { SupportService } from './support.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   providers: [
     SupportResolver,
     SupportService,

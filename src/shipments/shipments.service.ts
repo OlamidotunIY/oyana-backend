@@ -12,6 +12,8 @@ import {
   AddShipmentItemDto,
   CancelShipmentDto,
   CreateShipmentDto,
+  NotificationAudience,
+  NotificationCategory,
   ProviderKycStatus,
   ProviderDashboardQuary,
   Shipment,
@@ -51,6 +53,7 @@ import {
   DISPATCH_SHIPMENT_JOB,
   type DispatchShipmentJobPayload,
 } from '../queue/queue.constants';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ShipmentsService {
@@ -135,6 +138,7 @@ export class ShipmentsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
     @InjectQueue(DISPATCH_QUEUE_NAME)
     private readonly dispatchQueue: Queue<DispatchShipmentJobPayload>,
   ) {
@@ -831,6 +835,34 @@ export class ShipmentsService {
 
     await this.enqueueDispatchShipmentIfRequired(shipment);
 
+    const customerAudience = await this.resolveNotificationAudience(
+      shipment.customerProfileId,
+    );
+    await this.notifications.createNotification({
+      recipientProfileId: shipment.customerProfileId,
+      audience: customerAudience,
+      category: NotificationCategory.SHIPMENT,
+      title: `Shipment ${shipment.trackingCode} created`,
+      body: 'Your shipment is now in the dispatch pipeline.',
+      entityType: 'shipment',
+      entityId: shipment.id,
+      metadata: {
+        status: shipment.status,
+        mode: shipment.mode,
+      },
+    });
+
+    await this.notifications.notifyAdmins({
+      category: NotificationCategory.SHIPMENT,
+      title: `New shipment ${shipment.trackingCode}`,
+      body: `${shipment.mode} ${shipment.vehicleCategory} shipment created.`,
+      entityType: 'shipment',
+      entityId: shipment.id,
+      metadata: {
+        customerProfileId: shipment.customerProfileId,
+      },
+    });
+
     return this.toGraphqlShipment(shipment);
   }
 
@@ -966,6 +998,19 @@ export class ShipmentsService {
         }),
     );
 
+    if (statusChanged && input.status) {
+      await this.notifyShipmentStatusChange({
+        shipmentId: shipment.id,
+        trackingCode: shipment.trackingCode,
+        status: input.status,
+        actorProfileId: viewerProfileId,
+        customerProfileId: existingShipment.customerProfileId,
+        details: {
+          previousStatus: existingShipment.status,
+        },
+      });
+    }
+
     return this.toGraphqlShipment(shipment);
   }
 
@@ -1047,6 +1092,17 @@ export class ShipmentsService {
           return updatedShipment;
         }),
     );
+
+    await this.notifyShipmentStatusChange({
+      shipmentId: cancelledShipment.id,
+      trackingCode: cancelledShipment.trackingCode,
+      status: ShipmentStatus.CANCELLED,
+      actorProfileId: viewerProfileId,
+      customerProfileId: shipment.customerProfileId,
+      details: {
+        reason: input.cancellationReason.trim(),
+      },
+    });
 
     return this.toGraphqlShipment(cancelledShipment);
   }
@@ -1661,6 +1717,83 @@ export class ShipmentsService {
       cancelledByProfileId: shipment.cancelledByProfileId ?? undefined,
       cancellationReason: shipment.cancellationReason ?? undefined,
     };
+  }
+
+  private async notifyShipmentStatusChange(input: {
+    shipmentId: string;
+    trackingCode: string;
+    status: ShipmentStatus;
+    actorProfileId: string;
+    customerProfileId: string;
+    details?: Prisma.InputJsonValue;
+  }): Promise<void> {
+    const assignment = await this.prisma.shipmentAssignment.findUnique({
+      where: {
+        shipmentId: input.shipmentId,
+      },
+      select: {
+        providerId: true,
+      },
+    });
+
+    if (input.customerProfileId !== input.actorProfileId) {
+      const customerAudience = await this.resolveNotificationAudience(
+        input.customerProfileId,
+      );
+      await this.notifications.createNotification({
+        recipientProfileId: input.customerProfileId,
+        audience: customerAudience,
+        category: NotificationCategory.SHIPMENT,
+        title: `Shipment ${input.trackingCode} updated`,
+        body: `Status changed to ${input.status}.`,
+        entityType: 'shipment',
+        entityId: input.shipmentId,
+        metadata: input.details,
+      });
+    }
+
+    if (assignment?.providerId) {
+      await this.notifications.notifyProviderTeam(assignment.providerId, {
+        category: NotificationCategory.SHIPMENT,
+        title: `Shipment ${input.trackingCode} updated`,
+        body: `Status changed to ${input.status}.`,
+        entityType: 'shipment',
+        entityId: input.shipmentId,
+        metadata: input.details,
+      });
+    }
+
+    await this.notifications.notifyAdmins({
+      category: NotificationCategory.SHIPMENT,
+      title: `Shipment ${input.trackingCode} updated`,
+      body: `Status changed to ${input.status}.`,
+      entityType: 'shipment',
+      entityId: input.shipmentId,
+      metadata: {
+        actorProfileId: input.actorProfileId,
+        ...((input.details as Record<string, unknown> | undefined) ?? {}),
+      },
+    });
+  }
+
+  private async resolveNotificationAudience(
+    profileId: string,
+  ): Promise<NotificationAudience> {
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.BUSINESS,
+      UserType.INDIVIDUAL,
+    ]);
+
+    if (role === UserType.ADMIN) {
+      return NotificationAudience.ADMIN;
+    }
+
+    if (role === UserType.BUSINESS) {
+      return NotificationAudience.PROVIDER;
+    }
+
+    return NotificationAudience.CUSTOMER;
   }
 
   private toGraphqlShipmentItem(item: PrismaShipmentItem): ShipmentItem {

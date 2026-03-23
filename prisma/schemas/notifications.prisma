@@ -1,0 +1,41 @@
+// ============================================================================
+// NOTIFICATIONS DOMAIN: In-app notifications for customer/provider/admin
+// ============================================================================
+
+enum NotificationAudience {
+  customer
+  provider
+  admin
+}
+
+enum NotificationCategory {
+  shipment
+  dispatch
+  support
+  dispute
+  system
+}
+
+model Notification {
+  id                 String               @id @default(uuid()) @db.Uuid
+  recipientProfileId String               @map("recipient_profile_id") @db.Uuid
+  audience           NotificationAudience
+  category           NotificationCategory
+  title              String
+  body               String
+  entityType         String?              @map("entity_type")
+  entityId           String?              @map("entity_id")
+  metadata           Json?
+  isRead             Boolean              @default(false) @map("is_read")
+  readAt             DateTime?            @map("read_at") @db.Timestamptz(6)
+  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  recipientProfile Profile @relation("ProfileNotifications", fields: [recipientProfileId], references: [id], onDelete: Cascade)
+
+  @@index([recipientProfileId, createdAt(sort: Desc)])
+  @@index([audience, isRead, createdAt(sort: Desc)])
+  @@index([category, createdAt(sort: Desc)])
+  @@map("notifications")
+}
