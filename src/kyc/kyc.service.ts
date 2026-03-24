@@ -1295,26 +1295,23 @@ export class KycService {
   private async ensureProviderKycProfile(
     providerId: string,
   ): Promise<PrismaProviderKycProfile> {
-    return this.prisma.runWithRetry(
-      'KycService.ensureProviderKycProfile',
-      async () => {
-        const existing = await this.prisma.providerKycProfile.findUnique({
-          where: {
-            providerId,
-          },
-        });
+    return (async () => {
+      const existing = await this.prisma.providerKycProfile.findUnique({
+        where: {
+          providerId,
+        },
+      });
 
-        if (existing) {
-          return existing;
-        }
+      if (existing) {
+        return existing;
+      }
 
-        return this.prisma.providerKycProfile.create({
-          data: {
-            providerId,
-          },
-        });
-      },
-    );
+      return this.prisma.providerKycProfile.create({
+        data: {
+          providerId,
+        },
+      });
+    })();
   }
 
   private async requireProviderMedia(

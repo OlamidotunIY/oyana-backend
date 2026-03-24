@@ -78,7 +78,9 @@ export class UserService {
       phoneVerifiedAt: profile.phoneVerifiedAt,
       state: profile.state,
       referralCode: profile.referralCode,
-      preferredLanguage: this.normalizePreferredLanguage(profile.preferredLanguage),
+      preferredLanguage: this.normalizePreferredLanguage(
+        profile.preferredLanguage,
+      ),
       status: profile.status,
       lastLoginAt: profile.lastLoginAt,
       createdAt: profile.createdAt,
@@ -94,67 +96,65 @@ export class UserService {
   }
 
   async getProfileByEmail(email: string): Promise<Profile | null> {
-    const profile = await this.prisma.runWithRetry('UserService.getProfileByEmail', () =>
-      this.prisma.profile.findUnique({
-        where: { email },
-        select: {
-          id: true,
-          email: true,
-          roles: true,
-          firstName: true,
-          lastName: true,
-          phoneE164: true,
-          phoneVerified: true,
-          phoneVerifiedAt: true,
-          state: true,
-          referralCode: true,
-          preferredLanguage: true,
-          status: true,
-          lastLoginAt: true,
-          createdAt: true,
-          updatedAt: true,
-          contactForProviders: {
-            select: {
-              id: true,
-              businessName: true,
-              isAvailable: true,
-              availabilityUpdatedAt: true,
-            },
-            take: 1,
+    const profile = await this.prisma.profile.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        roles: true,
+        firstName: true,
+        lastName: true,
+        phoneE164: true,
+        phoneVerified: true,
+        phoneVerifiedAt: true,
+        state: true,
+        referralCode: true,
+        preferredLanguage: true,
+        status: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        contactForProviders: {
+          select: {
+            id: true,
+            businessName: true,
+            isAvailable: true,
+            availabilityUpdatedAt: true,
           },
-          providerMembers: {
-            where: {
-              status: 'active',
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-            take: 1,
-            select: {
-              role: true,
-              provider: {
-                select: {
-                  id: true,
-                  businessName: true,
-                  isAvailable: true,
-                  availabilityUpdatedAt: true,
-                },
+          take: 1,
+        },
+        providerMembers: {
+          where: {
+            status: 'active',
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          take: 1,
+          select: {
+            role: true,
+            provider: {
+              select: {
+                id: true,
+                businessName: true,
+                isAvailable: true,
+                availabilityUpdatedAt: true,
               },
             },
           },
-          userAddresses: {
-            select: {
-              address: true,
-              city: true,
-            },
-            orderBy: {
-              updatedAt: 'desc',
-            },
-            take: 1,
-          },
         },
-      }),
-    );
+        userAddresses: {
+          select: {
+            address: true,
+            city: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          take: 1,
+        },
+      },
+    });
 
     if (!profile) {
       return null;
@@ -164,67 +164,65 @@ export class UserService {
   }
 
   async findProfileById(profileId: string): Promise<Profile | null> {
-    const profile = await this.prisma.runWithRetry('UserService.findProfileById', () =>
-      this.prisma.profile.findUnique({
-        where: { id: profileId },
-        select: {
-          id: true,
-          email: true,
-          roles: true,
-          firstName: true,
-          lastName: true,
-          phoneE164: true,
-          phoneVerified: true,
-          phoneVerifiedAt: true,
-          state: true,
-          referralCode: true,
-          preferredLanguage: true,
-          status: true,
-          lastLoginAt: true,
-          createdAt: true,
-          updatedAt: true,
-          contactForProviders: {
-            select: {
-              id: true,
-              businessName: true,
-              isAvailable: true,
-              availabilityUpdatedAt: true,
-            },
-            take: 1,
+    const profile = await this.prisma.profile.findUnique({
+      where: { id: profileId },
+      select: {
+        id: true,
+        email: true,
+        roles: true,
+        firstName: true,
+        lastName: true,
+        phoneE164: true,
+        phoneVerified: true,
+        phoneVerifiedAt: true,
+        state: true,
+        referralCode: true,
+        preferredLanguage: true,
+        status: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        contactForProviders: {
+          select: {
+            id: true,
+            businessName: true,
+            isAvailable: true,
+            availabilityUpdatedAt: true,
           },
-          providerMembers: {
-            where: {
-              status: 'active',
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-            take: 1,
-            select: {
-              role: true,
-              provider: {
-                select: {
-                  id: true,
-                  businessName: true,
-                  isAvailable: true,
-                  availabilityUpdatedAt: true,
-                },
+          take: 1,
+        },
+        providerMembers: {
+          where: {
+            status: 'active',
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          take: 1,
+          select: {
+            role: true,
+            provider: {
+              select: {
+                id: true,
+                businessName: true,
+                isAvailable: true,
+                availabilityUpdatedAt: true,
               },
             },
           },
-          userAddresses: {
-            select: {
-              address: true,
-              city: true,
-            },
-            orderBy: {
-              updatedAt: 'desc',
-            },
-            take: 1,
-          },
         },
-      }),
-    );
+        userAddresses: {
+          select: {
+            address: true,
+            city: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          take: 1,
+        },
+      },
+    });
 
     if (!profile) {
       return null;
@@ -263,72 +261,70 @@ export class UserService {
     }
 
     // Use upsert to create profile if it doesn't exist
-    const profile = await this.prisma.runWithRetry('UserService.updateProfile', () =>
-      this.prisma.profile.upsert({
-        where: { id: profileId },
-        update: updateData,
-        create: {
-          id: profileId,
-          ...updateData,
-        },
-        select: {
-          id: true,
-          email: true,
-          roles: true,
-          firstName: true,
-          lastName: true,
-          phoneE164: true,
-          phoneVerified: true,
-          phoneVerifiedAt: true,
-          state: true,
-          referralCode: true,
-          preferredLanguage: true,
-          status: true,
-          lastLoginAt: true,
-          createdAt: true,
-          updatedAt: true,
-          contactForProviders: {
-            select: {
-              id: true,
-              businessName: true,
-              isAvailable: true,
-              availabilityUpdatedAt: true,
-            },
-            take: 1,
+    const profile = await this.prisma.profile.upsert({
+      where: { id: profileId },
+      update: updateData,
+      create: {
+        id: profileId,
+        ...updateData,
+      },
+      select: {
+        id: true,
+        email: true,
+        roles: true,
+        firstName: true,
+        lastName: true,
+        phoneE164: true,
+        phoneVerified: true,
+        phoneVerifiedAt: true,
+        state: true,
+        referralCode: true,
+        preferredLanguage: true,
+        status: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        contactForProviders: {
+          select: {
+            id: true,
+            businessName: true,
+            isAvailable: true,
+            availabilityUpdatedAt: true,
           },
-          providerMembers: {
-            where: {
-              status: 'active',
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-            take: 1,
-            select: {
-              role: true,
-              provider: {
-                select: {
-                  id: true,
-                  businessName: true,
-                  isAvailable: true,
-                  availabilityUpdatedAt: true,
-                },
+          take: 1,
+        },
+        providerMembers: {
+          where: {
+            status: 'active',
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          take: 1,
+          select: {
+            role: true,
+            provider: {
+              select: {
+                id: true,
+                businessName: true,
+                isAvailable: true,
+                availabilityUpdatedAt: true,
               },
             },
           },
-          userAddresses: {
-            select: {
-              address: true,
-              city: true,
-            },
-            orderBy: {
-              updatedAt: 'desc',
-            },
-            take: 1,
-          },
         },
-      }),
-    );
+        userAddresses: {
+          select: {
+            address: true,
+            city: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          take: 1,
+        },
+      },
+    });
 
     return this.toGraphqlProfile(profile);
   }
@@ -341,23 +337,19 @@ export class UserService {
       throw new BadRequestException('Admin role cannot be self-activated');
     }
 
-    const profile = await this.prisma.runWithRetry(
-      'UserService.activateRole.profile',
-      () =>
-        this.prisma.profile.findUnique({
-          where: {
-            id: profileId,
-          },
-          select: {
-            id: true,
-            email: true,
-            roles: true,
-            firstName: true,
-            lastName: true,
-            state: true,
-          },
-        }),
-    );
+    const profile = await this.prisma.profile.findUnique({
+      where: {
+        id: profileId,
+      },
+      select: {
+        id: true,
+        email: true,
+        roles: true,
+        firstName: true,
+        lastName: true,
+        state: true,
+      },
+    });
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
@@ -376,7 +368,9 @@ export class UserService {
       new Set([
         ...currentRoles,
         input.targetRole,
-        ...(input.targetRole === UserType.BUSINESS ? [UserType.INDIVIDUAL] : []),
+        ...(input.targetRole === UserType.BUSINESS
+          ? [UserType.INDIVIDUAL]
+          : []),
       ]),
     );
 
@@ -460,36 +454,28 @@ export class UserService {
     profileId: string,
     input: SetProviderAvailabilityInput,
   ): Promise<Profile> {
-    const ownerProvider = await this.prisma.runWithRetry(
-      'UserService.setProviderAvailability.ownerProvider',
-      () =>
-        this.prisma.provider.findFirst({
-          where: {
-            profileId,
-          },
-          select: {
-            id: true,
-          },
-        }),
-    );
+    const ownerProvider = await this.prisma.provider.findFirst({
+      where: {
+        profileId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
-    const ownerMembership = await this.prisma.runWithRetry(
-      'UserService.setProviderAvailability.ownerMembership',
-      () =>
-        this.prisma.providerMember.findFirst({
-          where: {
-            profileId,
-            status: 'active',
-            role: 'owner',
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          select: {
-            providerId: true,
-          },
-        }),
-    );
+    const ownerMembership = await this.prisma.providerMember.findFirst({
+      where: {
+        profileId,
+        status: 'active',
+        role: 'owner',
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      select: {
+        providerId: true,
+      },
+    });
 
     const providerId = ownerProvider?.id ?? ownerMembership?.providerId;
     if (!providerId) {
@@ -498,19 +484,15 @@ export class UserService {
       );
     }
 
-    await this.prisma.runWithRetry(
-      'UserService.setProviderAvailability.updateProvider',
-      () =>
-        this.prisma.provider.update({
-          where: {
-            id: providerId,
-          },
-          data: {
-            isAvailable: input.isAvailable,
-            availabilityUpdatedAt: new Date(),
-          },
-        }),
-    );
+    await this.prisma.provider.update({
+      where: {
+        id: providerId,
+      },
+      data: {
+        isAvailable: input.isAvailable,
+        availabilityUpdatedAt: new Date(),
+      },
+    });
 
     const profile = await this.findProfileById(profileId);
     if (!profile) {

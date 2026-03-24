@@ -64,30 +64,29 @@ export class DisputesService {
         ? Prisma.empty
         : Prisma.sql`WHERE "owner_profile_id" = ${profileId}::uuid`;
 
-    const rows = await this.prisma.runWithRetry('DisputesService.myDisputes', () =>
-      this.prisma.$queryRaw<DisputeCaseRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<DisputeCaseRow[]>(Prisma.sql`
         SELECT *
         FROM "dispute_cases"
         ${where}
         ORDER BY "updated_at" DESC
-      `),
-    );
+      `);
 
     return rows.map((row) => this.toDisputeCase(row));
   }
 
-  async dispute(profileId: string, disputeId: string): Promise<DisputeCase | null> {
+  async dispute(
+    profileId: string,
+    disputeId: string,
+  ): Promise<DisputeCase | null> {
     const role = await this.requireUserRole(profileId);
     const dispute = await this.requireDisputeAccess(profileId, role, disputeId);
 
-    const events = await this.prisma.runWithRetry('DisputesService.dispute.events', () =>
-      this.prisma.$queryRaw<DisputeEventRow[]>(Prisma.sql`
+    const events = await this.prisma.$queryRaw<DisputeEventRow[]>(Prisma.sql`
         SELECT *
         FROM "dispute_events"
         WHERE "dispute_case_id" = ${disputeId}::uuid
         ORDER BY "created_at" ASC
-      `),
-    );
+      `);
 
     return this.toDisputeCase(
       dispute,
@@ -95,7 +94,10 @@ export class DisputesService {
     );
   }
 
-  async createDispute(profileId: string, input: CreateDisputeDto): Promise<DisputeCase> {
+  async createDispute(
+    profileId: string,
+    input: CreateDisputeDto,
+  ): Promise<DisputeCase> {
     const role = await this.requireUserRole(profileId);
     const actorRole = this.toActorRole(role);
     const now = new Date();
@@ -107,11 +109,8 @@ export class DisputesService {
     await this.validateDisputeReferences(profileId, role, input);
     const disputeNumber = this.generateReference('DSP');
 
-    const [caseRow] = await this.prisma.runWithRetry(
-      'DisputesService.createDispute',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const insertedCase = await tx.$queryRaw<DisputeCaseRow[]>(Prisma.sql`
+    const [caseRow] = await this.prisma.$transaction(async (tx) => {
+      const insertedCase = await tx.$queryRaw<DisputeCaseRow[]>(Prisma.sql`
             INSERT INTO "dispute_cases" (
               "id",
               "dispute_number",
@@ -141,7 +140,7 @@ export class DisputesService {
             RETURNING *
           `);
 
-          await tx.$executeRaw(Prisma.sql`
+      await tx.$executeRaw(Prisma.sql`
             INSERT INTO "dispute_events" (
               "id",
               "dispute_case_id",
@@ -162,9 +161,8 @@ export class DisputesService {
             )
           `);
 
-          return insertedCase;
-        }),
-    );
+      return insertedCase;
+    });
 
     await this.notifications.createNotification({
       recipientProfileId: profileId,
@@ -205,15 +203,16 @@ export class DisputesService {
     }
 
     const role = await this.requireUserRole(profileId);
-    const dispute = await this.requireDisputeAccess(profileId, role, input.disputeId);
+    const dispute = await this.requireDisputeAccess(
+      profileId,
+      role,
+      input.disputeId,
+    );
     const actorRole = this.toActorRole(role);
     const now = new Date();
 
-    const [event] = await this.prisma.runWithRetry(
-      'DisputesService.addDisputeComment',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const inserted = await tx.$queryRaw<DisputeEventRow[]>(Prisma.sql`
+    const [event] = await this.prisma.$transaction(async (tx) => {
+      const inserted = await tx.$queryRaw<DisputeEventRow[]>(Prisma.sql`
             INSERT INTO "dispute_events" (
               "id",
               "dispute_case_id",
@@ -235,15 +234,14 @@ export class DisputesService {
             RETURNING *
           `);
 
-          await tx.$executeRaw(Prisma.sql`
+      await tx.$executeRaw(Prisma.sql`
             UPDATE "dispute_cases"
             SET "updated_at" = ${now}
             WHERE "id" = ${input.disputeId}::uuid
           `);
 
-          return inserted;
-        }),
-    );
+      return inserted;
+    });
 
     if (dispute.owner_profile_id !== profileId) {
       const ownerRole = await this.requireUserRole(dispute.owner_profile_id);
@@ -274,7 +272,10 @@ export class DisputesService {
     return this.toDisputeEvent(event);
   }
 
-  async resolveDispute(profileId: string, input: ResolveDisputeDto): Promise<DisputeCase> {
+  async resolveDispute(
+    profileId: string,
+    input: ResolveDisputeDto,
+  ): Promise<DisputeCase> {
     await this.assertAdmin(profileId);
 
     if (!input.resolutionSummary.trim()) {
@@ -282,16 +283,16 @@ export class DisputesService {
     }
 
     const status = input.status ?? DisputeStatus.RESOLVED;
-    if (status !== DisputeStatus.RESOLVED && status !== DisputeStatus.REJECTED) {
+    if (
+      status !== DisputeStatus.RESOLVED &&
+      status !== DisputeStatus.REJECTED
+    ) {
       throw new BadRequestException('status must be RESOLVED or REJECTED');
     }
 
     const now = new Date();
-    const [updated] = await this.prisma.runWithRetry(
-      'DisputesService.resolveDispute',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const disputeRows = await tx.$queryRaw<DisputeCaseRow[]>(Prisma.sql`
+    const [updated] = await this.prisma.$transaction(async (tx) => {
+      const disputeRows = await tx.$queryRaw<DisputeCaseRow[]>(Prisma.sql`
             UPDATE "dispute_cases"
             SET
               "status" = ${status},
@@ -303,11 +304,13 @@ export class DisputesService {
             RETURNING *
           `);
 
-          if (!disputeRows[0]) {
-            throw new NotFoundException(`Dispute with id ${input.disputeId} not found`);
-          }
+      if (!disputeRows[0]) {
+        throw new NotFoundException(
+          `Dispute with id ${input.disputeId} not found`,
+        );
+      }
 
-          await tx.$executeRaw(Prisma.sql`
+      await tx.$executeRaw(Prisma.sql`
             INSERT INTO "dispute_events" (
               "id",
               "dispute_case_id",
@@ -328,9 +331,8 @@ export class DisputesService {
             )
           `);
 
-          return disputeRows;
-        }),
-    );
+      return disputeRows;
+    });
 
     const ownerRole = await this.requireUserRole(updated.owner_profile_id);
     await this.notifications.createNotification({
@@ -365,7 +367,9 @@ export class DisputesService {
       });
 
       if (!shipment) {
-        throw new NotFoundException(`Shipment with id ${input.shipmentId} not found`);
+        throw new NotFoundException(
+          `Shipment with id ${input.shipmentId} not found`,
+        );
       }
 
       if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
@@ -385,7 +389,9 @@ export class DisputesService {
 
       const invoice = invoices[0];
       if (!invoice) {
-        throw new NotFoundException(`Invoice with id ${input.invoiceId} not found`);
+        throw new NotFoundException(
+          `Invoice with id ${input.invoiceId} not found`,
+        );
       }
 
       if (role !== UserType.ADMIN && invoice.profile_id !== profileId) {
@@ -412,7 +418,9 @@ export class DisputesService {
     }
 
     if (role !== UserType.ADMIN && dispute.owner_profile_id !== profileId) {
-      throw new ForbiddenException('You are not allowed to access this dispute');
+      throw new ForbiddenException(
+        'You are not allowed to access this dispute',
+      );
     }
 
     return dispute;
@@ -471,7 +479,10 @@ export class DisputesService {
     return NotificationAudience.CUSTOMER;
   }
 
-  private toDisputeCase(row: DisputeCaseRow, events?: DisputeEvent[]): DisputeCase {
+  private toDisputeCase(
+    row: DisputeCaseRow,
+    events?: DisputeEvent[],
+  ): DisputeCase {
     return {
       id: row.id,
       disputeNumber: row.dispute_number,

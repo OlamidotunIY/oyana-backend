@@ -9,12 +9,7 @@ import { KycResolver } from './kyc.resolver';
 @Module({
   imports: [SupabaseModule],
   controllers: [KycController],
-  providers: [
-    KycService,
-    KycResolver,
-    PremblyClient,
-    MobileClientGuard,
-  ],
+  providers: [KycService, KycResolver, PremblyClient, MobileClientGuard],
   exports: [KycService],
 })
 export class KycModule {}

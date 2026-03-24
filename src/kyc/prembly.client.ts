@@ -62,9 +62,7 @@ export class PremblyClient {
     });
   }
 
-  async verifyVin(input: {
-    vin: string;
-  }): Promise<Record<string, unknown>> {
+  async verifyVin(input: { vin: string }): Promise<Record<string, unknown>> {
     return this.postByType('vehicle_vin', {
       vin: input.vin,
     });
@@ -80,12 +78,16 @@ export class PremblyClient {
 
   private resolveEndpoint(type: PremblyCheckType): string {
     const fromEnv = {
-      nin_face: this.configService.get<string>('PREMBLY_NIN_FACE_ENDPOINT')?.trim(),
+      nin_face: this.configService
+        .get<string>('PREMBLY_NIN_FACE_ENDPOINT')
+        ?.trim(),
       phone: this.configService.get<string>('PREMBLY_PHONE_ENDPOINT')?.trim(),
       vehicle_plate: this.configService
         .get<string>('PREMBLY_PLATE_ENDPOINT')
         ?.trim(),
-      vehicle_vin: this.configService.get<string>('PREMBLY_VIN_ENDPOINT')?.trim(),
+      vehicle_vin: this.configService
+        .get<string>('PREMBLY_VIN_ENDPOINT')
+        ?.trim(),
       status: this.configService.get<string>('PREMBLY_STATUS_ENDPOINT')?.trim(),
     }[type];
 
@@ -95,8 +97,10 @@ export class PremblyClient {
 
     const fallback: Record<PremblyCheckType, string | undefined> = {
       nin_face: '/api/v1/biometrics/merchant/data/verification/nin_face',
-      phone: '/api/v1/biometrics/merchant/data/verification/basic_phone_number_1',
-      vehicle_plate: '/api/v1/biometrics/merchant/data/verification/plate_number',
+      phone:
+        '/api/v1/biometrics/merchant/data/verification/basic_phone_number_1',
+      vehicle_plate:
+        '/api/v1/biometrics/merchant/data/verification/plate_number',
       vehicle_vin: undefined,
       status: undefined,
     };
@@ -154,7 +158,10 @@ export class PremblyClient {
 
       return body;
     } catch (error) {
-      const axiosError = error as AxiosError<{ message?: string; detail?: string }>;
+      const axiosError = error as AxiosError<{
+        message?: string;
+        detail?: string;
+      }>;
       const message =
         axiosError.response?.data?.detail ??
         axiosError.response?.data?.message ??
@@ -196,7 +203,11 @@ export class PremblyClient {
 
   private extractReference(body: Record<string, unknown>): string | undefined {
     const verification = body.verification;
-    if (verification && typeof verification === 'object' && !Array.isArray(verification)) {
+    if (
+      verification &&
+      typeof verification === 'object' &&
+      !Array.isArray(verification)
+    ) {
       const nested = (verification as Record<string, unknown>).reference;
       if (typeof nested === 'string' && nested.trim().length > 0) {
         return nested.trim();

@@ -2,10 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { buildRedisConnection } from './queue.config';
-import {
-  DISPATCH_QUEUE_NAME,
-  MAINTENANCE_QUEUE_NAME,
-} from './queue.constants';
+import { DISPATCH_QUEUE_NAME, MAINTENANCE_QUEUE_NAME } from './queue.constants';
 
 @Global()
 @Module({

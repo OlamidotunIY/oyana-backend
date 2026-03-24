@@ -43,7 +43,9 @@ export class DispatchQueueProcessor extends WorkerHost {
 
   @OnWorkerEvent('failed')
   onFailed(
-    job: Job<DispatchShipmentJobPayload | DispatchReconcileJobPayload> | undefined,
+    job:
+      | Job<DispatchShipmentJobPayload | DispatchReconcileJobPayload>
+      | undefined,
     error: Error,
   ): void {
     this.logger.error(

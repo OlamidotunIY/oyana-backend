@@ -32,7 +32,9 @@ export class DispatchResolver {
   @Query(() => [DispatchOffer])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
-  async myDispatchOffers(@CurrentUser() user: AuthUser): Promise<DispatchOffer[]> {
+  async myDispatchOffers(
+    @CurrentUser() user: AuthUser,
+  ): Promise<DispatchOffer[]> {
     return this.dispatchService.myDispatchOffers(user.id);
   }
 

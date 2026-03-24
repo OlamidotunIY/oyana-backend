@@ -437,7 +437,9 @@ registerEnumType(ShipmentEventType, { name: 'ShipmentEventType' });
 registerEnumType(ShipmentActorRole, { name: 'ShipmentActorRole' });
 registerEnumType(DispatchBatchStatus, { name: 'DispatchBatchStatus' });
 registerEnumType(DispatchOfferStatus, { name: 'DispatchOfferStatus' });
-registerEnumType(ShipmentAssignmentStatus, { name: 'ShipmentAssignmentStatus' });
+registerEnumType(ShipmentAssignmentStatus, {
+  name: 'ShipmentAssignmentStatus',
+});
 registerEnumType(BidStatus, { name: 'BidStatus' });
 registerEnumType(SupportTicketStatus, { name: 'SupportTicketStatus' });
 registerEnumType(SupportTicketPriority, { name: 'SupportTicketPriority' });

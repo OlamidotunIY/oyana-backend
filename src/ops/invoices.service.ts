@@ -57,29 +57,31 @@ export class InvoicesService {
         ? Prisma.empty
         : Prisma.sql`WHERE "profile_id" = ${profileId}::uuid`;
 
-    const rows = await this.prisma.runWithRetry('InvoicesService.myInvoices', () =>
-      this.prisma.$queryRaw<InvoiceRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<InvoiceRow[]>(Prisma.sql`
         SELECT *
         FROM "invoices"
         ${where}
         ORDER BY "created_at" DESC
-      `),
-    );
+      `);
 
     return rows.map((row) => this.toInvoice(row));
   }
 
   async invoice(profileId: string, invoiceId: string): Promise<Invoice | null> {
     const role = await this.requireUserRole(profileId);
-    const invoiceRow = await this.requireInvoiceAccess(profileId, role, invoiceId);
-    const lineItems = await this.prisma.runWithRetry('InvoicesService.invoice.lineItems', () =>
-      this.prisma.$queryRaw<InvoiceLineItemRow[]>(Prisma.sql`
+    const invoiceRow = await this.requireInvoiceAccess(
+      profileId,
+      role,
+      invoiceId,
+    );
+    const lineItems = await this.prisma.$queryRaw<
+      InvoiceLineItemRow[]
+    >(Prisma.sql`
         SELECT *
         FROM "invoice_line_items"
         WHERE "invoice_id" = ${invoiceId}::uuid
         ORDER BY "created_at" ASC
-      `),
-    );
+      `);
 
     return this.toInvoice(
       invoiceRow,
@@ -87,7 +89,10 @@ export class InvoicesService {
     );
   }
 
-  async createInvoice(profileId: string, input: CreateInvoiceDto): Promise<Invoice> {
+  async createInvoice(
+    profileId: string,
+    input: CreateInvoiceDto,
+  ): Promise<Invoice> {
     await this.assertAdmin(profileId);
 
     if (!input.lineItems?.length) {
@@ -97,7 +102,9 @@ export class InvoicesService {
     const now = new Date();
     const invoiceNumber = this.generateReference('INV');
     const currency = input.currency?.trim().toUpperCase() || 'NGN';
-    const normalizedItems = input.lineItems.map((item) => this.normalizeLineItem(item));
+    const normalizedItems = input.lineItems.map((item) =>
+      this.normalizeLineItem(item),
+    );
 
     const subtotalMinor = normalizedItems.reduce(
       (sum, item) => sum + item.totalAmountMinor,
@@ -107,11 +114,8 @@ export class InvoicesService {
     const taxMinor = BigInt(0);
     const totalMinor = subtotalMinor + feeMinor + taxMinor;
 
-    const created = await this.prisma.runWithRetry(
-      'InvoicesService.createInvoice',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const [invoice] = await tx.$queryRaw<InvoiceRow[]>(Prisma.sql`
+    const created = await this.prisma.$transaction(async (tx) => {
+      const [invoice] = await tx.$queryRaw<InvoiceRow[]>(Prisma.sql`
             INSERT INTO "invoices" (
               "id",
               "invoice_number",
@@ -149,9 +153,9 @@ export class InvoicesService {
             RETURNING *
           `);
 
-          const lineItems: InvoiceLineItemRow[] = [];
-          for (const item of normalizedItems) {
-            const [lineItem] = await tx.$queryRaw<InvoiceLineItemRow[]>(Prisma.sql`
+      const lineItems: InvoiceLineItemRow[] = [];
+      for (const item of normalizedItems) {
+        const [lineItem] = await tx.$queryRaw<InvoiceLineItemRow[]>(Prisma.sql`
               INSERT INTO "invoice_line_items" (
                 "id",
                 "invoice_id",
@@ -172,12 +176,11 @@ export class InvoicesService {
               )
               RETURNING *
             `);
-            lineItems.push(lineItem);
-          }
+        lineItems.push(lineItem);
+      }
 
-          return { invoice, lineItems };
-        }),
-    );
+      return { invoice, lineItems };
+    });
 
     return this.toInvoice(
       created.invoice,
@@ -194,10 +197,7 @@ export class InvoicesService {
     const now = new Date();
     const paidAt = input.status === InvoiceStatus.PAID ? now : null;
 
-    const [updated] = await this.prisma.runWithRetry(
-      'InvoicesService.updateInvoiceStatus',
-      () =>
-        this.prisma.$queryRaw<InvoiceRow[]>(Prisma.sql`
+    const [updated] = await this.prisma.$queryRaw<InvoiceRow[]>(Prisma.sql`
           UPDATE "invoices"
           SET
             "status" = ${input.status},
@@ -205,11 +205,12 @@ export class InvoicesService {
             "updated_at" = ${now}
           WHERE "id" = ${input.invoiceId}::uuid
           RETURNING *
-        `),
-    );
+        `);
 
     if (!updated) {
-      throw new NotFoundException(`Invoice with id ${input.invoiceId} not found`);
+      throw new NotFoundException(
+        `Invoice with id ${input.invoiceId} not found`,
+      );
     }
 
     return this.toInvoice(updated);
@@ -222,7 +223,9 @@ export class InvoicesService {
     totalAmountMinor: bigint;
   } {
     if (!item.description.trim()) {
-      throw new BadRequestException('Invoice line item description is required');
+      throw new BadRequestException(
+        'Invoice line item description is required',
+      );
     }
 
     const quantity = Math.max(1, Math.round(Number(item.quantity ?? 1)));
@@ -232,7 +235,9 @@ export class InvoicesService {
 
     const unitAmountMinor = this.toBigInt(item.unitAmountMinor);
     if (unitAmountMinor < BigInt(0)) {
-      throw new BadRequestException('Invoice line item amount must be non-negative');
+      throw new BadRequestException(
+        'Invoice line item amount must be non-negative',
+      );
     }
 
     return {
@@ -261,7 +266,9 @@ export class InvoicesService {
     }
 
     if (role !== UserType.ADMIN && invoice.profile_id !== profileId) {
-      throw new ForbiddenException('You are not allowed to access this invoice');
+      throw new ForbiddenException(
+        'You are not allowed to access this invoice',
+      );
     }
 
     return invoice;

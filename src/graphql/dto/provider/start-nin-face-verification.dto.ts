@@ -1,5 +1,13 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 @InputType()
 export class StartNinFaceVerificationDto {

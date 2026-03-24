@@ -62,16 +62,12 @@ export class SupportService {
         ? Prisma.empty
         : Prisma.sql`WHERE "owner_profile_id" = ${profileId}::uuid`;
 
-    const rows = await this.prisma.runWithRetry(
-      'SupportService.mySupportTickets',
-      () =>
-        this.prisma.$queryRaw<SupportTicketRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<SupportTicketRow[]>(Prisma.sql`
           SELECT *
           FROM "support_tickets"
           ${where}
           ORDER BY "updated_at" DESC
-        `),
-    );
+        `);
 
     return rows.map((row) => this.toSupportTicket(row));
   }
@@ -81,18 +77,20 @@ export class SupportService {
     ticketId: string,
   ): Promise<SupportTicket | null> {
     const role = await this.requireUserRole(profileId);
-    const ticket = await this.requireSupportTicketAccess(profileId, role, ticketId);
+    const ticket = await this.requireSupportTicketAccess(
+      profileId,
+      role,
+      ticketId,
+    );
 
-    const messages = await this.prisma.runWithRetry(
-      'SupportService.supportTicket.messages',
-      () =>
-        this.prisma.$queryRaw<SupportTicketMessageRow[]>(Prisma.sql`
+    const messages = await this.prisma.$queryRaw<
+      SupportTicketMessageRow[]
+    >(Prisma.sql`
           SELECT *
           FROM "support_ticket_messages"
           WHERE "ticket_id" = ${ticketId}::uuid
           ORDER BY "created_at" ASC
-        `),
-    );
+        `);
 
     return this.toSupportTicket(
       ticket,
@@ -104,8 +102,14 @@ export class SupportService {
     profileId: string,
     input: CreateSupportTicketDto,
   ): Promise<SupportTicket> {
-    if (!input.subject.trim() || !input.category.trim() || !input.description.trim()) {
-      throw new BadRequestException('subject, category, and description are required');
+    if (
+      !input.subject.trim() ||
+      !input.category.trim() ||
+      !input.description.trim()
+    ) {
+      throw new BadRequestException(
+        'subject, category, and description are required',
+      );
     }
 
     const role = await this.requireUserRole(profileId);
@@ -114,11 +118,8 @@ export class SupportService {
     const ticketNumber = this.generateReference('TKT');
     const priority = input.priority ?? SupportTicketPriority.MEDIUM;
 
-    const created = await this.prisma.runWithRetry(
-      'SupportService.createSupportTicket',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const [ticket] = await tx.$queryRaw<SupportTicketRow[]>(Prisma.sql`
+    const created = await this.prisma.$transaction(async (tx) => {
+      const [ticket] = await tx.$queryRaw<SupportTicketRow[]>(Prisma.sql`
             INSERT INTO "support_tickets" (
               "id",
               "ticket_number",
@@ -148,7 +149,9 @@ export class SupportService {
             RETURNING *
           `);
 
-          const [message] = await tx.$queryRaw<SupportTicketMessageRow[]>(Prisma.sql`
+      const [message] = await tx.$queryRaw<
+        SupportTicketMessageRow[]
+      >(Prisma.sql`
             INSERT INTO "support_ticket_messages" (
               "id",
               "ticket_id",
@@ -168,9 +171,8 @@ export class SupportService {
             RETURNING *
           `);
 
-          return { ticket, message };
-        }),
-    );
+      return { ticket, message };
+    });
 
     await this.notifications.createNotification({
       recipientProfileId: profileId,
@@ -212,15 +214,16 @@ export class SupportService {
     }
 
     const role = await this.requireUserRole(profileId);
-    const ticket = await this.requireSupportTicketAccess(profileId, role, input.ticketId);
+    const ticket = await this.requireSupportTicketAccess(
+      profileId,
+      role,
+      input.ticketId,
+    );
     const actorRole = this.toActorRole(role);
     const now = new Date();
 
-    const [message] = await this.prisma.runWithRetry(
-      'SupportService.replySupportTicket',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const inserted = await tx.$queryRaw<SupportTicketMessageRow[]>(Prisma.sql`
+    const [message] = await this.prisma.$transaction(async (tx) => {
+      const inserted = await tx.$queryRaw<SupportTicketMessageRow[]>(Prisma.sql`
             INSERT INTO "support_ticket_messages" (
               "id",
               "ticket_id",
@@ -240,15 +243,14 @@ export class SupportService {
             RETURNING *
           `);
 
-          await tx.$executeRaw(Prisma.sql`
+      await tx.$executeRaw(Prisma.sql`
             UPDATE "support_tickets"
             SET "updated_at" = ${now}
             WHERE "id" = ${input.ticketId}::uuid
           `);
 
-          return inserted;
-        }),
-    );
+      return inserted;
+    });
 
     if (ticket.owner_profile_id !== profileId) {
       const ownerRole = await this.requireUserRole(ticket.owner_profile_id);
@@ -284,12 +286,17 @@ export class SupportService {
     input: UpdateSupportTicketStatusDto,
   ): Promise<SupportTicket> {
     const role = await this.requireUserRole(profileId);
-    const ticket = await this.requireSupportTicketAccess(profileId, role, input.ticketId);
+    const ticket = await this.requireSupportTicketAccess(
+      profileId,
+      role,
+      input.ticketId,
+    );
 
-    if (role !== UserType.ADMIN && input.status !== SupportTicketStatus.CLOSED) {
-      throw new ForbiddenException(
-        'Only admins can set this ticket status',
-      );
+    if (
+      role !== UserType.ADMIN &&
+      input.status !== SupportTicketStatus.CLOSED
+    ) {
+      throw new ForbiddenException('Only admins can set this ticket status');
     }
 
     const now = new Date();
@@ -298,10 +305,9 @@ export class SupportService {
     const closedAt =
       input.status === SupportTicketStatus.CLOSED ? now : ticket.closed_at;
 
-    const [updated] = await this.prisma.runWithRetry(
-      'SupportService.updateSupportTicketStatus',
-      () =>
-        this.prisma.$queryRaw<SupportTicketRow[]>(Prisma.sql`
+    const [updated] = await this.prisma.$queryRaw<
+      SupportTicketRow[]
+    >(Prisma.sql`
           UPDATE "support_tickets"
           SET
             "status" = ${input.status},
@@ -310,8 +316,7 @@ export class SupportService {
             "updated_at" = ${now}
           WHERE "id" = ${input.ticketId}::uuid
           RETURNING *
-        `),
-    );
+        `);
 
     if (updated.owner_profile_id !== profileId) {
       const ownerRole = await this.requireUserRole(updated.owner_profile_id);
@@ -343,7 +348,9 @@ export class SupportService {
 
     const ticket = rows[0];
     if (!ticket) {
-      throw new NotFoundException(`Support ticket with id ${ticketId} not found`);
+      throw new NotFoundException(
+        `Support ticket with id ${ticketId} not found`,
+      );
     }
 
     if (role !== UserType.ADMIN && ticket.owner_profile_id !== profileId) {
@@ -422,7 +429,9 @@ export class SupportService {
     };
   }
 
-  private toSupportTicketMessage(row: SupportTicketMessageRow): SupportTicketMessage {
+  private toSupportTicketMessage(
+    row: SupportTicketMessageRow,
+  ): SupportTicketMessage {
     return {
       id: row.id,
       ticketId: row.ticket_id,

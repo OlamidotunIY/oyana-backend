@@ -163,18 +163,12 @@ export class NotificationsService {
 
     const unreadMap = new Map<NotificationAudience, number>();
     for (const row of unreadRows) {
-      unreadMap.set(
-        row.audience as NotificationAudience,
-        row._count._all,
-      );
+      unreadMap.set(row.audience as NotificationAudience, row._count._all);
     }
 
     const totalMap = new Map<NotificationAudience, number>();
     for (const row of totalRows) {
-      totalMap.set(
-        row.audience as NotificationAudience,
-        row._count._all,
-      );
+      totalMap.set(row.audience as NotificationAudience, row._count._all);
     }
 
     const audiences: NotificationAudience[] = [

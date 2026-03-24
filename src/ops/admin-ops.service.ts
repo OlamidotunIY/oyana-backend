@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
@@ -159,170 +163,179 @@ export class AdminOpsService {
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
-    const [shipmentsInRange, activeFleetRows, walletSummary, totalShipmentsToday, activeAssignments, notificationSummary] =
-      await Promise.all([
-        this.prisma.shipment.findMany({
-          where: {
-            ...shipmentModeWhere,
-            OR: [
-              {
-                createdAt: {
-                  gte: filter.rangeFrom,
-                  lte: filter.rangeTo,
-                },
+    const [
+      shipmentsInRange,
+      activeFleetRows,
+      walletSummary,
+      totalShipmentsToday,
+      activeAssignments,
+      notificationSummary,
+    ] = await Promise.all([
+      this.prisma.shipment.findMany({
+        where: {
+          ...shipmentModeWhere,
+          OR: [
+            {
+              createdAt: {
+                gte: filter.rangeFrom,
+                lte: filter.rangeTo,
               },
-              {
-                updatedAt: {
-                  gte: filter.rangeFrom,
-                  lte: filter.rangeTo,
-                },
+            },
+            {
+              updatedAt: {
+                gte: filter.rangeFrom,
+                lte: filter.rangeTo,
               },
-            ],
+            },
+          ],
+        },
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          scheduledAt: true,
+        },
+      }),
+      this.prisma.shipment.findMany({
+        where: {
+          ...shipmentModeWhere,
+          status: {
+            in: ACTIVE_SHIPMENT_STATUSES,
           },
-          select: {
-            id: true,
-            status: true,
-            createdAt: true,
-            updatedAt: true,
-            scheduledAt: true,
+          ...(filter.fleetSearch
+            ? {
+                OR: [
+                  {
+                    trackingCode: {
+                      contains: filter.fleetSearch,
+                      mode: 'insensitive',
+                    },
+                  },
+                  {
+                    pickupAddress: {
+                      is: {
+                        city: {
+                          contains: filter.fleetSearch,
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                  {
+                    dropoffAddress: {
+                      is: {
+                        city: {
+                          contains: filter.fleetSearch,
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                  {
+                    pickupAddress: {
+                      is: {
+                        address: {
+                          contains: filter.fleetSearch,
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                  {
+                    dropoffAddress: {
+                      is: {
+                        address: {
+                          contains: filter.fleetSearch,
+                          mode: 'insensitive',
+                        },
+                      },
+                    },
+                  },
+                ],
+              }
+            : {}),
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: filter.fleetLimit,
+        select: {
+          id: true,
+          trackingCode: true,
+          mode: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          scheduledAt: true,
+          pickupAddress: {
+            select: {
+              address: true,
+              city: true,
+              lat: true,
+              lng: true,
+            },
           },
-        }),
-        this.prisma.shipment.findMany({
-          where: {
+          dropoffAddress: {
+            select: {
+              address: true,
+              city: true,
+              lat: true,
+              lng: true,
+            },
+          },
+          assignment: {
+            select: {
+              providerId: true,
+              vehicleId: true,
+            },
+          },
+        },
+      }),
+      this.prisma.walletAccount.aggregate({
+        _sum: {
+          balanceMinor: true,
+          escrowMinor: true,
+        },
+      }),
+      this.prisma.shipment.count({
+        where: {
+          ...shipmentModeWhere,
+          createdAt: {
+            gte: todayStart,
+            lte: now,
+          },
+        },
+      }),
+      this.prisma.shipmentAssignment.findMany({
+        where: {
+          status: ShipmentAssignmentStatus.ACTIVE,
+          shipment: {
             ...shipmentModeWhere,
             status: {
               in: ACTIVE_SHIPMENT_STATUSES,
             },
-            ...(filter.fleetSearch
-              ? {
-                  OR: [
-                    {
-                      trackingCode: {
-                        contains: filter.fleetSearch,
-                        mode: 'insensitive',
-                      },
-                    },
-                    {
-                      pickupAddress: {
-                        is: {
-                          city: {
-                            contains: filter.fleetSearch,
-                            mode: 'insensitive',
-                          },
-                        },
-                      },
-                    },
-                    {
-                      dropoffAddress: {
-                        is: {
-                          city: {
-                            contains: filter.fleetSearch,
-                            mode: 'insensitive',
-                          },
-                        },
-                      },
-                    },
-                    {
-                      pickupAddress: {
-                        is: {
-                          address: {
-                            contains: filter.fleetSearch,
-                            mode: 'insensitive',
-                          },
-                        },
-                      },
-                    },
-                    {
-                      dropoffAddress: {
-                        is: {
-                          address: {
-                            contains: filter.fleetSearch,
-                            mode: 'insensitive',
-                          },
-                        },
-                      },
-                    },
-                  ],
-                }
-              : {}),
           },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: filter.fleetLimit,
-          select: {
-            id: true,
-            trackingCode: true,
-            mode: true,
-            status: true,
-            createdAt: true,
-            updatedAt: true,
-            scheduledAt: true,
-            pickupAddress: {
-              select: {
-                address: true,
-                city: true,
-                lat: true,
-                lng: true,
-              },
-            },
-            dropoffAddress: {
-              select: {
-                address: true,
-                city: true,
-                lat: true,
-                lng: true,
-              },
-            },
-            assignment: {
-              select: {
-                providerId: true,
-                vehicleId: true,
-              },
-            },
-          },
-        }),
-        this.prisma.walletAccount.aggregate({
-          _sum: {
-            balanceMinor: true,
-            escrowMinor: true,
-          },
-        }),
-        this.prisma.shipment.count({
-          where: {
-            ...shipmentModeWhere,
-            createdAt: {
-              gte: todayStart,
-              lte: now,
-            },
-          },
-        }),
-        this.prisma.shipmentAssignment.findMany({
-          where: {
-            status: ShipmentAssignmentStatus.ACTIVE,
-            shipment: {
-              ...shipmentModeWhere,
-              status: {
-                in: ACTIVE_SHIPMENT_STATUSES,
-              },
-            },
-          },
-          select: {
-            providerId: true,
-            vehicleId: true,
-          },
-        }),
-        this.notifications.summarizeByAudience(),
-      ]);
+        },
+        select: {
+          providerId: true,
+          vehicleId: true,
+        },
+      }),
+      this.notifications.summarizeByAudience(),
+    ]);
 
     const completedShipments = shipmentsInRange.filter(
       (shipment) =>
-        COMPLETED_SHIPMENT_STATUSES.includes(shipment.status as ShipmentStatus) &&
+        COMPLETED_SHIPMENT_STATUSES.includes(
+          shipment.status as ShipmentStatus,
+        ) &&
         shipment.updatedAt >= filter.rangeFrom &&
         shipment.updatedAt <= filter.rangeTo,
     );
 
-    const averageDeliveryMinutes = this.calculateAverageDeliveryMinutes(completedShipments);
+    const averageDeliveryMinutes =
+      this.calculateAverageDeliveryMinutes(completedShipments);
     const onTimeDeliveryRate = this.calculateOnTimeRate(
       completedShipments,
       filter.delayGraceMinutes,
@@ -578,7 +591,9 @@ export class AdminOpsService {
       faceVerifiedAt: status.faceVerifiedAt ?? undefined,
       vehiclePlateVerifiedAt: status.vehiclePlateVerifiedAt ?? undefined,
       vehicleVinVerifiedAt: status.vehicleVinVerifiedAt ?? undefined,
-      faceConfidence: status.faceConfidence ? Number(status.faceConfidence) : undefined,
+      faceConfidence: status.faceConfidence
+        ? Number(status.faceConfidence)
+        : undefined,
       maskedNin: status.maskedNin ?? undefined,
       maskedPhone: status.maskedPhone ?? undefined,
       failureSummary: status.failureSummary ?? undefined,
@@ -618,7 +633,9 @@ export class AdminOpsService {
       confidence: item.confidence ? Number(item.confidence) : undefined,
       message: item.message ?? undefined,
       maskedIdentifier: item.maskedIdentifier ?? undefined,
-      normalizedData: item.normalizedData as Record<string, unknown> | undefined,
+      normalizedData: item.normalizedData as
+        | Record<string, unknown>
+        | undefined,
       expiresAt: item.expiresAt ?? undefined,
       verifiedAt: item.verifiedAt ?? undefined,
       failedAt: item.failedAt ?? undefined,
@@ -689,27 +706,31 @@ export class AdminOpsService {
   async adminFinanceSummary(profileId: string): Promise<AdminFinanceSummary> {
     await this.assertAdmin(profileId);
 
-    const [walletSummary, pendingRefunds, overdueInvoiceSummary] = await Promise.all([
-      this.prisma.walletAccount.aggregate({
-        _sum: {
-          balanceMinor: true,
-          escrowMinor: true,
-        },
-      }),
-      this.prisma.refund.aggregate({
-        where: {
-          status: 'pending',
-        },
-        _count: {
-          _all: true,
-        },
-        _sum: {
-          amountMinor: true,
-        },
-      }),
-      this.prisma.$queryRaw<
-        Array<{ count: bigint | number | string; total: bigint | number | string | null }>
-      >`
+    const [walletSummary, pendingRefunds, overdueInvoiceSummary] =
+      await Promise.all([
+        this.prisma.walletAccount.aggregate({
+          _sum: {
+            balanceMinor: true,
+            escrowMinor: true,
+          },
+        }),
+        this.prisma.refund.aggregate({
+          where: {
+            status: 'pending',
+          },
+          _count: {
+            _all: true,
+          },
+          _sum: {
+            amountMinor: true,
+          },
+        }),
+        this.prisma.$queryRaw<
+          Array<{
+            count: bigint | number | string;
+            total: bigint | number | string | null;
+          }>
+        >`
         SELECT
           COUNT(*)::bigint AS count,
           COALESCE(SUM("total_minor"), 0)::bigint AS total
@@ -718,9 +739,12 @@ export class AdminOpsService {
           AND "due_at" IS NOT NULL
           AND "due_at" < NOW()
       `,
-    ]);
+      ]);
 
-    const overdue = overdueInvoiceSummary[0] ?? { count: BigInt(0), total: BigInt(0) };
+    const overdue = overdueInvoiceSummary[0] ?? {
+      count: BigInt(0),
+      total: BigInt(0),
+    };
 
     return {
       currency: 'NGN',
@@ -743,7 +767,10 @@ export class AdminOpsService {
     return rows.map((row) => this.toPlatformConfig(row));
   }
 
-  async flagFraudCase(profileId: string, input: FlagFraudCaseDto): Promise<FraudFlag> {
+  async flagFraudCase(
+    profileId: string,
+    input: FlagFraudCaseDto,
+  ): Promise<FraudFlag> {
     await this.assertAdmin(profileId);
 
     const flagCode = this.generateReference('FRD');
@@ -792,7 +819,8 @@ export class AdminOpsService {
     await this.assertAdmin(profileId);
     const now = new Date();
     const isResolvedState =
-      input.status === FraudStatus.RESOLVED || input.status === FraudStatus.DISMISSED;
+      input.status === FraudStatus.RESOLVED ||
+      input.status === FraudStatus.DISMISSED;
 
     const [row] = await this.prisma.$queryRaw<FraudFlagRow[]>(Prisma.sql`
       UPDATE "fraud_flags"
@@ -806,13 +834,18 @@ export class AdminOpsService {
     `);
 
     if (!row) {
-      throw new NotFoundException(`Fraud flag with id ${input.fraudFlagId} not found`);
+      throw new NotFoundException(
+        `Fraud flag with id ${input.fraudFlagId} not found`,
+      );
     }
 
     return this.toFraudFlag(row);
   }
 
-  async createSlaRule(profileId: string, input: CreateSlaRuleDto): Promise<SLARule> {
+  async createSlaRule(
+    profileId: string,
+    input: CreateSlaRuleDto,
+  ): Promise<SLARule> {
     await this.assertAdmin(profileId);
     const rule = await this.prisma.slaRule.create({
       data: {
@@ -836,7 +869,10 @@ export class AdminOpsService {
     };
   }
 
-  async updateSlaRule(profileId: string, input: UpdateSlaRuleDto): Promise<SLARule> {
+  async updateSlaRule(
+    profileId: string,
+    input: UpdateSlaRuleDto,
+  ): Promise<SLARule> {
     await this.assertAdmin(profileId);
     const rule = await this.prisma.slaRule.update({
       where: {
@@ -859,7 +895,10 @@ export class AdminOpsService {
     };
   }
 
-  async approveRefund(profileId: string, input: ApproveRefundDto): Promise<Refund> {
+  async approveRefund(
+    profileId: string,
+    input: ApproveRefundDto,
+  ): Promise<Refund> {
     await this.assertAdmin(profileId);
     const status = input.approved ? 'succeeded' : 'failed';
     const updated = await this.prisma.refund.update({
@@ -941,7 +980,10 @@ export class AdminOpsService {
     const safeNow = new Date(now);
     const providedFrom = input?.from ? new Date(input.from) : undefined;
     const providedTo = input?.to ? new Date(input.to) : undefined;
-    const rangeTo = providedTo && providedTo.getTime() <= safeNow.getTime() ? providedTo : safeNow;
+    const rangeTo =
+      providedTo && providedTo.getTime() <= safeNow.getTime()
+        ? providedTo
+        : safeNow;
     const defaultFrom = new Date(rangeTo);
     defaultFrom.setHours(0, 0, 0, 0);
 
@@ -997,7 +1039,8 @@ export class AdminOpsService {
     }
 
     const totalMinutes = completedShipments.reduce((sum, shipment) => {
-      const durationMs = shipment.updatedAt.getTime() - shipment.createdAt.getTime();
+      const durationMs =
+        shipment.updatedAt.getTime() - shipment.createdAt.getTime();
       return sum + Math.max(0, durationMs / (1000 * 60));
     }, 0);
 
@@ -1066,7 +1109,9 @@ export class AdminOpsService {
         continue;
       }
 
-      if (COMPLETED_SHIPMENT_STATUSES.includes(shipment.status as ShipmentStatus)) {
+      if (
+        COMPLETED_SHIPMENT_STATUSES.includes(shipment.status as ShipmentStatus)
+      ) {
         bucket.delivered += 1;
       }
 
@@ -1123,7 +1168,9 @@ export class AdminOpsService {
 
       const etaMinutes =
         row.scheduledAt && row.scheduledAt.getTime() > now.getTime()
-          ? Math.round((row.scheduledAt.getTime() - now.getTime()) / (1000 * 60))
+          ? Math.round(
+              (row.scheduledAt.getTime() - now.getTime()) / (1000 * 60),
+            )
           : undefined;
 
       activeFleet.push({
@@ -1140,7 +1187,11 @@ export class AdminOpsService {
   }
 
   private buildOrderStatusMetrics(
-    shipments: Array<{ status: string; scheduledAt: Date | null; updatedAt: Date }>,
+    shipments: Array<{
+      status: string;
+      scheduledAt: Date | null;
+      updatedAt: Date;
+    }>,
     now: Date,
     delayGraceMinutes: number,
   ): AdminDashboard['orderStatus'] {
@@ -1203,7 +1254,12 @@ export class AdminOpsService {
     delayGraceMinutes: number,
   ): AdminFleetStatus {
     if (
-      this.isDelayedShipment(shipmentStatus, scheduledAt, now, delayGraceMinutes)
+      this.isDelayedShipment(
+        shipmentStatus,
+        scheduledAt,
+        now,
+        delayGraceMinutes,
+      )
     ) {
       return AdminFleetStatus.DELAYED;
     }
@@ -1238,10 +1294,7 @@ export class AdminOpsService {
     return now.getTime() > dueAt;
   }
 
-  private truncateToBucket(
-    date: Date,
-    interval: AdminDashboardInterval,
-  ): Date {
+  private truncateToBucket(date: Date, interval: AdminDashboardInterval): Date {
     const truncated = new Date(date);
     if (interval === AdminDashboardInterval.DAILY) {
       truncated.setHours(0, 0, 0, 0);
@@ -1252,10 +1305,7 @@ export class AdminOpsService {
     return truncated;
   }
 
-  private incrementBucket(
-    date: Date,
-    interval: AdminDashboardInterval,
-  ): Date {
+  private incrementBucket(date: Date, interval: AdminDashboardInterval): Date {
     const next = new Date(date);
     if (interval === AdminDashboardInterval.DAILY) {
       next.setDate(next.getDate() + 1);
@@ -1358,7 +1408,10 @@ export class AdminOpsService {
   }
 
   private async querySingleCount(query: Prisma.Sql): Promise<number> {
-    const rows = await this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(query);
+    const rows =
+      await this.prisma.$queryRaw<Array<{ count: bigint | number | string }>>(
+        query,
+      );
     if (!rows[0]) {
       return 0;
     }

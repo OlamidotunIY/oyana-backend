@@ -20,7 +20,10 @@ const parseNumber = (
   return Math.floor(parsed);
 };
 
-const parseBoolean = (rawValue: string | undefined, fallback = false): boolean => {
+const parseBoolean = (
+  rawValue: string | undefined,
+  fallback = false,
+): boolean => {
   if (!rawValue) {
     return fallback;
   }

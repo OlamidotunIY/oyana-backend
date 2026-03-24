@@ -43,18 +43,14 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    const profile = await this.prisma.runWithRetry(
-      'RolesGuard.canActivate.profile',
-      () =>
-        this.prisma.profile.findUnique({
-          where: {
-            id: request.user!.id,
-          },
-          select: {
-            roles: true,
-          },
-        }),
-    );
+    const profile = await this.prisma.profile.findUnique({
+      where: {
+        id: request.user!.id,
+      },
+      select: {
+        roles: true,
+      },
+    });
 
     if (!profile) {
       throw new UnauthorizedException('Profile not found');

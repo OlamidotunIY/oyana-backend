@@ -46,10 +46,9 @@ export class MarketPlaceService {
       return { items: [] };
     }
 
-    const vehicleCategories =
-      filter?.vehicleCategories?.length
-        ? filter.vehicleCategories
-        : await this.getProviderVehicleCategories(providerId);
+    const vehicleCategories = filter?.vehicleCategories?.length
+      ? filter.vehicleCategories
+      : await this.getProviderVehicleCategories(providerId);
 
     if (!vehicleCategories.length) {
       return { items: [] };
@@ -134,42 +133,38 @@ export class MarketPlaceService {
       ...(andFilters.length ? { AND: andFilters } : {}),
     };
 
-    const shipments = await this.prisma.runWithRetry(
-      'MarketPlaceService.marketplaceShipments',
-      () =>
-        this.prisma.shipment.findMany({
-          where,
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-          take,
-          skip: filter?.cursor ? 1 : 0,
-          cursor: filter?.cursor ? { id: filter.cursor } : undefined,
-          include: {
-            pickupAddress: {
-              select: {
-                address: true,
-                city: true,
-                lat: true,
-                lng: true,
-              },
-            },
-            dropoffAddress: {
-              select: {
-                address: true,
-                city: true,
-                lat: true,
-                lng: true,
-              },
-            },
-            items: cargoQuery
-              ? {
-                  select: {
-                    name: true,
-                  },
-                }
-              : undefined,
+    const shipments = await this.prisma.shipment.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take,
+      skip: filter?.cursor ? 1 : 0,
+      cursor: filter?.cursor ? { id: filter.cursor } : undefined,
+      include: {
+        pickupAddress: {
+          select: {
+            address: true,
+            city: true,
+            lat: true,
+            lng: true,
           },
-        }),
-    );
+        },
+        dropoffAddress: {
+          select: {
+            address: true,
+            city: true,
+            lat: true,
+            lng: true,
+          },
+        },
+        items: cargoQuery
+          ? {
+              select: {
+                name: true,
+              },
+            }
+          : undefined,
+      },
+    });
 
     const distanceFiltered = distanceKmMax
       ? shipments.filter((shipment) => {
@@ -208,26 +203,24 @@ export class MarketPlaceService {
       return [];
     }
 
-    const bids = await this.prisma.runWithRetry(
-      'MarketPlaceService.shipmentBids',
-      () =>
-        this.prisma.shipmentBid.findMany({
-          where: {
-            shipmentId,
-            providerId,
-          },
-          include: {
-            award: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-    );
+    const bids = await this.prisma.shipmentBid.findMany({
+      where: {
+        shipmentId,
+        providerId,
+      },
+      include: {
+        award: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
     return bids.map((bid) =>
       this.toGraphqlShipmentBid(bid, {
-        award: bid.award ? this.toGraphqlShipmentBidAward(bid.award) : undefined,
+        award: bid.award
+          ? this.toGraphqlShipmentBidAward(bid.award)
+          : undefined,
       }),
     );
   }
@@ -239,44 +232,40 @@ export class MarketPlaceService {
       return [];
     }
 
-    const bids = await this.prisma.runWithRetry(
-      'MarketPlaceService.myBids',
-      () =>
-        this.prisma.shipmentBid.findMany({
-          where: {
-            providerId,
-            shipment: {
-              mode: ShipmentMode.MARKETPLACE,
-            },
-          },
+    const bids = await this.prisma.shipmentBid.findMany({
+      where: {
+        providerId,
+        shipment: {
+          mode: ShipmentMode.MARKETPLACE,
+        },
+      },
+      include: {
+        shipment: {
           include: {
-            shipment: {
-              include: {
-                pickupAddress: {
-                  select: {
-                    address: true,
-                    city: true,
-                    lat: true,
-                    lng: true,
-                  },
-                },
-                dropoffAddress: {
-                  select: {
-                    address: true,
-                    city: true,
-                    lat: true,
-                    lng: true,
-                  },
-                },
+            pickupAddress: {
+              select: {
+                address: true,
+                city: true,
+                lat: true,
+                lng: true,
               },
             },
-            award: true,
+            dropoffAddress: {
+              select: {
+                address: true,
+                city: true,
+                lat: true,
+                lng: true,
+              },
+            },
           },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-    );
+        },
+        award: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
     return bids.map((bid) =>
       this.toGraphqlShipmentBid(bid, {
@@ -290,7 +279,9 @@ export class MarketPlaceService {
               ),
             })
           : undefined,
-        award: bid.award ? this.toGraphqlShipmentBidAward(bid.award) : undefined,
+        award: bid.award
+          ? this.toGraphqlShipmentBidAward(bid.award)
+          : undefined,
       }),
     );
   }
@@ -305,30 +296,26 @@ export class MarketPlaceService {
       ...(role === UserType.ADMIN ? {} : { customerProfileId: profileId }),
     };
 
-    const shipments = await this.prisma.runWithRetry(
-      'MarketPlaceService.myFreightRequests',
-      () =>
-        this.prisma.shipment.findMany({
-          where,
-          include: {
-            pickupAddress: {
-              select: {
-                address: true,
-                city: true,
-              },
-            },
-            dropoffAddress: {
-              select: {
-                address: true,
-                city: true,
-              },
-            },
+    const shipments = await this.prisma.shipment.findMany({
+      where,
+      include: {
+        pickupAddress: {
+          select: {
+            address: true,
+            city: true,
           },
-          orderBy: {
-            createdAt: 'desc',
+        },
+        dropoffAddress: {
+          select: {
+            address: true,
+            city: true,
           },
-        }),
-    );
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
     return shipments.map((shipment) =>
       this.toGraphqlShipment(shipment, {
@@ -346,20 +333,16 @@ export class MarketPlaceService {
       UserType.ADMIN,
       UserType.INDIVIDUAL,
     ]);
-    const shipment = await this.prisma.runWithRetry(
-      'MarketPlaceService.freightRequestBids.shipment',
-      () =>
-        this.prisma.shipment.findUnique({
-          where: {
-            id: shipmentId,
-          },
-          select: {
-            id: true,
-            customerProfileId: true,
-            mode: true,
-          },
-        }),
-    );
+    const shipment = await this.prisma.shipment.findUnique({
+      where: {
+        id: shipmentId,
+      },
+      select: {
+        id: true,
+        customerProfileId: true,
+        mode: true,
+      },
+    });
 
     if (!shipment) {
       throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
@@ -373,37 +356,33 @@ export class MarketPlaceService {
       throw new ForbiddenException('Only owner can view bids on this request');
     }
 
-    const bids = await this.prisma.runWithRetry(
-      'MarketPlaceService.freightRequestBids.bids',
-      () =>
-        this.prisma.shipmentBid.findMany({
-          where: {
-            shipmentId,
-          },
+    const bids = await this.prisma.shipmentBid.findMany({
+      where: {
+        shipmentId,
+      },
+      include: {
+        award: true,
+        shipment: {
           include: {
-            award: true,
-            shipment: {
-              include: {
-                pickupAddress: {
-                  select: {
-                    address: true,
-                    city: true,
-                  },
-                },
-                dropoffAddress: {
-                  select: {
-                    address: true,
-                    city: true,
-                  },
-                },
+            pickupAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+            dropoffAddress: {
+              select: {
+                address: true,
+                city: true,
               },
             },
           },
-          orderBy: {
-            amountMinor: 'asc',
-          },
-        }),
-    );
+        },
+      },
+      orderBy: {
+        amountMinor: 'asc',
+      },
+    });
 
     return bids.map((bid) =>
       this.toGraphqlShipmentBid(bid, {
@@ -417,7 +396,9 @@ export class MarketPlaceService {
               ),
             })
           : undefined,
-        award: bid.award ? this.toGraphqlShipmentBidAward(bid.award) : undefined,
+        award: bid.award
+          ? this.toGraphqlShipmentBidAward(bid.award)
+          : undefined,
       }),
     );
   }
@@ -432,20 +413,16 @@ export class MarketPlaceService {
       throw new ForbiddenException('No provider account found for this user');
     }
 
-    const shipment = await this.prisma.runWithRetry(
-      'MarketPlaceService.createShipmentBid.shipment',
-      () =>
-        this.prisma.shipment.findUnique({
-          where: { id: input.shipmentId },
-          select: {
-            id: true,
-            mode: true,
-            status: true,
-            vehicleCategory: true,
-            pricingCurrency: true,
-          },
-        }),
-    );
+    const shipment = await this.prisma.shipment.findUnique({
+      where: { id: input.shipmentId },
+      select: {
+        id: true,
+        mode: true,
+        status: true,
+        vehicleCategory: true,
+        pricingCurrency: true,
+      },
+    });
 
     if (!shipment) {
       throw new NotFoundException(
@@ -471,18 +448,14 @@ export class MarketPlaceService {
       shipment.vehicleCategory,
     );
 
-    const existingBid = await this.prisma.runWithRetry(
-      'MarketPlaceService.createShipmentBid.existingBid',
-      () =>
-        this.prisma.shipmentBid.findUnique({
-          where: {
-            shipmentId_providerId: {
-              shipmentId: input.shipmentId,
-              providerId,
-            },
-          },
-        }),
-    );
+    const existingBid = await this.prisma.shipmentBid.findUnique({
+      where: {
+        shipmentId_providerId: {
+          shipmentId: input.shipmentId,
+          providerId,
+        },
+      },
+    });
 
     const currency = input.currency ?? shipment.pricingCurrency ?? 'NGN';
 
@@ -495,37 +468,29 @@ export class MarketPlaceService {
         throw new BadRequestException('Your bid has already been accepted.');
       }
 
-      const updatedBid = await this.prisma.runWithRetry(
-        'MarketPlaceService.createShipmentBid.reactivateBid',
-        () =>
-          this.prisma.shipmentBid.update({
-            where: { id: existingBid.id },
-            data: {
-              amountMinor: input.amountMinor,
-              currency,
-              message: input.message,
-              status: BidStatus.ACTIVE,
-            },
-          }),
-      );
+      const updatedBid = await this.prisma.shipmentBid.update({
+        where: { id: existingBid.id },
+        data: {
+          amountMinor: input.amountMinor,
+          currency,
+          message: input.message,
+          status: BidStatus.ACTIVE,
+        },
+      });
 
       return this.toGraphqlShipmentBid(updatedBid);
     }
 
-    const bid = await this.prisma.runWithRetry(
-      'MarketPlaceService.createShipmentBid.create',
-      () =>
-        this.prisma.shipmentBid.create({
-          data: {
-            shipmentId: input.shipmentId,
-            providerId,
-            amountMinor: input.amountMinor,
-            currency,
-            message: input.message,
-            status: BidStatus.ACTIVE,
-          },
-        }),
-    );
+    const bid = await this.prisma.shipmentBid.create({
+      data: {
+        shipmentId: input.shipmentId,
+        providerId,
+        amountMinor: input.amountMinor,
+        currency,
+        message: input.message,
+        status: BidStatus.ACTIVE,
+      },
+    });
 
     return this.toGraphqlShipmentBid(bid);
   }
@@ -541,16 +506,12 @@ export class MarketPlaceService {
       throw new ForbiddenException('No provider account found for this user');
     }
 
-    const bid = await this.prisma.runWithRetry(
-      'MarketPlaceService.updateShipmentBid.findBid',
-      () =>
-        this.prisma.shipmentBid.findFirst({
-          where: {
-            id,
-            providerId,
-          },
-        }),
-    );
+    const bid = await this.prisma.shipmentBid.findFirst({
+      where: {
+        id,
+        providerId,
+      },
+    });
 
     if (!bid) {
       throw new NotFoundException('Bid not found for this provider');
@@ -568,19 +529,15 @@ export class MarketPlaceService {
       );
     }
 
-    const updatedBid = await this.prisma.runWithRetry(
-      'MarketPlaceService.updateShipmentBid.update',
-      () =>
-        this.prisma.shipmentBid.update({
-          where: { id },
-          data: {
-            amountMinor: input.amountMinor ?? undefined,
-            currency: input.currency ?? undefined,
-            message: input.message ?? undefined,
-            status: input.status ?? undefined,
-          },
-        }),
-    );
+    const updatedBid = await this.prisma.shipmentBid.update({
+      where: { id },
+      data: {
+        amountMinor: input.amountMinor ?? undefined,
+        currency: input.currency ?? undefined,
+        message: input.message ?? undefined,
+        status: input.status ?? undefined,
+      },
+    });
 
     return this.toGraphqlShipmentBid(updatedBid);
   }
@@ -592,16 +549,12 @@ export class MarketPlaceService {
       throw new ForbiddenException('No provider account found for this user');
     }
 
-    const bid = await this.prisma.runWithRetry(
-      'MarketPlaceService.withdrawBid.findBid',
-      () =>
-        this.prisma.shipmentBid.findFirst({
-          where: {
-            id,
-            providerId,
-          },
-        }),
-    );
+    const bid = await this.prisma.shipmentBid.findFirst({
+      where: {
+        id,
+        providerId,
+      },
+    });
 
     if (!bid) {
       throw new NotFoundException('Bid not found for this provider');
@@ -613,16 +566,12 @@ export class MarketPlaceService {
       );
     }
 
-    const updatedBid = await this.prisma.runWithRetry(
-      'MarketPlaceService.withdrawBid.update',
-      () =>
-        this.prisma.shipmentBid.update({
-          where: { id },
-          data: {
-            status: BidStatus.WITHDRAWN,
-          },
-        }),
-    );
+    const updatedBid = await this.prisma.shipmentBid.update({
+      where: { id },
+      data: {
+        status: BidStatus.WITHDRAWN,
+      },
+    });
 
     return this.toGraphqlShipmentBid(updatedBid);
   }
@@ -637,123 +586,113 @@ export class MarketPlaceService {
       UserType.INDIVIDUAL,
     ]);
 
-    const award = await this.prisma.runWithRetry(
-      'MarketPlaceService.awardShipmentBid.transaction',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const shipment = await tx.shipment.findUnique({
-            where: { id: input.shipmentId },
-            select: {
-              id: true,
-              customerProfileId: true,
-              mode: true,
-              status: true,
-            },
-          });
+    const award = await this.prisma.$transaction(async (tx) => {
+      const shipment = await tx.shipment.findUnique({
+        where: { id: input.shipmentId },
+        select: {
+          id: true,
+          customerProfileId: true,
+          mode: true,
+          status: true,
+        },
+      });
 
-          if (!shipment) {
-            throw new NotFoundException(
-              `Shipment with id ${input.shipmentId} not found`,
-            );
-          }
+      if (!shipment) {
+        throw new NotFoundException(
+          `Shipment with id ${input.shipmentId} not found`,
+        );
+      }
 
-          if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
-            throw new ForbiddenException(
-              'Only the shipment owner can award bids',
-            );
-          }
+      if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
+        throw new ForbiddenException('Only the shipment owner can award bids');
+      }
 
-          if (shipment.mode !== ShipmentMode.MARKETPLACE) {
-            throw new BadRequestException(
-              'Shipment is not a marketplace request',
-            );
-          }
+      if (shipment.mode !== ShipmentMode.MARKETPLACE) {
+        throw new BadRequestException('Shipment is not a marketplace request');
+      }
 
-          const bid = await tx.shipmentBid.findFirst({
-            where: {
-              id: input.bidId,
-              shipmentId: input.shipmentId,
-            },
-          });
+      const bid = await tx.shipmentBid.findFirst({
+        where: {
+          id: input.bidId,
+          shipmentId: input.shipmentId,
+        },
+      });
 
-          if (!bid) {
-            throw new NotFoundException('Bid not found for this shipment');
-          }
+      if (!bid) {
+        throw new NotFoundException('Bid not found for this shipment');
+      }
 
-          if (bid.status !== BidStatus.ACTIVE) {
-            throw new BadRequestException(
-              `Bid is already in ${bid.status} status`,
-            );
-          }
+      if (bid.status !== BidStatus.ACTIVE) {
+        throw new BadRequestException(`Bid is already in ${bid.status} status`);
+      }
 
-          const existingAward = await tx.shipmentBidAward.findUnique({
-            where: {
-              shipmentId: input.shipmentId,
-            },
-          });
+      const existingAward = await tx.shipmentBidAward.findUnique({
+        where: {
+          shipmentId: input.shipmentId,
+        },
+      });
 
-          if (existingAward) {
-            throw new BadRequestException(
-              'This shipment already has an awarded bid',
-            );
-          }
+      if (existingAward) {
+        throw new BadRequestException(
+          'This shipment already has an awarded bid',
+        );
+      }
 
-          const createdAward = await tx.shipmentBidAward.create({
-            data: {
-              shipmentId: input.shipmentId,
-              bidId: input.bidId,
-              awardedByProfileId: profileId,
-              awardedAt: now,
-              notes: input.notes,
-            },
-          });
+      const createdAward = await tx.shipmentBidAward.create({
+        data: {
+          shipmentId: input.shipmentId,
+          bidId: input.bidId,
+          awardedByProfileId: profileId,
+          awardedAt: now,
+          notes: input.notes,
+        },
+      });
 
-          await tx.shipmentBid.update({
-            where: { id: bid.id },
-            data: {
-              status: BidStatus.ACCEPTED,
-            },
-          });
+      await tx.shipmentBid.update({
+        where: { id: bid.id },
+        data: {
+          status: BidStatus.ACCEPTED,
+        },
+      });
 
-          await tx.shipmentBid.updateMany({
-            where: {
-              shipmentId: input.shipmentId,
-              id: { not: bid.id },
-              status: BidStatus.ACTIVE,
-            },
-            data: {
-              status: BidStatus.REJECTED,
-            },
-          });
+      await tx.shipmentBid.updateMany({
+        where: {
+          shipmentId: input.shipmentId,
+          id: { not: bid.id },
+          status: BidStatus.ACTIVE,
+        },
+        data: {
+          status: BidStatus.REJECTED,
+        },
+      });
 
-          const existingAssignment = await tx.shipmentAssignment.findUnique({
-            where: {
-              shipmentId: input.shipmentId,
-            },
-          });
+      const existingAssignment = await tx.shipmentAssignment.findUnique({
+        where: {
+          shipmentId: input.shipmentId,
+        },
+      });
 
-          if (!existingAssignment) {
-            await tx.shipmentAssignment.create({
-              data: {
-                shipmentId: input.shipmentId,
-                providerId: bid.providerId,
-                status: ShipmentAssignmentStatus.ACTIVE,
-                agreedPriceMinor: bid.amountMinor,
-                currency: bid.currency,
-              },
-            });
-          }
+      if (!existingAssignment) {
+        await tx.shipmentAssignment.create({
+          data: {
+            shipmentId: input.shipmentId,
+            providerId: bid.providerId,
+            status: ShipmentAssignmentStatus.ACTIVE,
+            agreedPriceMinor: bid.amountMinor,
+            currency: bid.currency,
+          },
+        });
+      }
 
-          await tx.shipment.update({
-            where: { id: input.shipmentId },
-            data: {
-              status: ShipmentStatus.ASSIGNED,
-            },
-          });
+      await tx.shipment.update({
+        where: { id: input.shipmentId },
+        data: {
+          status: ShipmentStatus.ASSIGNED,
+        },
+      });
 
-          return createdAward;
-        }),
-    );
+      return createdAward;
+    });
 
     return this.toGraphqlShipmentBidAward(award);
   }
@@ -761,39 +700,31 @@ export class MarketPlaceService {
   private async resolveProviderIdForProfile(
     profileId: string,
   ): Promise<string | null> {
-    const provider = await this.prisma.runWithRetry(
-      'MarketPlaceService.resolveProviderIdForProfile.provider',
-      () =>
-        this.prisma.provider.findFirst({
-          where: {
-            profileId,
-          },
-          select: {
-            id: true,
-          },
-        }),
-    );
+    const provider = await this.prisma.provider.findFirst({
+      where: {
+        profileId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (provider?.id) {
       return provider.id;
     }
 
-    const providerMember = await this.prisma.runWithRetry(
-      'MarketPlaceService.resolveProviderIdForProfile.providerMember',
-      () =>
-        this.prisma.providerMember.findFirst({
-          where: {
-            profileId,
-            status: 'active',
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          select: {
-            providerId: true,
-          },
-        }),
-    );
+    const providerMember = await this.prisma.providerMember.findFirst({
+      where: {
+        profileId,
+        status: 'active',
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      select: {
+        providerId: true,
+      },
+    });
 
     return providerMember?.providerId ?? null;
   }
@@ -806,18 +737,14 @@ export class MarketPlaceService {
       UserType.INDIVIDUAL,
     ],
   ): Promise<UserType> {
-    const profile = await this.prisma.runWithRetry(
-      'MarketPlaceService.requireUserRole.profile',
-      () =>
-        this.prisma.profile.findUnique({
-          where: {
-            id: profileId,
-          },
-          select: {
-            roles: true,
-          },
-        }),
-    );
+    const profile = await this.prisma.profile.findUnique({
+      where: {
+        id: profileId,
+      },
+      select: {
+        roles: true,
+      },
+    });
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
@@ -829,19 +756,15 @@ export class MarketPlaceService {
   private async getProviderVehicleCategories(
     providerId: string,
   ): Promise<VehicleCategory[]> {
-    const vehicles = await this.prisma.runWithRetry(
-      'MarketPlaceService.getProviderVehicleCategories',
-      () =>
-        this.prisma.vehicle.findMany({
-          where: {
-            providerId,
-            status: 'active',
-          },
-          select: {
-            category: true,
-          },
-        }),
-    );
+    const vehicles = await this.prisma.vehicle.findMany({
+      where: {
+        providerId,
+        status: 'active',
+      },
+      select: {
+        category: true,
+      },
+    });
 
     const categories = new Set<VehicleCategory>();
     vehicles.forEach((vehicle) => {
@@ -855,20 +778,16 @@ export class MarketPlaceService {
     providerId: string,
     category: VehicleCategory,
   ): Promise<void> {
-    const vehicle = await this.prisma.runWithRetry(
-      'MarketPlaceService.requireProviderVehicleCategory',
-      () =>
-        this.prisma.vehicle.findFirst({
-          where: {
-            providerId,
-            category,
-            status: 'active',
-          },
-          select: {
-            id: true,
-          },
-        }),
-    );
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: {
+        providerId,
+        category,
+        status: 'active',
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!vehicle) {
       throw new ForbiddenException(
@@ -920,10 +839,12 @@ export class MarketPlaceService {
     };
   }
 
-  private toAddressSummary(address: {
-    address?: string | null;
-    city?: string | null;
-  } | null): string | undefined {
+  private toAddressSummary(
+    address: {
+      address?: string | null;
+      city?: string | null;
+    } | null,
+  ): string | undefined {
     if (!address) {
       return undefined;
     }
@@ -944,12 +865,7 @@ export class MarketPlaceService {
     lat2: number | null,
     lon2: number | null,
   ): number | null {
-    if (
-      lat1 === null ||
-      lon1 === null ||
-      lat2 === null ||
-      lon2 === null
-    ) {
+    if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) {
       return null;
     }
 

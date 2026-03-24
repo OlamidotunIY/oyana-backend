@@ -45,7 +45,9 @@ export class AdminOpsResolver {
   }
 
   @Query(() => AdminOverview)
-  async adminOverview(@CurrentUser() user: SupabaseUser): Promise<AdminOverview> {
+  async adminOverview(
+    @CurrentUser() user: SupabaseUser,
+  ): Promise<AdminOverview> {
     return this.adminOpsService.adminOverview(user.id);
   }
 
@@ -94,7 +96,9 @@ export class AdminOpsResolver {
   }
 
   @Query(() => [DisputeCase])
-  async adminDisputes(@CurrentUser() user: SupabaseUser): Promise<DisputeCase[]> {
+  async adminDisputes(
+    @CurrentUser() user: SupabaseUser,
+  ): Promise<DisputeCase[]> {
     return this.adminOpsService.adminDisputes(user.id);
   }
 
@@ -118,7 +122,9 @@ export class AdminOpsResolver {
   }
 
   @Query(() => [PlatformConfig])
-  async adminConfig(@CurrentUser() user: SupabaseUser): Promise<PlatformConfig[]> {
+  async adminConfig(
+    @CurrentUser() user: SupabaseUser,
+  ): Promise<PlatformConfig[]> {
     return this.adminOpsService.adminConfig(user.id);
   }
 

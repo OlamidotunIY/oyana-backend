@@ -1,16 +1,6 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
-import {
-  AdminDashboardInterval,
-  ShipmentMode,
-} from '../../enums';
-import {
-  IsEnum,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
+import { AdminDashboardInterval, ShipmentMode } from '../../enums';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 @InputType()
 export class AdminDashboardFilterDto {

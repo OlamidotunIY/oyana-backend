@@ -70,18 +70,14 @@ export class WalletService {
   ): Promise<Transaction[]> {
     await this.assertWalletOwnership(ownerProfileId, walletAccountId);
 
-    const transactions = await this.prisma.runWithRetry(
-      'WalletService.getWalletTransactions',
-      () =>
-        this.prisma.walletTransaction.findMany({
-          where: {
-            walletAccountId,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-    );
+    const transactions = await this.prisma.walletTransaction.findMany({
+      where: {
+        walletAccountId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
     return transactions.map((transaction) =>
       this.toGraphqlTransaction(transaction),
@@ -98,22 +94,18 @@ export class WalletService {
       MAX_TRANSACTIONS_PAGE_SIZE,
     );
 
-    const transactions = await this.prisma.runWithRetry(
-      'WalletService.getMyWalletTransactions',
-      () =>
-        this.prisma.walletTransaction.findMany({
-          where: {
-            walletAccountId: wallet.id,
-            direction: input?.direction,
-            status: input?.status,
-            type: input?.transactionType,
-          },
-          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-          take: take + 1,
-          skip: input?.cursor ? 1 : 0,
-          cursor: input?.cursor ? { id: input.cursor } : undefined,
-        }),
-    );
+    const transactions = await this.prisma.walletTransaction.findMany({
+      where: {
+        walletAccountId: wallet.id,
+        direction: input?.direction,
+        status: input?.status,
+        type: input?.transactionType,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      skip: input?.cursor ? 1 : 0,
+      cursor: input?.cursor ? { id: input.cursor } : undefined,
+    });
 
     const hasMore = transactions.length > take;
     const pageItems = hasMore ? transactions.slice(0, take) : transactions;
@@ -128,16 +120,12 @@ export class WalletService {
   }
 
   async getWalletCompliance(ownerProfileId: string): Promise<WalletCompliance> {
-    const profile = await this.prisma.runWithRetry(
-      'WalletService.getWalletCompliance.profile',
-      () =>
-        this.prisma.profile.findUnique({
-          where: { id: ownerProfileId },
-          select: {
-            phoneVerified: true,
-          },
-        }),
-    );
+    const profile = await this.prisma.profile.findUnique({
+      where: { id: ownerProfileId },
+      select: {
+        phoneVerified: true,
+      },
+    });
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
@@ -146,7 +134,9 @@ export class WalletService {
     const blockReasons: string[] = [];
 
     if (!profile.phoneVerified) {
-      blockReasons.push('Phone verification is required before wallet funding or withdrawal');
+      blockReasons.push(
+        'Phone verification is required before wallet funding or withdrawal',
+      );
     }
 
     return {
@@ -157,20 +147,18 @@ export class WalletService {
     };
   }
 
-  async getSavedFundingCards(ownerProfileId: string): Promise<WalletCardMethod[]> {
+  async getSavedFundingCards(
+    ownerProfileId: string,
+  ): Promise<WalletCardMethod[]> {
     const wallet = await this.getOrCreateWalletAccount(ownerProfileId);
 
-    const cards = await this.prisma.runWithRetry(
-      'WalletService.getSavedFundingCards',
-      () =>
-        this.prisma.walletCardMethod.findMany({
-          where: {
-            profileId: ownerProfileId,
-            walletAccountId: wallet.id,
-          },
-          orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
-        }),
-    );
+    const cards = await this.prisma.walletCardMethod.findMany({
+      where: {
+        profileId: ownerProfileId,
+        walletAccountId: wallet.id,
+      },
+      orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
+    });
 
     return cards.map((card) => this.toGraphqlWalletCardMethod(card));
   }
@@ -180,17 +168,13 @@ export class WalletService {
   ): Promise<WalletSavedBankAccount[]> {
     const wallet = await this.getOrCreateWalletAccount(ownerProfileId);
 
-    const bankAccounts = await this.prisma.runWithRetry(
-      'WalletService.getSavedWithdrawalAccounts',
-      () =>
-        this.prisma.walletSavedBankAccount.findMany({
-          where: {
-            profileId: ownerProfileId,
-            walletAccountId: wallet.id,
-          },
-          orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
-        }),
-    );
+    const bankAccounts = await this.prisma.walletSavedBankAccount.findMany({
+      where: {
+        profileId: ownerProfileId,
+        walletAccountId: wallet.id,
+      },
+      orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
+    });
 
     return bankAccounts.map((bankAccount) =>
       this.toGraphqlWalletSavedBankAccount(bankAccount),
@@ -231,24 +215,21 @@ export class WalletService {
       IDEMPOTENCY_OPERATION_CREATE_FUNDING,
       input.idempotencyKey,
       payload,
-      (responsePayload) => this.replayWalletFundingResponse(ownerProfileId, responsePayload),
+      (responsePayload) =>
+        this.replayWalletFundingResponse(ownerProfileId, responsePayload),
       async () => {
         const wallet = await this.getOrCreateWalletAccount(ownerProfileId);
         const profile = await this.requireProfile(ownerProfileId);
         const reference = this.generateReference('WLF');
 
         if (input.savedCardMethodId) {
-          const savedCard = await this.prisma.runWithRetry(
-            'WalletService.createWalletFunding.savedCard',
-            () =>
-              this.prisma.walletCardMethod.findFirst({
-                where: {
-                  id: input.savedCardMethodId,
-                  profileId: ownerProfileId,
-                  walletAccountId: wallet.id,
-                },
-              }),
-          );
+          const savedCard = await this.prisma.walletCardMethod.findFirst({
+            where: {
+              id: input.savedCardMethodId,
+              profileId: ownerProfileId,
+              walletAccountId: wallet.id,
+            },
+          });
 
           if (!savedCard) {
             throw new NotFoundException('Saved funding card not found');
@@ -270,21 +251,17 @@ export class WalletService {
             chargeResult.status,
           );
 
-          const paymentIntent = await this.prisma.runWithRetry(
-            'WalletService.createWalletFunding.createPaymentIntentFromSavedCard',
-            () =>
-              this.prisma.paymentIntent.create({
-                data: {
-                  walletAccountId: wallet.id,
-                  provider: 'paystack',
-                  amountMinor,
-                  currency,
-                  status: paystackStatus,
-                  paystackReference: reference,
-                  rawInitResponse: chargeResult as unknown as Prisma.InputJsonValue,
-                },
-              }),
-          );
+          const paymentIntent = await this.prisma.paymentIntent.create({
+            data: {
+              walletAccountId: wallet.id,
+              provider: 'paystack',
+              amountMinor,
+              currency,
+              status: paystackStatus,
+              paystackReference: reference,
+              rawInitResponse: chargeResult as unknown as Prisma.InputJsonValue,
+            },
+          });
 
           let result: WalletFundingResult;
 
@@ -315,36 +292,34 @@ export class WalletService {
           };
         }
 
-        const initializeResult = await this.paystackService.initializeTransaction({
-          email: profile.email,
-          amountMinor,
-          reference,
-          currency,
-          callbackUrl:
-            input.callbackUrl ??
-            this.getOptionalStringEnv('PAYSTACK_WALLET_CALLBACK_URL'),
-          metadata: {
-            ...(input.metadata ?? {}),
+        const initializeResult =
+          await this.paystackService.initializeTransaction({
+            email: profile.email,
+            amountMinor,
+            reference,
+            currency,
+            callbackUrl:
+              input.callbackUrl ??
+              this.getOptionalStringEnv('PAYSTACK_WALLET_CALLBACK_URL'),
+            metadata: {
+              ...(input.metadata ?? {}),
+              walletAccountId: wallet.id,
+            },
+          });
+
+        const paymentIntent = await this.prisma.paymentIntent.create({
+          data: {
             walletAccountId: wallet.id,
+            provider: 'paystack',
+            amountMinor,
+            currency,
+            status: PaymentIntentStatus.INITIALIZED,
+            paystackReference: reference,
+            authorizationUrl: initializeResult.authorization_url,
+            rawInitResponse:
+              initializeResult as unknown as Prisma.InputJsonValue,
           },
         });
-
-        const paymentIntent = await this.prisma.runWithRetry(
-          'WalletService.createWalletFunding.createPaymentIntentHosted',
-          () =>
-            this.prisma.paymentIntent.create({
-              data: {
-                walletAccountId: wallet.id,
-                provider: 'paystack',
-                amountMinor,
-                currency,
-                status: PaymentIntentStatus.INITIALIZED,
-                paystackReference: reference,
-                authorizationUrl: initializeResult.authorization_url,
-                rawInitResponse: initializeResult as unknown as Prisma.InputJsonValue,
-              },
-            }),
-        );
 
         return {
           result: {
@@ -353,7 +328,8 @@ export class WalletService {
             reference,
             authorizationUrl: initializeResult.authorization_url,
             paymentIntent: this.toGraphqlPaymentIntent(paymentIntent),
-            message: 'Funding initialized. Complete checkout to finish wallet funding.',
+            message:
+              'Funding initialized. Complete checkout to finish wallet funding.',
           },
           responsePayload: {
             reference,
@@ -369,18 +345,14 @@ export class WalletService {
   ): Promise<WalletFundingResult> {
     await this.assertPhoneVerified(ownerProfileId);
 
-    const paymentIntent = await this.prisma.runWithRetry(
-      'WalletService.confirmWalletFunding.paymentIntent',
-      () =>
-        this.prisma.paymentIntent.findFirst({
-          where: {
-            paystackReference: input.reference,
-            walletAccount: {
-              ownerProfileId,
-            },
-          },
-        }),
-    );
+    const paymentIntent = await this.prisma.paymentIntent.findFirst({
+      where: {
+        paystackReference: input.reference,
+        walletAccount: {
+          ownerProfileId,
+        },
+      },
+    });
 
     if (!paymentIntent) {
       throw new NotFoundException('Funding reference not found');
@@ -390,18 +362,14 @@ export class WalletService {
       paymentIntent.status === PaymentIntentStatus.SUCCEEDED &&
       paymentIntent.confirmedAt
     ) {
-      const walletTransaction = await this.prisma.runWithRetry(
-        'WalletService.confirmWalletFunding.transaction',
-        () =>
-          this.prisma.walletTransaction.findFirst({
-            where: {
-              relatedPaymentIntentId: paymentIntent.id,
-              direction: TransactionDirection.CREDIT,
-              type: TransactionType.TOPUP,
-              status: TransactionStatus.COMPLETED,
-            },
-          }),
-      );
+      const walletTransaction = await this.prisma.walletTransaction.findFirst({
+        where: {
+          relatedPaymentIntentId: paymentIntent.id,
+          direction: TransactionDirection.CREDIT,
+          type: TransactionType.TOPUP,
+          status: TransactionStatus.COMPLETED,
+        },
+      });
 
       return {
         success: true,
@@ -423,20 +391,15 @@ export class WalletService {
     );
 
     if (verifyStatus !== PaymentIntentStatus.SUCCEEDED) {
-      const failedIntent = await this.prisma.runWithRetry(
-        'WalletService.confirmWalletFunding.markFailedIntent',
-        () =>
-          this.prisma.paymentIntent.update({
-            where: {
-              id: paymentIntent.id,
-            },
-            data: {
-              status: PaymentIntentStatus.FAILED,
-              rawWebhook:
-                verificationResult as unknown as Prisma.InputJsonValue,
-            },
-          }),
-      );
+      const failedIntent = await this.prisma.paymentIntent.update({
+        where: {
+          id: paymentIntent.id,
+        },
+        data: {
+          status: PaymentIntentStatus.FAILED,
+          rawWebhook: verificationResult as unknown as Prisma.InputJsonValue,
+        },
+      });
 
       return {
         success: false,
@@ -447,7 +410,11 @@ export class WalletService {
       };
     }
 
-    return this.finalizeFundingIntent(paymentIntent.id, verificationResult, 'confirm');
+    return this.finalizeFundingIntent(
+      paymentIntent.id,
+      verificationResult,
+      'confirm',
+    );
   }
 
   async createWalletWithdrawal(
@@ -460,10 +427,15 @@ export class WalletService {
     const currency = this.normalizeCurrency(input.currency);
 
     if (amountMinor <= BigInt(0)) {
-      throw new BadRequestException('Withdrawal amount must be greater than zero');
+      throw new BadRequestException(
+        'Withdrawal amount must be greater than zero',
+      );
     }
 
-    if (!input.savedBankAccountId && (!input.bankCode || !input.accountNumber)) {
+    if (
+      !input.savedBankAccountId &&
+      (!input.bankCode || !input.accountNumber)
+    ) {
       throw new BadRequestException(
         'Provide a saved bank account or both bankCode and accountNumber',
       );
@@ -491,19 +463,17 @@ export class WalletService {
         );
 
         if (!withdrawalId) {
-          throw new ConflictException('Withdrawal idempotency response is invalid');
+          throw new ConflictException(
+            'Withdrawal idempotency response is invalid',
+          );
         }
 
-        const withdrawal = await this.prisma.runWithRetry(
-          'WalletService.createWalletWithdrawal.replay',
-          () =>
-            this.prisma.walletWithdrawal.findFirst({
-              where: {
-                id: withdrawalId,
-                profileId: ownerProfileId,
-              },
-            }),
-        );
+        const withdrawal = await this.prisma.walletWithdrawal.findFirst({
+          where: {
+            id: withdrawalId,
+            profileId: ownerProfileId,
+          },
+        });
 
         if (!withdrawal) {
           throw new ConflictException(
@@ -530,83 +500,79 @@ export class WalletService {
 
         let createdWithdrawal: PrismaWalletWithdrawal;
 
-        await this.prisma.runWithRetry(
-          'WalletService.createWalletWithdrawal.createDebit',
-          () =>
-            this.prisma.$transaction(async (tx) => {
-              const walletForUpdate = await tx.walletAccount.findUnique({
-                where: {
-                  id: wallet.id,
-                },
-              });
+        await this.prisma.$transaction(async (tx) => {
+          const walletForUpdate = await tx.walletAccount.findUnique({
+            where: {
+              id: wallet.id,
+            },
+          });
 
-              if (!walletForUpdate) {
-                throw new NotFoundException('Wallet not found');
-              }
+          if (!walletForUpdate) {
+            throw new NotFoundException('Wallet not found');
+          }
 
-              if (walletForUpdate.balanceMinor < amountMinor) {
-                throw new BadRequestException('Insufficient wallet balance');
-              }
+          if (walletForUpdate.balanceMinor < amountMinor) {
+            throw new BadRequestException('Insufficient wallet balance');
+          }
 
-              const withdrawalReference = this.generateReference('WDR');
+          const withdrawalReference = this.generateReference('WDR');
 
-              createdWithdrawal = await tx.walletWithdrawal.create({
-                data: {
-                  walletAccountId: wallet.id,
-                  profileId: ownerProfileId,
-                  reference: withdrawalReference,
-                  amountMinor,
-                  currency,
-                  status: 'processing',
-                  bankCode: destination.bankCode,
-                  bankName: destination.bankName,
-                  accountName: destination.accountName,
-                  accountNumberMasked: destination.accountNumberMasked,
-                  recipientCode: destination.recipientCode,
-                  savedBankAccountId: destination.savedBankAccountId,
-                },
-              });
+          createdWithdrawal = await tx.walletWithdrawal.create({
+            data: {
+              walletAccountId: wallet.id,
+              profileId: ownerProfileId,
+              reference: withdrawalReference,
+              amountMinor,
+              currency,
+              status: 'processing',
+              bankCode: destination.bankCode,
+              bankName: destination.bankName,
+              accountName: destination.accountName,
+              accountNumberMasked: destination.accountNumberMasked,
+              recipientCode: destination.recipientCode,
+              savedBankAccountId: destination.savedBankAccountId,
+            },
+          });
 
-              await tx.walletTransaction.create({
-                data: {
-                  walletAccountId: wallet.id,
-                  direction: TransactionDirection.DEBIT,
-                  type: TransactionType.WITHDRAWAL,
-                  status: TransactionStatus.COMPLETED,
-                  amountMinor,
-                  currency,
-                  reference: this.getWithdrawalDebitReference(createdWithdrawal.id),
-                  metadata: {
-                    reason: input.reason ?? null,
-                    recipientCode: destination.recipientCode,
-                    withdrawalId: createdWithdrawal.id,
-                  } as Prisma.InputJsonValue,
-                },
-              });
+          await tx.walletTransaction.create({
+            data: {
+              walletAccountId: wallet.id,
+              direction: TransactionDirection.DEBIT,
+              type: TransactionType.WITHDRAWAL,
+              status: TransactionStatus.COMPLETED,
+              amountMinor,
+              currency,
+              reference: this.getWithdrawalDebitReference(createdWithdrawal.id),
+              metadata: {
+                reason: input.reason ?? null,
+                recipientCode: destination.recipientCode,
+                withdrawalId: createdWithdrawal.id,
+              } as Prisma.InputJsonValue,
+            },
+          });
 
-              await tx.walletAccount.update({
-                where: {
-                  id: wallet.id,
-                },
-                data: {
-                  balanceMinor: {
-                    decrement: amountMinor,
-                  },
-                },
-              });
+          await tx.walletAccount.update({
+            where: {
+              id: wallet.id,
+            },
+            data: {
+              balanceMinor: {
+                decrement: amountMinor,
+              },
+            },
+          });
 
-              if (destination.savedBankAccountId) {
-                await tx.walletSavedBankAccount.update({
-                  where: {
-                    id: destination.savedBankAccountId,
-                  },
-                  data: {
-                    lastUsedAt: new Date(),
-                  },
-                });
-              }
-            }),
-        );
+          if (destination.savedBankAccountId) {
+            await tx.walletSavedBankAccount.update({
+              where: {
+                id: destination.savedBankAccountId,
+              },
+              data: {
+                lastUsedAt: new Date(),
+              },
+            });
+          }
+        });
 
         const withdrawal = createdWithdrawal!;
 
@@ -636,7 +602,11 @@ export class WalletService {
 
           let savedBankAccountId = destination.savedBankAccountId;
 
-          if (!savedBankAccountId && input.saveAccount && destination.persistable) {
+          if (
+            !savedBankAccountId &&
+            input.saveAccount &&
+            destination.persistable
+          ) {
             const savedAccount = await this.persistSavedBankAccount({
               profileId: ownerProfileId,
               walletAccountId: wallet.id,
@@ -649,32 +619,26 @@ export class WalletService {
             savedBankAccountId = savedAccount.id;
           }
 
-          const updatedWithdrawal = await this.prisma.runWithRetry(
-            'WalletService.createWalletWithdrawal.updateAfterTransfer',
-            () =>
-              this.prisma.walletWithdrawal.update({
-                where: {
-                  id: withdrawal.id,
-                },
-                data: {
-                  status:
-                    normalizedTransferStatus === 'success'
-                      ? 'succeeded'
-                      : 'processing',
-                  completedAt:
-                    normalizedTransferStatus === 'success'
-                      ? new Date()
-                      : undefined,
-                  transferCode: transferResult.transfer_code,
-                  paystackTransferId: transferResult.id
-                    ? String(transferResult.id)
-                    : undefined,
-                  rawInitResponse:
-                    transferResult as unknown as Prisma.InputJsonValue,
-                  savedBankAccountId,
-                },
-              }),
-          );
+          const updatedWithdrawal = await this.prisma.walletWithdrawal.update({
+            where: {
+              id: withdrawal.id,
+            },
+            data: {
+              status:
+                normalizedTransferStatus === 'success'
+                  ? 'succeeded'
+                  : 'processing',
+              completedAt:
+                normalizedTransferStatus === 'success' ? new Date() : undefined,
+              transferCode: transferResult.transfer_code,
+              paystackTransferId: transferResult.id
+                ? String(transferResult.id)
+                : undefined,
+              rawInitResponse:
+                transferResult as unknown as Prisma.InputJsonValue,
+              savedBankAccountId,
+            },
+          });
 
           return {
             result: this.toGraphqlWalletWithdrawal(updatedWithdrawal),
@@ -685,7 +649,9 @@ export class WalletService {
         } catch (error) {
           await this.markWithdrawalFailedAndReverse(
             withdrawal.id,
-            error instanceof Error ? error.message : 'Withdrawal transfer failed',
+            error instanceof Error
+              ? error.message
+              : 'Withdrawal transfer failed',
           );
           throw error;
         }
@@ -753,7 +719,11 @@ export class WalletService {
         this.readString(eventData.failure_reason) ??
         `${event} webhook received`;
 
-      await this.markWithdrawalFailedByReference(reference, failureReason, eventData);
+      await this.markWithdrawalFailedByReference(
+        reference,
+        failureReason,
+        eventData,
+      );
       return;
     }
 
@@ -765,18 +735,14 @@ export class WalletService {
     rawPayload: Record<string, unknown>,
     source: 'webhook' | 'confirm',
   ): Promise<void> {
-    const paymentIntent = await this.prisma.runWithRetry(
-      'WalletService.finalizeFundingByReference.paymentIntent',
-      () =>
-        this.prisma.paymentIntent.findFirst({
-          where: {
-            paystackReference: reference,
-          },
-          select: {
-            id: true,
-          },
-        }),
-    );
+    const paymentIntent = await this.prisma.paymentIntent.findFirst({
+      where: {
+        paystackReference: reference,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!paymentIntent) {
       this.logger.warn(
@@ -797,151 +763,152 @@ export class WalletService {
     verificationData: PaystackVerifyTransactionData,
     source: 'webhook' | 'confirm' | 'charge_authorization',
   ): Promise<WalletFundingResult> {
-    const { paymentIntent, walletTransaction } = await this.prisma.runWithRetry(
-      'WalletService.finalizeFundingIntent',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const intent = await tx.paymentIntent.findUnique({
-            where: {
-              id: paymentIntentId,
-            },
-            include: {
-              walletAccount: {
-                select: {
-                  ownerProfileId: true,
-                },
+    const { paymentIntent, walletTransaction } = await this.prisma.$transaction(
+      async (tx) => {
+        const intent = await tx.paymentIntent.findUnique({
+          where: {
+            id: paymentIntentId,
+          },
+          include: {
+            walletAccount: {
+              select: {
+                ownerProfileId: true,
               },
             },
-          });
+          },
+        });
 
-          if (!intent) {
-            throw new NotFoundException('Payment intent not found');
-          }
+        if (!intent) {
+          throw new NotFoundException('Payment intent not found');
+        }
 
-          const verifyStatus = this.mapPaystackStatusToPaymentIntentStatus(
-            verificationData.status,
-          );
-          if (verifyStatus !== PaymentIntentStatus.SUCCEEDED) {
-            const failedIntent = await tx.paymentIntent.update({
-              where: {
-                id: intent.id,
-              },
-              data: {
-                status: PaymentIntentStatus.FAILED,
-                rawWebhook: verificationData as unknown as Prisma.InputJsonValue,
-              },
-            });
-
-            return {
-              paymentIntent: failedIntent,
-              walletTransaction: null,
-            };
-          }
-
-          const verifiedAmount = this.extractPaystackAmount(verificationData.amount);
-          if (verifiedAmount !== null && verifiedAmount !== intent.amountMinor) {
-            throw new BadRequestException(
-              'Funding verification amount does not match initialized amount',
-            );
-          }
-
-          const verifiedCurrency =
-            this.readString(verificationData.currency)?.toUpperCase() ?? intent.currency;
-          if (verifiedCurrency !== intent.currency) {
-            throw new BadRequestException(
-              'Funding verification currency does not match initialized currency',
-            );
-          }
-
-          const existingWalletTransaction = await tx.walletTransaction.findFirst({
-            where: {
-              relatedPaymentIntentId: intent.id,
-              direction: TransactionDirection.CREDIT,
-              type: TransactionType.TOPUP,
-              status: TransactionStatus.COMPLETED,
-            },
-            orderBy: {
-              createdAt: 'desc',
-            },
-          });
-
-          let walletTransaction = existingWalletTransaction;
-
-          if (!existingWalletTransaction) {
-            const fundingTransactionReference =
-              this.getFundingTransactionReference(intent.id);
-
-            try {
-              walletTransaction = await tx.walletTransaction.create({
-                data: {
-                  walletAccountId: intent.walletAccountId,
-                  direction: TransactionDirection.CREDIT,
-                  type: TransactionType.TOPUP,
-                  status: TransactionStatus.COMPLETED,
-                  amountMinor: intent.amountMinor,
-                  currency: intent.currency,
-                  reference: fundingTransactionReference,
-                  relatedPaymentIntentId: intent.id,
-                  metadata: {
-                    source,
-                    paystackReference: intent.paystackReference,
-                  } as Prisma.InputJsonValue,
-                },
-              });
-
-              await tx.walletAccount.update({
-                where: {
-                  id: intent.walletAccountId,
-                },
-                data: {
-                  balanceMinor: {
-                    increment: intent.amountMinor,
-                  },
-                },
-              });
-            } catch (error) {
-              if (!this.isUniqueConstraintError(error)) {
-                throw error;
-              }
-
-              walletTransaction = await tx.walletTransaction.findUnique({
-                where: {
-                  reference: fundingTransactionReference,
-                },
-              });
-            }
-          }
-
-          const updatedIntent = await tx.paymentIntent.update({
+        const verifyStatus = this.mapPaystackStatusToPaymentIntentStatus(
+          verificationData.status,
+        );
+        if (verifyStatus !== PaymentIntentStatus.SUCCEEDED) {
+          const failedIntent = await tx.paymentIntent.update({
             where: {
               id: intent.id,
             },
             data: {
-              status: PaymentIntentStatus.SUCCEEDED,
-              confirmedAt: new Date(),
+              status: PaymentIntentStatus.FAILED,
               rawWebhook: verificationData as unknown as Prisma.InputJsonValue,
             },
           });
 
-          const profileId = intent.walletAccount.ownerProfileId;
-          if (profileId) {
-            await this.upsertWalletCardMethod(
-              tx,
-              profileId,
-              intent.walletAccountId,
-              verificationData,
-              {
-                paystackReference: intent.paystackReference,
-                source,
-              },
-            );
-          }
-
           return {
-            paymentIntent: updatedIntent,
-            walletTransaction,
+            paymentIntent: failedIntent,
+            walletTransaction: null,
           };
-        }),
+        }
+
+        const verifiedAmount = this.extractPaystackAmount(
+          verificationData.amount,
+        );
+        if (verifiedAmount !== null && verifiedAmount !== intent.amountMinor) {
+          throw new BadRequestException(
+            'Funding verification amount does not match initialized amount',
+          );
+        }
+
+        const verifiedCurrency =
+          this.readString(verificationData.currency)?.toUpperCase() ??
+          intent.currency;
+        if (verifiedCurrency !== intent.currency) {
+          throw new BadRequestException(
+            'Funding verification currency does not match initialized currency',
+          );
+        }
+
+        const existingWalletTransaction = await tx.walletTransaction.findFirst({
+          where: {
+            relatedPaymentIntentId: intent.id,
+            direction: TransactionDirection.CREDIT,
+            type: TransactionType.TOPUP,
+            status: TransactionStatus.COMPLETED,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        });
+
+        let walletTransaction = existingWalletTransaction;
+
+        if (!existingWalletTransaction) {
+          const fundingTransactionReference =
+            this.getFundingTransactionReference(intent.id);
+
+          try {
+            walletTransaction = await tx.walletTransaction.create({
+              data: {
+                walletAccountId: intent.walletAccountId,
+                direction: TransactionDirection.CREDIT,
+                type: TransactionType.TOPUP,
+                status: TransactionStatus.COMPLETED,
+                amountMinor: intent.amountMinor,
+                currency: intent.currency,
+                reference: fundingTransactionReference,
+                relatedPaymentIntentId: intent.id,
+                metadata: {
+                  source,
+                  paystackReference: intent.paystackReference,
+                } as Prisma.InputJsonValue,
+              },
+            });
+
+            await tx.walletAccount.update({
+              where: {
+                id: intent.walletAccountId,
+              },
+              data: {
+                balanceMinor: {
+                  increment: intent.amountMinor,
+                },
+              },
+            });
+          } catch (error) {
+            if (!this.isUniqueConstraintError(error)) {
+              throw error;
+            }
+
+            walletTransaction = await tx.walletTransaction.findUnique({
+              where: {
+                reference: fundingTransactionReference,
+              },
+            });
+          }
+        }
+
+        const updatedIntent = await tx.paymentIntent.update({
+          where: {
+            id: intent.id,
+          },
+          data: {
+            status: PaymentIntentStatus.SUCCEEDED,
+            confirmedAt: new Date(),
+            rawWebhook: verificationData as unknown as Prisma.InputJsonValue,
+          },
+        });
+
+        const profileId = intent.walletAccount.ownerProfileId;
+        if (profileId) {
+          await this.upsertWalletCardMethod(
+            tx,
+            profileId,
+            intent.walletAccountId,
+            verificationData,
+            {
+              paystackReference: intent.paystackReference,
+              source,
+            },
+          );
+        }
+
+        return {
+          paymentIntent: updatedIntent,
+          walletTransaction,
+        };
+      },
     );
 
     return {
@@ -968,7 +935,10 @@ export class WalletService {
   ): Promise<void> {
     const authorization = verificationData.authorization;
 
-    if (!authorization?.authorization_code || authorization.reusable === false) {
+    if (
+      !authorization?.authorization_code ||
+      authorization.reusable === false
+    ) {
       return;
     }
 
@@ -1032,18 +1002,14 @@ export class WalletService {
       throw new ConflictException('Funding idempotency response is invalid');
     }
 
-    const paymentIntent = await this.prisma.runWithRetry(
-      'WalletService.replayWalletFundingResponse.paymentIntent',
-      () =>
-        this.prisma.paymentIntent.findFirst({
-          where: {
-            paystackReference: reference,
-            walletAccount: {
-              ownerProfileId,
-            },
-          },
-        }),
-    );
+    const paymentIntent = await this.prisma.paymentIntent.findFirst({
+      where: {
+        paystackReference: reference,
+        walletAccount: {
+          ownerProfileId,
+        },
+      },
+    });
 
     if (!paymentIntent) {
       throw new ConflictException(
@@ -1051,15 +1017,11 @@ export class WalletService {
       );
     }
 
-    const walletTransaction = await this.prisma.runWithRetry(
-      'WalletService.replayWalletFundingResponse.walletTransaction',
-      () =>
-        this.prisma.walletTransaction.findFirst({
-          where: {
-            relatedPaymentIntentId: paymentIntent.id,
-          },
-        }),
-    );
+    const walletTransaction = await this.prisma.walletTransaction.findFirst({
+      where: {
+        relatedPaymentIntentId: paymentIntent.id,
+      },
+    });
 
     return {
       success:
@@ -1080,23 +1042,21 @@ export class WalletService {
     reference: string,
     rawPayload: Record<string, unknown>,
   ): Promise<void> {
-    await this.prisma.runWithRetry('WalletService.markWithdrawalSucceeded', () =>
-      this.prisma.walletWithdrawal.updateMany({
-        where: {
-          reference,
-          status: {
-            in: ['processing', 'pending'],
-          },
+    await this.prisma.walletWithdrawal.updateMany({
+      where: {
+        reference,
+        status: {
+          in: ['processing', 'pending'],
         },
-        data: {
-          status: 'succeeded',
-          completedAt: new Date(),
-          transferCode: this.readString(rawPayload.transfer_code) ?? undefined,
-          paystackTransferId: this.readString(rawPayload.id) ?? undefined,
-          rawWebhook: rawPayload as unknown as Prisma.InputJsonValue,
-        },
-      }),
-    );
+      },
+      data: {
+        status: 'succeeded',
+        completedAt: new Date(),
+        transferCode: this.readString(rawPayload.transfer_code) ?? undefined,
+        paystackTransferId: this.readString(rawPayload.id) ?? undefined,
+        rawWebhook: rawPayload as unknown as Prisma.InputJsonValue,
+      },
+    });
   }
 
   private async markWithdrawalFailedByReference(
@@ -1104,18 +1064,14 @@ export class WalletService {
     failureReason: string,
     rawPayload?: Record<string, unknown>,
   ): Promise<void> {
-    const withdrawal = await this.prisma.runWithRetry(
-      'WalletService.markWithdrawalFailedByReference.withdrawal',
-      () =>
-        this.prisma.walletWithdrawal.findUnique({
-          where: {
-            reference,
-          },
-          select: {
-            id: true,
-          },
-        }),
-    );
+    const withdrawal = await this.prisma.walletWithdrawal.findUnique({
+      where: {
+        reference,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!withdrawal) {
       this.logger.warn(
@@ -1136,78 +1092,75 @@ export class WalletService {
     failureReason: string,
     rawPayload?: Record<string, unknown>,
   ): Promise<void> {
-    await this.prisma.runWithRetry(
-      'WalletService.markWithdrawalFailedAndReverse',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const withdrawal = await tx.walletWithdrawal.findUnique({
-            where: {
-              id: withdrawalId,
-            },
-          });
+    await this.prisma.$transaction(async (tx) => {
+      const withdrawal = await tx.walletWithdrawal.findUnique({
+        where: {
+          id: withdrawalId,
+        },
+      });
 
-          if (!withdrawal) {
-            return;
-          }
+      if (!withdrawal) {
+        return;
+      }
 
-          if (withdrawal.status === 'reversed') {
-            return;
-          }
+      if (withdrawal.status === 'reversed') {
+        return;
+      }
 
-          const reversalReference =
-            this.getWithdrawalReversalReference(withdrawal.id);
+      const reversalReference = this.getWithdrawalReversalReference(
+        withdrawal.id,
+      );
 
-          const existingReversal = await tx.walletTransaction.findUnique({
-            where: {
-              reference: reversalReference,
-            },
-          });
+      const existingReversal = await tx.walletTransaction.findUnique({
+        where: {
+          reference: reversalReference,
+        },
+      });
 
-          if (!existingReversal) {
-            await tx.walletTransaction.create({
-              data: {
-                walletAccountId: withdrawal.walletAccountId,
-                direction: TransactionDirection.CREDIT,
-                type: TransactionType.ADJUSTMENT,
-                status: TransactionStatus.COMPLETED,
-                amountMinor: withdrawal.amountMinor,
-                currency: withdrawal.currency,
-                reference: reversalReference,
-                metadata: {
-                  reason: 'withdrawal_reversal',
-                  failureReason,
-                  withdrawalId: withdrawal.id,
-                } as Prisma.InputJsonValue,
-              },
-            });
-
-            await tx.walletAccount.update({
-              where: {
-                id: withdrawal.walletAccountId,
-              },
-              data: {
-                balanceMinor: {
-                  increment: withdrawal.amountMinor,
-                },
-              },
-            });
-          }
-
-          await tx.walletWithdrawal.update({
-            where: {
-              id: withdrawal.id,
-            },
-            data: {
-              status: 'reversed',
+      if (!existingReversal) {
+        await tx.walletTransaction.create({
+          data: {
+            walletAccountId: withdrawal.walletAccountId,
+            direction: TransactionDirection.CREDIT,
+            type: TransactionType.ADJUSTMENT,
+            status: TransactionStatus.COMPLETED,
+            amountMinor: withdrawal.amountMinor,
+            currency: withdrawal.currency,
+            reference: reversalReference,
+            metadata: {
+              reason: 'withdrawal_reversal',
               failureReason,
-              failedAt: new Date(),
-              ...(rawPayload
-                ? { rawWebhook: rawPayload as unknown as Prisma.InputJsonValue }
-                : {}),
+              withdrawalId: withdrawal.id,
+            } as Prisma.InputJsonValue,
+          },
+        });
+
+        await tx.walletAccount.update({
+          where: {
+            id: withdrawal.walletAccountId,
+          },
+          data: {
+            balanceMinor: {
+              increment: withdrawal.amountMinor,
             },
-          });
-        }),
-    );
+          },
+        });
+      }
+
+      await tx.walletWithdrawal.update({
+        where: {
+          id: withdrawal.id,
+        },
+        data: {
+          status: 'reversed',
+          failureReason,
+          failedAt: new Date(),
+          ...(rawPayload
+            ? { rawWebhook: rawPayload as unknown as Prisma.InputJsonValue }
+            : {}),
+        },
+      });
+    });
   }
 
   private async getSavedBankWithdrawalDestination(
@@ -1223,17 +1176,13 @@ export class WalletService {
     savedBankAccountId: string;
     persistable: false;
   }> {
-    const savedAccount = await this.prisma.runWithRetry(
-      'WalletService.getSavedBankWithdrawalDestination',
-      () =>
-        this.prisma.walletSavedBankAccount.findFirst({
-          where: {
-            id: savedBankAccountId,
-            profileId: ownerProfileId,
-            walletAccountId,
-          },
-        }),
-    );
+    const savedAccount = await this.prisma.walletSavedBankAccount.findFirst({
+      where: {
+        id: savedBankAccountId,
+        profileId: ownerProfileId,
+        walletAccountId,
+      },
+    });
 
     if (!savedAccount) {
       throw new NotFoundException('Saved withdrawal account not found');
@@ -1297,53 +1246,41 @@ export class WalletService {
     accountNumberMasked: string;
     recipientCode: string;
   }): Promise<PrismaWalletSavedBankAccount> {
-    const existing = await this.prisma.runWithRetry(
-      'WalletService.persistSavedBankAccount.findExisting',
-      () =>
-        this.prisma.walletSavedBankAccount.findFirst({
-          where: {
-            profileId: input.profileId,
-            walletAccountId: input.walletAccountId,
-            recipientCode: input.recipientCode,
-          },
-        }),
-    );
+    const existing = await this.prisma.walletSavedBankAccount.findFirst({
+      where: {
+        profileId: input.profileId,
+        walletAccountId: input.walletAccountId,
+        recipientCode: input.recipientCode,
+      },
+    });
 
     if (existing) {
-      return this.prisma.runWithRetry(
-        'WalletService.persistSavedBankAccount.updateExisting',
-        () =>
-          this.prisma.walletSavedBankAccount.update({
-            where: {
-              id: existing.id,
-            },
-            data: {
-              bankCode: input.bankCode,
-              bankName: input.bankName,
-              accountName: input.accountName,
-              accountNumberMasked: input.accountNumberMasked,
-              lastUsedAt: new Date(),
-            },
-          }),
-      );
+      return this.prisma.walletSavedBankAccount.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          bankCode: input.bankCode,
+          bankName: input.bankName,
+          accountName: input.accountName,
+          accountNumberMasked: input.accountNumberMasked,
+          lastUsedAt: new Date(),
+        },
+      });
     }
 
-    return this.prisma.runWithRetry(
-      'WalletService.persistSavedBankAccount.create',
-      () =>
-        this.prisma.walletSavedBankAccount.create({
-          data: {
-            profileId: input.profileId,
-            walletAccountId: input.walletAccountId,
-            bankCode: input.bankCode,
-            bankName: input.bankName,
-            accountName: input.accountName,
-            accountNumberMasked: input.accountNumberMasked,
-            recipientCode: input.recipientCode,
-            lastUsedAt: new Date(),
-          },
-        }),
-    );
+    return this.prisma.walletSavedBankAccount.create({
+      data: {
+        profileId: input.profileId,
+        walletAccountId: input.walletAccountId,
+        bankCode: input.bankCode,
+        bankName: input.bankName,
+        accountName: input.accountName,
+        accountNumberMasked: input.accountNumberMasked,
+        recipientCode: input.recipientCode,
+        lastUsedAt: new Date(),
+      },
+    });
   }
 
   private async lookupBankName(bankCode: string): Promise<string> {
@@ -1377,19 +1314,15 @@ export class WalletService {
 
     const requestHash = this.hashPayload(payload);
 
-    const existingRecord = await this.prisma.runWithRetry(
-      'WalletService.withIdempotency.findExisting',
-      () =>
-        this.prisma.walletIdempotencyKey.findUnique({
-          where: {
-            profileId_operation_key: {
-              profileId: ownerProfileId,
-              operation,
-              key,
-            },
-          },
-        }),
-    );
+    const existingRecord = await this.prisma.walletIdempotencyKey.findUnique({
+      where: {
+        profileId_operation_key: {
+          profileId: ownerProfileId,
+          operation,
+          key,
+        },
+      },
+    });
 
     if (existingRecord) {
       if (existingRecord.requestHash !== requestHash) {
@@ -1408,46 +1341,40 @@ export class WalletService {
         );
       }
 
-      throw new ConflictException('A request with this idempotency key is already processing');
+      throw new ConflictException(
+        'A request with this idempotency key is already processing',
+      );
     }
 
     let idempotencyRecord: { id: string };
 
     try {
-      idempotencyRecord = await this.prisma.runWithRetry(
-        'WalletService.withIdempotency.create',
-        () =>
-          this.prisma.walletIdempotencyKey.create({
-            data: {
-              profileId: ownerProfileId,
-              operation,
-              key,
-              requestHash,
-              status: 'in_progress',
-            },
-            select: {
-              id: true,
-            },
-          }),
-      );
+      idempotencyRecord = await this.prisma.walletIdempotencyKey.create({
+        data: {
+          profileId: ownerProfileId,
+          operation,
+          key,
+          requestHash,
+          status: 'in_progress',
+        },
+        select: {
+          id: true,
+        },
+      });
     } catch (error) {
       if (!this.isUniqueConstraintError(error)) {
         throw error;
       }
 
-      const racedRecord = await this.prisma.runWithRetry(
-        'WalletService.withIdempotency.findRacedRecord',
-        () =>
-          this.prisma.walletIdempotencyKey.findUnique({
-            where: {
-              profileId_operation_key: {
-                profileId: ownerProfileId,
-                operation,
-                key,
-              },
-            },
-          }),
-      );
+      const racedRecord = await this.prisma.walletIdempotencyKey.findUnique({
+        where: {
+          profileId_operation_key: {
+            profileId: ownerProfileId,
+            operation,
+            key,
+          },
+        },
+      });
 
       if (!racedRecord) {
         throw new ConflictException(
@@ -1479,31 +1406,28 @@ export class WalletService {
     try {
       const { result, responsePayload } = await action();
 
-      await this.prisma.runWithRetry('WalletService.withIdempotency.complete', () =>
-        this.prisma.walletIdempotencyKey.update({
-          where: {
-            id: idempotencyRecord.id,
-          },
-          data: {
-            status: 'completed',
-            response:
-              this.toJsonValue(responsePayload) as unknown as Prisma.InputJsonValue,
-          },
-        }),
-      );
+      await this.prisma.walletIdempotencyKey.update({
+        where: {
+          id: idempotencyRecord.id,
+        },
+        data: {
+          status: 'completed',
+          response: this.toJsonValue(
+            responsePayload,
+          ) as unknown as Prisma.InputJsonValue,
+        },
+      });
 
       return result;
     } catch (error) {
-      await this.prisma.runWithRetry('WalletService.withIdempotency.fail', () =>
-        this.prisma.walletIdempotencyKey.update({
-          where: {
-            id: idempotencyRecord.id,
-          },
-          data: {
-            status: 'failed',
-          },
-        }),
-      );
+      await this.prisma.walletIdempotencyKey.update({
+        where: {
+          id: idempotencyRecord.id,
+        },
+        data: {
+          status: 'failed',
+        },
+      });
 
       throw error;
     }
@@ -1513,22 +1437,20 @@ export class WalletService {
     ownerProfileId: string,
     walletAccountId: string,
   ): Promise<void> {
-    const wallet = await this.prisma.runWithRetry(
-      'WalletService.assertWalletOwnership',
-      () =>
-        this.prisma.walletAccount.findFirst({
-          where: {
-            id: walletAccountId,
-            ownerProfileId,
-          },
-          select: {
-            id: true,
-          },
-        }),
-    );
+    const wallet = await this.prisma.walletAccount.findFirst({
+      where: {
+        id: walletAccountId,
+        ownerProfileId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (!wallet) {
-      throw new ForbiddenException('You do not have access to this wallet account');
+      throw new ForbiddenException(
+        'You do not have access to this wallet account',
+      );
     }
   }
 
@@ -1552,20 +1474,16 @@ export class WalletService {
   }
 
   private async requireProfile(ownerProfileId: string) {
-    const profile = await this.prisma.runWithRetry(
-      'WalletService.requireProfile',
-      () =>
-        this.prisma.profile.findUnique({
-          where: {
-            id: ownerProfileId,
-          },
-          select: {
-            id: true,
-            email: true,
-            phoneVerified: true,
-          },
-        }),
-    );
+    const profile = await this.prisma.profile.findUnique({
+      where: {
+        id: ownerProfileId,
+      },
+      select: {
+        id: true,
+        email: true,
+        phoneVerified: true,
+      },
+    });
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
@@ -1699,7 +1617,10 @@ export class WalletService {
     const objectValue = value as Record<string, unknown>;
     const keys = Object.keys(objectValue).sort();
     return `{${keys
-      .map((key) => `${JSON.stringify(key)}:${this.stableStringify(objectValue[key])}`)
+      .map(
+        (key) =>
+          `${JSON.stringify(key)}:${this.stableStringify(objectValue[key])}`,
+      )
       .join(',')}}`;
   }
 

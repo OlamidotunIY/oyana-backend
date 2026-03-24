@@ -1,5 +1,11 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+} from 'class-validator';
 
 @InputType()
 export class StartPhoneVerificationDto {

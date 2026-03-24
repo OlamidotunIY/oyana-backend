@@ -9,7 +9,9 @@ const ALL_USER_TYPES = Object.values(UserType) as UserType[];
 const isUserType = (value: unknown): value is UserType =>
   typeof value === 'string' && ALL_USER_TYPES.includes(value as UserType);
 
-export const normalizeProfileRoles = (profile: ProfileRoleShape): UserType[] => {
+export const normalizeProfileRoles = (
+  profile: ProfileRoleShape,
+): UserType[] => {
   const roleSet = new Set<UserType>();
 
   for (const role of profile.roles ?? []) {

@@ -27,7 +27,10 @@ export class MarketPlaceResolver {
   @Roles(UserType.BUSINESS)
   async marketplaceShipments(
     @CurrentUser() user: SupabaseUser,
-    @Args('filter', { type: () => MarketplaceShipmentsFilterDto, nullable: true })
+    @Args('filter', {
+      type: () => MarketplaceShipmentsFilterDto,
+      nullable: true,
+    })
     filter?: MarketplaceShipmentsFilterDto,
   ): Promise<MarketplaceShipmentsResult> {
     return this.marketPlaceService.marketplaceShipments(user.id, filter);

@@ -30,7 +30,9 @@ export class KycResolver {
 
   @Query(() => ProviderKycStatus, { nullable: true })
   @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async myKycStatus(@CurrentUser() user: AuthUser): Promise<ProviderKycStatus | null> {
+  async myKycStatus(
+    @CurrentUser() user: AuthUser,
+  ): Promise<ProviderKycStatus | null> {
     return this.kycService.myKycStatus(user.id);
   }
 

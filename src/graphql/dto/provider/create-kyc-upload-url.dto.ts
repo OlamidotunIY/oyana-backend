@@ -1,6 +1,13 @@
 import { Field, InputType } from '@nestjs/graphql';
 import { GraphQLBigInt } from '../../scalars';
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 @InputType()
 export class CreateKycUploadUrlDto {

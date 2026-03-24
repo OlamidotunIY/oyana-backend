@@ -293,19 +293,14 @@ export class DispatchService {
   }
 
   async dispatchDueShipments(): Promise<number> {
-    const dueShipments = await this.prisma.runWithRetry(
-      'DispatchService.dispatchDueShipments.findDueShipments',
-      () =>
-        this.prisma.shipment.findMany({
-          where: this.buildDueShipmentWhere(),
-          orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'asc' }],
-          take: this.dispatchWorkerBatchSize,
-          select: {
-            id: true,
-          },
-        }),
-      this.dispatchReconcileDbRetryOptions,
-    );
+    const dueShipments = await this.prisma.shipment.findMany({
+      where: this.buildDueShipmentWhere(),
+      orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'asc' }],
+      take: this.dispatchWorkerBatchSize,
+      select: {
+        id: true,
+      },
+    });
 
     let dispatchedCount = 0;
     for (const dueShipment of dueShipments) {
@@ -325,18 +320,14 @@ export class DispatchService {
   async createDispatchBatch(
     input: CreateDispatchBatchDto,
   ): Promise<DispatchBatch> {
-    const batch = await this.prisma.runWithRetry(
-      'DispatchService.createDispatchBatch',
-      () =>
-        this.prisma.dispatchBatch.create({
-          data: {
-            shipmentId: input.shipmentId,
-            status: DispatchBatchStatus.OPEN,
-            openedAt: new Date(),
-            expiresAt: input.expiresAt,
-          },
-        }),
-    );
+    const batch = await this.prisma.dispatchBatch.create({
+      data: {
+        shipmentId: input.shipmentId,
+        status: DispatchBatchStatus.OPEN,
+        openedAt: new Date(),
+        expiresAt: input.expiresAt,
+      },
+    });
 
     return this.toGraphqlDispatchBatch(batch);
   }
@@ -344,23 +335,19 @@ export class DispatchService {
   async sendDispatchOffer(
     input: CreateDispatchOfferDto,
   ): Promise<DispatchOffer> {
-    const offer = await this.prisma.runWithRetry(
-      'DispatchService.sendDispatchOffer',
-      () =>
-        this.prisma.dispatchOffer.create({
-          data: {
-            batchId: input.batchId,
-            providerId: input.providerId,
-            shipmentId: input.shipmentId,
-            vehicleId: input.vehicleId,
-            status: DispatchOfferStatus.SENT,
-            sentAt: new Date(),
-            expiresAt: input.expiresAt,
-            providerEtaMinutes: input.providerEtaMinutes,
-            metadata: input.metadata,
-          },
-        }),
-    );
+    const offer = await this.prisma.dispatchOffer.create({
+      data: {
+        batchId: input.batchId,
+        providerId: input.providerId,
+        shipmentId: input.shipmentId,
+        vehicleId: input.vehicleId,
+        status: DispatchOfferStatus.SENT,
+        sentAt: new Date(),
+        expiresAt: input.expiresAt,
+        providerEtaMinutes: input.providerEtaMinutes,
+        metadata: input.metadata,
+      },
+    });
 
     return this.toGraphqlDispatchOffer(offer);
   }
@@ -394,22 +381,18 @@ export class DispatchService {
   async createShipmentAssignment(
     input: AssignShipmentDto,
   ): Promise<ShipmentAssignment> {
-    const assignment = await this.prisma.runWithRetry(
-      'DispatchService.createShipmentAssignment',
-      () =>
-        this.prisma.shipmentAssignment.create({
-          data: {
-            shipmentId: input.shipmentId,
-            providerId: input.providerId,
-            vehicleId: input.vehicleId,
-            driverProfileId: input.driverProfileId,
-            dispatchOfferId: input.dispatchOfferId,
-            agreedPriceMinor: input.agreedPriceMinor,
-            currency: input.currency,
-            status: ShipmentAssignmentStatus.ACTIVE,
-          },
-        }),
-    );
+    const assignment = await this.prisma.shipmentAssignment.create({
+      data: {
+        shipmentId: input.shipmentId,
+        providerId: input.providerId,
+        vehicleId: input.vehicleId,
+        driverProfileId: input.driverProfileId,
+        dispatchOfferId: input.dispatchOfferId,
+        agreedPriceMinor: input.agreedPriceMinor,
+        currency: input.currency,
+        status: ShipmentAssignmentStatus.ACTIVE,
+      },
+    });
 
     return this.toGraphqlShipmentAssignment(assignment);
   }
@@ -418,38 +401,30 @@ export class DispatchService {
     id: string,
     input: AssignShipmentDto,
   ): Promise<ShipmentAssignment> {
-    const assignment = await this.prisma.runWithRetry(
-      'DispatchService.updateShipmentAssignment',
-      () =>
-        this.prisma.shipmentAssignment.update({
-          where: { id },
-          data: {
-            shipmentId: input.shipmentId,
-            providerId: input.providerId,
-            vehicleId: input.vehicleId,
-            driverProfileId: input.driverProfileId,
-            dispatchOfferId: input.dispatchOfferId,
-            agreedPriceMinor: input.agreedPriceMinor,
-            currency: input.currency,
-          },
-        }),
-    );
+    const assignment = await this.prisma.shipmentAssignment.update({
+      where: { id },
+      data: {
+        shipmentId: input.shipmentId,
+        providerId: input.providerId,
+        vehicleId: input.vehicleId,
+        driverProfileId: input.driverProfileId,
+        dispatchOfferId: input.dispatchOfferId,
+        agreedPriceMinor: input.agreedPriceMinor,
+        currency: input.currency,
+      },
+    });
 
     return this.toGraphqlShipmentAssignment(assignment);
   }
 
   async cancelShipmentAssignment(id: string): Promise<ShipmentAssignment> {
-    const assignment = await this.prisma.runWithRetry(
-      'DispatchService.cancelShipmentAssignment',
-      () =>
-        this.prisma.shipmentAssignment.update({
-          where: { id },
-          data: {
-            status: ShipmentAssignmentStatus.CANCELLED,
-            cancelledAt: new Date(),
-          },
-        }),
-    );
+    const assignment = await this.prisma.shipmentAssignment.update({
+      where: { id },
+      data: {
+        status: ShipmentAssignmentStatus.CANCELLED,
+        cancelledAt: new Date(),
+      },
+    });
 
     return this.toGraphqlShipmentAssignment(assignment);
   }
@@ -466,38 +441,33 @@ export class DispatchService {
 
     await this.requireProviderOwnedActiveAssignment(providerId, shipmentId);
 
-    const shipment = await this.prisma.runWithRetry(
-      'DispatchService.markEnRoutePickup.updateShipment',
-      async () => {
-        const currentShipment = await this.prisma.shipment.findUnique({
-          where: { id: shipmentId },
-        });
+    const shipment = await (async () => {
+      const currentShipment = await this.prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
 
-        if (!currentShipment) {
-          throw new NotFoundException(
-            `Shipment with id ${shipmentId} not found`,
-          );
-        }
+      if (!currentShipment) {
+        throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+      }
 
-        const allowedStatuses = new Set<string>([
-          ShipmentStatus.ASSIGNED,
-          ShipmentStatus.EN_ROUTE_PICKUP,
-        ]);
+      const allowedStatuses = new Set<string>([
+        ShipmentStatus.ASSIGNED,
+        ShipmentStatus.EN_ROUTE_PICKUP,
+      ]);
 
-        if (!allowedStatuses.has(currentShipment.status)) {
-          throw new BadRequestException(
-            `Cannot mark pickup route from shipment status ${currentShipment.status}`,
-          );
-        }
+      if (!allowedStatuses.has(currentShipment.status)) {
+        throw new BadRequestException(
+          `Cannot mark pickup route from shipment status ${currentShipment.status}`,
+        );
+      }
 
-        return this.prisma.shipment.update({
-          where: { id: shipmentId },
-          data: {
-            status: ShipmentStatus.EN_ROUTE_PICKUP,
-          },
-        });
-      },
-    );
+      return this.prisma.shipment.update({
+        where: { id: shipmentId },
+        data: {
+          status: ShipmentStatus.EN_ROUTE_PICKUP,
+        },
+      });
+    })();
 
     await this.notifyShipmentProgress(
       shipment.id,
@@ -524,39 +494,34 @@ export class DispatchService {
 
     await this.requireProviderOwnedActiveAssignment(providerId, shipmentId);
 
-    const shipment = await this.prisma.runWithRetry(
-      'DispatchService.confirmPickup.updateShipment',
-      async () => {
-        const currentShipment = await this.prisma.shipment.findUnique({
-          where: { id: shipmentId },
-        });
+    const shipment = await (async () => {
+      const currentShipment = await this.prisma.shipment.findUnique({
+        where: { id: shipmentId },
+      });
 
-        if (!currentShipment) {
-          throw new NotFoundException(
-            `Shipment with id ${shipmentId} not found`,
-          );
-        }
+      if (!currentShipment) {
+        throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+      }
 
-        const allowedStatuses = new Set<string>([
-          ShipmentStatus.ASSIGNED,
-          ShipmentStatus.EN_ROUTE_PICKUP,
-          ShipmentStatus.PICKED_UP,
-        ]);
+      const allowedStatuses = new Set<string>([
+        ShipmentStatus.ASSIGNED,
+        ShipmentStatus.EN_ROUTE_PICKUP,
+        ShipmentStatus.PICKED_UP,
+      ]);
 
-        if (!allowedStatuses.has(currentShipment.status)) {
-          throw new BadRequestException(
-            `Cannot confirm pickup from shipment status ${currentShipment.status}`,
-          );
-        }
+      if (!allowedStatuses.has(currentShipment.status)) {
+        throw new BadRequestException(
+          `Cannot confirm pickup from shipment status ${currentShipment.status}`,
+        );
+      }
 
-        return this.prisma.shipment.update({
-          where: { id: shipmentId },
-          data: {
-            status: ShipmentStatus.PICKED_UP,
-          },
-        });
-      },
-    );
+      return this.prisma.shipment.update({
+        where: { id: shipmentId },
+        data: {
+          status: ShipmentStatus.PICKED_UP,
+        },
+      });
+    })();
 
     await this.notifyShipmentProgress(
       shipment.id,
@@ -588,49 +553,43 @@ export class DispatchService {
 
     const now = new Date();
 
-    const result = await this.prisma.runWithRetry(
-      'DispatchService.confirmDropoff.transaction',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const currentShipment = await tx.shipment.findUnique({
-            where: { id: shipmentId },
-          });
+    const result = await this.prisma.$transaction(async (tx) => {
+      const currentShipment = await tx.shipment.findUnique({
+        where: { id: shipmentId },
+      });
 
-          if (!currentShipment) {
-            throw new NotFoundException(
-              `Shipment with id ${shipmentId} not found`,
-            );
-          }
+      if (!currentShipment) {
+        throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+      }
 
-          const allowedStatuses = new Set<string>([
-            ShipmentStatus.PICKED_UP,
-            ShipmentStatus.EN_ROUTE_DROPOFF,
-            ShipmentStatus.DELIVERED,
-            ShipmentStatus.COMPLETED,
-          ]);
+      const allowedStatuses = new Set<string>([
+        ShipmentStatus.PICKED_UP,
+        ShipmentStatus.EN_ROUTE_DROPOFF,
+        ShipmentStatus.DELIVERED,
+        ShipmentStatus.COMPLETED,
+      ]);
 
-          if (!allowedStatuses.has(currentShipment.status)) {
-            throw new BadRequestException(
-              `Cannot confirm dropoff from shipment status ${currentShipment.status}`,
-            );
-          }
+      if (!allowedStatuses.has(currentShipment.status)) {
+        throw new BadRequestException(
+          `Cannot confirm dropoff from shipment status ${currentShipment.status}`,
+        );
+      }
 
-          await tx.shipmentAssignment.update({
-            where: { id: assignment.id },
-            data: {
-              status: ShipmentAssignmentStatus.COMPLETED,
-              completedAt: assignment.completedAt ?? now,
-            },
-          });
+      await tx.shipmentAssignment.update({
+        where: { id: assignment.id },
+        data: {
+          status: ShipmentAssignmentStatus.COMPLETED,
+          completedAt: assignment.completedAt ?? now,
+        },
+      });
 
-          return tx.shipment.update({
-            where: { id: shipmentId },
-            data: {
-              status: ShipmentStatus.COMPLETED,
-            },
-          });
-        }),
-    );
+      return tx.shipment.update({
+        where: { id: shipmentId },
+        data: {
+          status: ShipmentStatus.COMPLETED,
+        },
+      });
+    });
 
     await this.notifyShipmentProgress(
       result.id,
@@ -649,16 +608,12 @@ export class DispatchService {
     providerId: string,
     input: UpdateDispatchOfferDto,
   ): Promise<DispatchOffer> {
-    const offer = await this.prisma.runWithRetry(
-      'DispatchService.declineDispatchOffer.findOffer',
-      () =>
-        this.prisma.dispatchOffer.findFirst({
-          where: {
-            id: input.offerId,
-            providerId,
-          },
-        }),
-    );
+    const offer = await this.prisma.dispatchOffer.findFirst({
+      where: {
+        id: input.offerId,
+        providerId,
+      },
+    });
 
     if (!offer) {
       throw new NotFoundException('Dispatch offer not found for this provider');
@@ -670,18 +625,14 @@ export class DispatchService {
       );
     }
 
-    const updatedOffer = await this.prisma.runWithRetry(
-      'DispatchService.declineDispatchOffer.updateOffer',
-      () =>
-        this.prisma.dispatchOffer.update({
-          where: { id: offer.id },
-          data: {
-            status: DispatchOfferStatus.DECLINED,
-            respondedAt: input.respondedAt ?? new Date(),
-            providerEtaMinutes: input.providerEtaMinutes,
-          },
-        }),
-    );
+    const updatedOffer = await this.prisma.dispatchOffer.update({
+      where: { id: offer.id },
+      data: {
+        status: DispatchOfferStatus.DECLINED,
+        respondedAt: input.respondedAt ?? new Date(),
+        providerEtaMinutes: input.providerEtaMinutes,
+      },
+    });
 
     const shipment = await this.prisma.shipment.findUnique({
       where: {
@@ -742,267 +693,263 @@ export class DispatchService {
         }
       | undefined;
 
-    const acceptedOffer = await this.prisma.runWithRetry(
-      'DispatchService.acceptDispatchOffer.transaction',
-      () =>
-        this.prisma.$transaction(async (tx) => {
-          const offerSeed = await tx.dispatchOffer.findFirst({
-            where: {
-              id: input.offerId,
-              providerId,
-            },
-            select: {
-              id: true,
-              shipmentId: true,
-            },
-          });
+    const acceptedOffer = await this.prisma.$transaction(async (tx) => {
+      const offerSeed = await tx.dispatchOffer.findFirst({
+        where: {
+          id: input.offerId,
+          providerId,
+        },
+        select: {
+          id: true,
+          shipmentId: true,
+        },
+      });
 
-          if (!offerSeed) {
-            throw new NotFoundException(
-              'Dispatch offer not found for this provider',
-            );
-          }
+      if (!offerSeed) {
+        throw new NotFoundException(
+          'Dispatch offer not found for this provider',
+        );
+      }
 
-          await tx.$queryRaw`
+      await tx.$queryRaw`
             SELECT id
             FROM "shipments"
             WHERE id = ${offerSeed.shipmentId}::uuid
             FOR UPDATE
           `;
 
-          const offer = await tx.dispatchOffer.findUnique({
-            where: {
-              id: offerSeed.id,
-            },
-          });
+      const offer = await tx.dispatchOffer.findUnique({
+        where: {
+          id: offerSeed.id,
+        },
+      });
 
-          if (!offer || offer.providerId !== providerId) {
-            throw new NotFoundException(
-              'Dispatch offer not found for this provider',
-            );
-          }
+      if (!offer || offer.providerId !== providerId) {
+        throw new NotFoundException(
+          'Dispatch offer not found for this provider',
+        );
+      }
 
-          if (offer.expiresAt && offer.expiresAt.getTime() <= now.getTime()) {
-            throw new BadRequestException('Dispatch offer has expired');
-          }
+      if (offer.expiresAt && offer.expiresAt.getTime() <= now.getTime()) {
+        throw new BadRequestException('Dispatch offer has expired');
+      }
 
-          const provider = await tx.provider.findUnique({
-            where: {
-              id: providerId,
-            },
-            select: {
-              isAvailable: true,
-            },
-          });
+      const provider = await tx.provider.findUnique({
+        where: {
+          id: providerId,
+        },
+        select: {
+          isAvailable: true,
+        },
+      });
 
-          if (!provider?.isAvailable) {
-            throw new ConflictException(
-              'Provider is currently unavailable and cannot accept dispatch offers',
-            );
-          }
+      if (!provider?.isAvailable) {
+        throw new ConflictException(
+          'Provider is currently unavailable and cannot accept dispatch offers',
+        );
+      }
 
-          const shipment = await tx.shipment.findUnique({
-            where: {
-              id: offer.shipmentId,
-            },
-            select: {
-              id: true,
-              trackingCode: true,
-              customerProfileId: true,
-              status: true,
-              vehicleCategory: true,
-              pricingCurrency: true,
-              finalPriceMinor: true,
-              quotedPriceMinor: true,
-            },
-          });
+      const shipment = await tx.shipment.findUnique({
+        where: {
+          id: offer.shipmentId,
+        },
+        select: {
+          id: true,
+          trackingCode: true,
+          customerProfileId: true,
+          status: true,
+          vehicleCategory: true,
+          pricingCurrency: true,
+          finalPriceMinor: true,
+          quotedPriceMinor: true,
+        },
+      });
 
-          if (!shipment) {
-            throw new NotFoundException(
-              `Shipment with id ${offer.shipmentId} not found`,
-            );
-          }
+      if (!shipment) {
+        throw new NotFoundException(
+          `Shipment with id ${offer.shipmentId} not found`,
+        );
+      }
 
-          if (
-            shipment.status !== ShipmentStatus.CREATED &&
-            shipment.status !== ShipmentStatus.BROADCASTING &&
-            shipment.status !== ShipmentStatus.ASSIGNED
-          ) {
-            throw new BadRequestException(
-              `Cannot accept dispatch offer from shipment status ${shipment.status}`,
-            );
-          }
+      if (
+        shipment.status !== ShipmentStatus.CREATED &&
+        shipment.status !== ShipmentStatus.BROADCASTING &&
+        shipment.status !== ShipmentStatus.ASSIGNED
+      ) {
+        throw new BadRequestException(
+          `Cannot accept dispatch offer from shipment status ${shipment.status}`,
+        );
+      }
 
-          if (offer.vehicleId) {
-            const vehicle = await tx.vehicle.findFirst({
-              where: {
-                id: offer.vehicleId,
-                providerId,
-                status: 'active',
-                category: shipment.vehicleCategory,
-              },
-              select: {
-                id: true,
-              },
-            });
+      if (offer.vehicleId) {
+        const vehicle = await tx.vehicle.findFirst({
+          where: {
+            id: offer.vehicleId,
+            providerId,
+            status: 'active',
+            category: shipment.vehicleCategory,
+          },
+          select: {
+            id: true,
+          },
+        });
 
-            if (!vehicle) {
-              throw new ConflictException(
-                'Dispatch vehicle is no longer active for this shipment',
-              );
-            }
-          } else {
-            const fallbackVehicle = await tx.vehicle.findFirst({
-              where: {
-                providerId,
-                status: 'active',
-                category: shipment.vehicleCategory,
-              },
-              select: {
-                id: true,
-              },
-              orderBy: {
-                createdAt: 'asc',
-              },
-            });
+        if (!vehicle) {
+          throw new ConflictException(
+            'Dispatch vehicle is no longer active for this shipment',
+          );
+        }
+      } else {
+        const fallbackVehicle = await tx.vehicle.findFirst({
+          where: {
+            providerId,
+            status: 'active',
+            category: shipment.vehicleCategory,
+          },
+          select: {
+            id: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        });
 
-            if (!fallbackVehicle) {
-              throw new ConflictException(
-                'No active vehicle is available for this dispatch category',
-              );
-            }
-          }
+        if (!fallbackVehicle) {
+          throw new ConflictException(
+            'No active vehicle is available for this dispatch category',
+          );
+        }
+      }
 
-          if (!this.canRespondToOffer(offer.status)) {
-            const activeAssignment = await tx.shipmentAssignment.findUnique({
-              where: {
-                shipmentId: offer.shipmentId,
-              },
-            });
+      if (!this.canRespondToOffer(offer.status)) {
+        const activeAssignment = await tx.shipmentAssignment.findUnique({
+          where: {
+            shipmentId: offer.shipmentId,
+          },
+        });
 
-            if (
-              offer.status === DispatchOfferStatus.ACCEPTED &&
-              activeAssignment?.providerId === providerId &&
-              activeAssignment.status === ShipmentAssignmentStatus.ACTIVE
-            ) {
-              return offer;
-            }
+        if (
+          offer.status === DispatchOfferStatus.ACCEPTED &&
+          activeAssignment?.providerId === providerId &&
+          activeAssignment.status === ShipmentAssignmentStatus.ACTIVE
+        ) {
+          return offer;
+        }
 
-            throw new BadRequestException(
-              'Dispatch offer has already been responded to',
-            );
-          }
+        throw new BadRequestException(
+          'Dispatch offer has already been responded to',
+        );
+      }
 
-          const existingAssignment = await tx.shipmentAssignment.findUnique({
-            where: {
-              shipmentId: offer.shipmentId,
-            },
-          });
+      const existingAssignment = await tx.shipmentAssignment.findUnique({
+        where: {
+          shipmentId: offer.shipmentId,
+        },
+      });
 
-          if (existingAssignment) {
-            const isSameProviderActiveAssignment =
-              existingAssignment.providerId === providerId &&
-              existingAssignment.status === ShipmentAssignmentStatus.ACTIVE;
+      if (existingAssignment) {
+        const isSameProviderActiveAssignment =
+          existingAssignment.providerId === providerId &&
+          existingAssignment.status === ShipmentAssignmentStatus.ACTIVE;
 
-            if (!isSameProviderActiveAssignment) {
-              throw new ConflictException(DISPATCH_ACCEPT_CONFLICT_MESSAGE);
-            }
-          }
+        if (!isSameProviderActiveAssignment) {
+          throw new ConflictException(DISPATCH_ACCEPT_CONFLICT_MESSAGE);
+        }
+      }
 
-          const acceptedUpdate = await tx.dispatchOffer.updateMany({
-            where: {
-              id: offer.id,
-              status: {
-                in: [DispatchOfferStatus.SENT, DispatchOfferStatus.VIEWED],
-              },
-            },
-            data: {
-              status: DispatchOfferStatus.ACCEPTED,
-              respondedAt: input.respondedAt ?? now,
-              providerEtaMinutes: input.providerEtaMinutes,
-            },
-          });
+      const acceptedUpdate = await tx.dispatchOffer.updateMany({
+        where: {
+          id: offer.id,
+          status: {
+            in: [DispatchOfferStatus.SENT, DispatchOfferStatus.VIEWED],
+          },
+        },
+        data: {
+          status: DispatchOfferStatus.ACCEPTED,
+          respondedAt: input.respondedAt ?? now,
+          providerEtaMinutes: input.providerEtaMinutes,
+        },
+      });
 
-          if (acceptedUpdate.count === 0) {
-            const refreshedOffer = await tx.dispatchOffer.findUnique({
-              where: { id: offer.id },
-            });
+      if (acceptedUpdate.count === 0) {
+        const refreshedOffer = await tx.dispatchOffer.findUnique({
+          where: { id: offer.id },
+        });
 
-            if (refreshedOffer?.status === DispatchOfferStatus.ACCEPTED) {
-              return refreshedOffer;
-            }
+        if (refreshedOffer?.status === DispatchOfferStatus.ACCEPTED) {
+          return refreshedOffer;
+        }
 
-            throw new ConflictException(DISPATCH_ACCEPT_CONFLICT_MESSAGE);
-          }
+        throw new ConflictException(DISPATCH_ACCEPT_CONFLICT_MESSAGE);
+      }
 
-          const updatedOffer = await tx.dispatchOffer.findUnique({
-            where: {
-              id: offer.id,
-            },
-          });
+      const updatedOffer = await tx.dispatchOffer.findUnique({
+        where: {
+          id: offer.id,
+        },
+      });
 
-          if (!updatedOffer) {
-            throw new NotFoundException('Dispatch offer no longer exists');
-          }
+      if (!updatedOffer) {
+        throw new NotFoundException('Dispatch offer no longer exists');
+      }
 
-          if (!existingAssignment) {
-            await tx.shipmentAssignment.create({
-              data: {
-                shipmentId: offer.shipmentId,
-                providerId,
-                vehicleId: offer.vehicleId,
-                dispatchOfferId: offer.id,
-                status: ShipmentAssignmentStatus.ACTIVE,
-                agreedPriceMinor:
-                  shipment.finalPriceMinor ?? shipment.quotedPriceMinor,
-                currency: shipment.pricingCurrency,
-              },
-            });
-          }
+      if (!existingAssignment) {
+        await tx.shipmentAssignment.create({
+          data: {
+            shipmentId: offer.shipmentId,
+            providerId,
+            vehicleId: offer.vehicleId,
+            dispatchOfferId: offer.id,
+            status: ShipmentAssignmentStatus.ACTIVE,
+            agreedPriceMinor:
+              shipment.finalPriceMinor ?? shipment.quotedPriceMinor,
+            currency: shipment.pricingCurrency,
+          },
+        });
+      }
 
-          await tx.shipment.update({
-            where: {
-              id: offer.shipmentId,
-            },
-            data: {
-              status: ShipmentStatus.ASSIGNED,
-            },
-          });
+      await tx.shipment.update({
+        where: {
+          id: offer.shipmentId,
+        },
+        data: {
+          status: ShipmentStatus.ASSIGNED,
+        },
+      });
 
-          await tx.dispatchOffer.updateMany({
-            where: {
-              shipmentId: offer.shipmentId,
-              id: {
-                not: offer.id,
-              },
-              status: {
-                in: [DispatchOfferStatus.SENT, DispatchOfferStatus.VIEWED],
-              },
-            },
-            data: {
-              status: DispatchOfferStatus.CANCELLED,
-            },
-          });
+      await tx.dispatchOffer.updateMany({
+        where: {
+          shipmentId: offer.shipmentId,
+          id: {
+            not: offer.id,
+          },
+          status: {
+            in: [DispatchOfferStatus.SENT, DispatchOfferStatus.VIEWED],
+          },
+        },
+        data: {
+          status: DispatchOfferStatus.CANCELLED,
+        },
+      });
 
-          await tx.dispatchBatch.update({
-            where: {
-              id: offer.batchId,
-            },
-            data: {
-              status: DispatchBatchStatus.ASSIGNED,
-              closedAt: now,
-            },
-          });
+      await tx.dispatchBatch.update({
+        where: {
+          id: offer.batchId,
+        },
+        data: {
+          status: DispatchBatchStatus.ASSIGNED,
+          closedAt: now,
+        },
+      });
 
-          acceptanceContext = {
-            shipmentId: shipment.id,
-            trackingCode: shipment.trackingCode,
-            customerProfileId: shipment.customerProfileId,
-          };
+      acceptanceContext = {
+        shipmentId: shipment.id,
+        trackingCode: shipment.trackingCode,
+        customerProfileId: shipment.customerProfileId,
+      };
 
-          return updatedOffer;
-        }),
-    );
+      return updatedOffer;
+    });
 
     if (acceptanceContext) {
       await this.notifications.notifyProviderTeam(providerId, {
@@ -1278,16 +1225,12 @@ export class DispatchService {
     providerId: string,
     shipmentId: string,
   ): Promise<PrismaShipmentAssignment> {
-    const assignment = await this.prisma.runWithRetry(
-      'DispatchService.requireProviderOwnedActiveAssignment',
-      () =>
-        this.prisma.shipmentAssignment.findFirst({
-          where: {
-            shipmentId,
-            providerId,
-          },
-        }),
-    );
+    const assignment = await this.prisma.shipmentAssignment.findFirst({
+      where: {
+        shipmentId,
+        providerId,
+      },
+    });
 
     if (!assignment) {
       throw new ForbiddenException(
@@ -1307,39 +1250,31 @@ export class DispatchService {
   private async resolveProviderIdForProfile(
     profileId: string,
   ): Promise<string | null> {
-    const provider = await this.prisma.runWithRetry(
-      'DispatchService.resolveProviderIdForProfile.provider',
-      () =>
-        this.prisma.provider.findFirst({
-          where: {
-            profileId,
-          },
-          select: {
-            id: true,
-          },
-        }),
-    );
+    const provider = await this.prisma.provider.findFirst({
+      where: {
+        profileId,
+      },
+      select: {
+        id: true,
+      },
+    });
 
     if (provider?.id) {
       return provider.id;
     }
 
-    const providerMember = await this.prisma.runWithRetry(
-      'DispatchService.resolveProviderIdForProfile.providerMember',
-      () =>
-        this.prisma.providerMember.findFirst({
-          where: {
-            profileId,
-            status: 'active',
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          select: {
-            providerId: true,
-          },
-        }),
-    );
+    const providerMember = await this.prisma.providerMember.findFirst({
+      where: {
+        profileId,
+        status: 'active',
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      select: {
+        providerId: true,
+      },
+    });
 
     return providerMember?.providerId ?? null;
   }

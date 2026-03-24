@@ -1,5 +1,11 @@
 import { InputType, Field } from '@nestjs/graphql';
-import { IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 @InputType()
 export class CreateUserAddressDto {

@@ -8,7 +8,10 @@ export class MailService {
   private readonly from: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.from = configService.get<string>('SMTP_FROM', 'Oyana <noreply@oyana.com>');
+    this.from = configService.get<string>(
+      'SMTP_FROM',
+      'Oyana <noreply@oyana.com>',
+    );
 
     this.transporter = nodemailer.createTransport({
       host: configService.get<string>('SMTP_HOST', 'smtp.gmail.com'),

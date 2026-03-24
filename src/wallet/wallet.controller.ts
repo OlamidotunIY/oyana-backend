@@ -1,4 +1,11 @@
-import { BadRequestException, Body, Controller, Headers, Post, Req } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Headers,
+  Post,
+  Req,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { WalletService } from './wallet.service';
 
@@ -24,7 +31,11 @@ export class WalletController {
       throw new BadRequestException('Missing Paystack signature');
     }
 
-    await this.walletService.handlePaystackWebhookEvent(payload, rawBody, signature);
+    await this.walletService.handlePaystackWebhookEvent(
+      payload,
+      rawBody,
+      signature,
+    );
 
     return { received: true };
   }

@@ -88,14 +88,10 @@ export class AuthService {
       }
     }
 
-    const existing = await this.prisma.runWithRetry(
-      'AuthService.signUp.checkEmail',
-      () =>
-        this.prisma.profile.findUnique({
-          where: { email: input.email },
-          select: { id: true },
-        }),
-    );
+    const existing = await this.prisma.profile.findUnique({
+      where: { email: input.email },
+      select: { id: true },
+    });
 
     if (existing) {
       throw new BadRequestException('Email already registered');
@@ -107,21 +103,19 @@ export class AuthService {
     );
     const profileId = randomUUID();
 
-    await this.prisma.runWithRetry('AuthService.signUp.createProfile', () =>
-      this.prisma.profile.create({
-        data: {
-          id: profileId,
-          email: input.email,
-          passwordHash,
-          roles,
-          firstName: input.firstName,
-          lastName: input.lastName,
-          state: input.state,
-          referralCode: input.referralCode,
-          phoneE164: input.phoneNumber,
-        },
-      }),
-    );
+    await this.prisma.profile.create({
+      data: {
+        id: profileId,
+        email: input.email,
+        passwordHash,
+        roles,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        state: input.state,
+        referralCode: input.referralCode,
+        phoneE164: input.phoneNumber,
+      },
+    });
 
     const signupEvent = new UserSignedUpEvent(
       profileId,
@@ -153,14 +147,10 @@ export class AuthService {
     req: ExpressRequest,
     response: ExpressResponse,
   ): Promise<AuthResponse> {
-    const profile = await this.prisma.runWithRetry(
-      'AuthService.signIn.findProfile',
-      () =>
-        this.prisma.profile.findUnique({
-          where: { email: input.email },
-          select: { id: true, email: true, passwordHash: true },
-        }),
-    );
+    const profile = await this.prisma.profile.findUnique({
+      where: { email: input.email },
+      select: { id: true, email: true, passwordHash: true },
+    });
 
     if (!profile || !profile.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
@@ -196,14 +186,10 @@ export class AuthService {
   // ---------------------------------------------------------------------------
 
   async requestOtp(input: RequestOtpInput): Promise<MessageResponse> {
-    const existing = await this.prisma.runWithRetry(
-      'AuthService.requestOtp.checkEmail',
-      () =>
-        this.prisma.profile.findUnique({
-          where: { email: input.email },
-          select: { id: true },
-        }),
-    );
+    const existing = await this.prisma.profile.findUnique({
+      where: { email: input.email },
+      select: { id: true },
+    });
 
     if (input.mode === OtpMode.SIGNUP && existing) {
       throw new BadRequestException('Email already registered');
@@ -216,11 +202,9 @@ export class AuthService {
     const codeHash = await bcrypt.hash(code, BCRYPT_OTP_ROUNDS);
     const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 
-    await this.prisma.runWithRetry('AuthService.requestOtp.createOtp', () =>
-      this.prisma.otpCode.create({
-        data: { email: input.email, codeHash, mode: input.mode, expiresAt },
-      }),
-    );
+    await this.prisma.otpCode.create({
+      data: { email: input.email, codeHash, mode: input.mode, expiresAt },
+    });
 
     await this.mailService.sendOtpEmail(input.email, code);
 
@@ -238,19 +222,15 @@ export class AuthService {
     req: ExpressRequest,
     response: ExpressResponse,
   ): Promise<AuthResponse> {
-    const otpRecord = await this.prisma.runWithRetry(
-      'AuthService.verifyOtp.findOtp',
-      () =>
-        this.prisma.otpCode.findFirst({
-          where: {
-            email: input.email,
-            mode: { in: [OtpMode.SIGNUP, OtpMode.SIGNIN] },
-            usedAt: null,
-            expiresAt: { gt: new Date() },
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-    );
+    const otpRecord = await this.prisma.otpCode.findFirst({
+      where: {
+        email: input.email,
+        mode: { in: [OtpMode.SIGNUP, OtpMode.SIGNIN] },
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
     if (!otpRecord) {
       throw new UnauthorizedException('Invalid or expired OTP');
@@ -261,24 +241,18 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    await this.prisma.runWithRetry('AuthService.verifyOtp.markUsed', () =>
-      this.prisma.otpCode.update({
-        where: { id: otpRecord.id },
-        data: { usedAt: new Date() },
-      }),
-    );
+    await this.prisma.otpCode.update({
+      where: { id: otpRecord.id },
+      data: { usedAt: new Date() },
+    });
 
     let profile = await this.userService.getProfileByEmail(input.email);
 
     if (!profile) {
       const profileId = randomUUID();
-      await this.prisma.runWithRetry(
-        'AuthService.verifyOtp.createProfile',
-        () =>
-          this.prisma.profile.create({
-            data: { id: profileId, email: input.email, state: 'Lagos' as any },
-          }),
-      );
+      await this.prisma.profile.create({
+        data: { id: profileId, email: input.email, state: 'Lagos' as any },
+      });
       profile = await this.userService.getProfileByEmail(input.email);
     }
 
@@ -330,13 +304,9 @@ export class AuthService {
 
     if (!profile) {
       const profileId = randomUUID();
-      await this.prisma.runWithRetry(
-        'AuthService.signInWithGoogle.createProfile',
-        () =>
-          this.prisma.profile.create({
-            data: { id: profileId, email, state: 'Lagos' as any },
-          }),
-      );
+      await this.prisma.profile.create({
+        data: { id: profileId, email, state: 'Lagos' as any },
+      });
       profile = await this.userService.getProfileByEmail(email);
     }
 
@@ -344,20 +314,16 @@ export class AuthService {
       throw new UnauthorizedException('Profile not found');
     }
 
-    await this.prisma.runWithRetry(
-      'AuthService.signInWithGoogle.upsertSocial',
-      () =>
-        this.prisma.socialAccount.upsert({
-          where: { provider_providerId: { provider: 'google', providerId } },
-          create: {
-            profileId: profile!.id,
-            provider: 'google',
-            providerId,
-            email,
-          },
-          update: { email },
-        }),
-    );
+    await this.prisma.socialAccount.upsert({
+      where: { provider_providerId: { provider: 'google', providerId } },
+      create: {
+        profileId: profile!.id,
+        provider: 'google',
+        providerId,
+        email,
+      },
+      update: { email },
+    });
 
     const { accessToken, refreshToken } = await this.issueTokens(
       profile.id,
@@ -376,14 +342,10 @@ export class AuthService {
   // ---------------------------------------------------------------------------
 
   async forgotPassword(input: ForgotPasswordInput): Promise<MessageResponse> {
-    const profile = await this.prisma.runWithRetry(
-      'AuthService.forgotPassword.findProfile',
-      () =>
-        this.prisma.profile.findUnique({
-          where: { email: input.email },
-          select: { id: true },
-        }),
-    );
+    const profile = await this.prisma.profile.findUnique({
+      where: { email: input.email },
+      select: { id: true },
+    });
 
     if (!profile) {
       // Don't reveal whether the email exists
@@ -397,16 +359,14 @@ export class AuthService {
     const codeHash = await bcrypt.hash(code, BCRYPT_OTP_ROUNDS);
     const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 
-    await this.prisma.runWithRetry('AuthService.forgotPassword.createOtp', () =>
-      this.prisma.otpCode.create({
-        data: {
-          email: input.email,
-          codeHash,
-          mode: 'password_reset',
-          expiresAt,
-        },
-      }),
-    );
+    await this.prisma.otpCode.create({
+      data: {
+        email: input.email,
+        codeHash,
+        mode: 'password_reset',
+        expiresAt,
+      },
+    });
 
     await this.mailService.sendPasswordResetEmail(input.email, code);
 
@@ -417,19 +377,15 @@ export class AuthService {
   }
 
   async resetPassword(input: ResetPasswordInput): Promise<MessageResponse> {
-    const otpRecord = await this.prisma.runWithRetry(
-      'AuthService.resetPassword.findOtp',
-      () =>
-        this.prisma.otpCode.findFirst({
-          where: {
-            email: input.email,
-            mode: 'password_reset',
-            usedAt: null,
-            expiresAt: { gt: new Date() },
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-    );
+    const otpRecord = await this.prisma.otpCode.findFirst({
+      where: {
+        email: input.email,
+        mode: 'password_reset',
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
     if (!otpRecord) {
       throw new BadRequestException('Invalid or expired reset code');
@@ -503,23 +459,17 @@ export class AuthService {
   ): Promise<AuthUser | null> {
     const tokenHash = this.hashToken(refreshToken);
 
-    const session = await this.prisma.runWithRetry(
-      'AuthService.rotateSession.findSession',
-      () =>
-        this.prisma.userSession.findUnique({
-          where: { refreshTokenHash: tokenHash },
-          include: { profile: { select: { id: true, email: true } } },
-        }),
-    );
+    const session = await this.prisma.userSession.findUnique({
+      where: { refreshTokenHash: tokenHash },
+      include: { profile: { select: { id: true, email: true } } },
+    });
 
     if (!session || session.expiresAt < new Date()) {
       return null;
     }
 
     // Delete old session (rotation — prevents replay)
-    await this.prisma.runWithRetry('AuthService.rotateSession.deleteOld', () =>
-      this.prisma.userSession.delete({ where: { id: session.id } }),
-    );
+    await this.prisma.userSession.delete({ where: { id: session.id } });
 
     await this.issueTokens(
       session.profile.id,
@@ -559,12 +509,10 @@ export class AuthService {
   ): Promise<MessageResponse> {
     if (refreshToken) {
       const tokenHash = this.hashToken(refreshToken);
-      await this.prisma
-        .runWithRetry('AuthService.logout.deleteSession', () =>
-          this.prisma.userSession.deleteMany({
-            where: { refreshTokenHash: tokenHash },
-          }),
-        )
+      await this.prisma.userSession
+        .deleteMany({
+          where: { refreshTokenHash: tokenHash },
+        })
         .catch((err) => {
           this.logger.warn(
             `Failed to delete session on logout: ${err instanceof Error ? err.message : String(err)}`,
@@ -604,13 +552,9 @@ export class AuthService {
       req?.socket?.remoteAddress ??
       undefined;
 
-    await this.prisma.runWithRetry(
-      'AuthService.issueTokens.createSession',
-      () =>
-        this.prisma.userSession.create({
-          data: { profileId, refreshTokenHash, userAgent, ip, expiresAt },
-        }),
-    );
+    await this.prisma.userSession.create({
+      data: { profileId, refreshTokenHash, userAgent, ip, expiresAt },
+    });
 
     this.setCookies(response, accessToken, refreshToken);
 
@@ -626,13 +570,11 @@ export class AuthService {
   }
 
   private async updateLastLogin(profileId: string): Promise<void> {
-    await this.prisma
-      .runWithRetry('AuthService.updateLastLogin', () =>
-        this.prisma.profile.update({
-          where: { id: profileId },
-          data: { lastLoginAt: new Date() },
-        }),
-      )
+    await this.prisma.profile
+      .update({
+        where: { id: profileId },
+        data: { lastLoginAt: new Date() },
+      })
       .catch((err) => {
         this.logger.warn(
           `Failed to update lastLoginAt for ${profileId}: ${err instanceof Error ? err.message : String(err)}`,

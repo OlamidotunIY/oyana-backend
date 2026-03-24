@@ -1,10 +1,5 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import {
-  ProfileStatus,
-  PreferredLanguage,
-  State,
-  UserType,
-} from '../../enums';
+import { ProfileStatus, PreferredLanguage, State, UserType } from '../../enums';
 
 @ObjectType()
 export class Profile {

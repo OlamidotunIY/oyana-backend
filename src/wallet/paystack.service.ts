@@ -122,7 +122,9 @@ export class PaystackService {
   constructor(private readonly configService: ConfigService) {
     this.httpClient = axios.create({
       baseURL: 'https://api.paystack.co',
-      timeout: Number(this.configService.get('PAYSTACK_REQUEST_TIMEOUT_MS') ?? 15000),
+      timeout: Number(
+        this.configService.get('PAYSTACK_REQUEST_TIMEOUT_MS') ?? 15000,
+      ),
     });
   }
 
@@ -170,7 +172,9 @@ export class PaystackService {
     return response;
   }
 
-  async verifyTransaction(reference: string): Promise<PaystackVerifyTransactionData> {
+  async verifyTransaction(
+    reference: string,
+  ): Promise<PaystackVerifyTransactionData> {
     const response = await this.request<PaystackVerifyTransactionData>(
       {
         method: 'GET',
@@ -237,7 +241,9 @@ export class PaystackService {
     return response;
   }
 
-  async initiateTransfer(input: PaystackTransferInput): Promise<PaystackTransferData> {
+  async initiateTransfer(
+    input: PaystackTransferInput,
+  ): Promise<PaystackTransferData> {
     const response = await this.request<PaystackTransferData>(
       {
         method: 'POST',
@@ -315,7 +321,9 @@ export class PaystackService {
         data?: { message?: string };
       }>;
       const paystackMessage =
-        axiosError.response?.data?.message ?? axiosError.message ?? fallbackMessage;
+        axiosError.response?.data?.message ??
+        axiosError.message ??
+        fallbackMessage;
 
       this.logger.warn(`${fallbackMessage}: ${paystackMessage}`);
       throw new BadRequestException(paystackMessage);

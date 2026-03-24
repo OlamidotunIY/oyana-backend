@@ -30,7 +30,9 @@ export class WalletResolver {
   @Query(() => WalletAccount, { nullable: true })
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
-  async myWallet(@CurrentUser() user: SupabaseUser): Promise<WalletAccount | null> {
+  async myWallet(
+    @CurrentUser() user: SupabaseUser,
+  ): Promise<WalletAccount | null> {
     if (!user?.id) {
       return null;
     }

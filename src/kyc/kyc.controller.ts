@@ -33,8 +33,9 @@ export class KycController {
       : JSON.stringify(payload ?? {});
     this.assertAllowlistedIp(req);
 
-    const signatureRequired =
-      this.configService.get<string>('PREMBLY_WEBHOOK_SECRET')?.trim().length;
+    const signatureRequired = this.configService
+      .get<string>('PREMBLY_WEBHOOK_SECRET')
+      ?.trim().length;
 
     if (signatureRequired && !signature) {
       throw new BadRequestException('Missing Prembly webhook signature');
@@ -59,7 +60,9 @@ export class KycController {
     const forwarded = req.headers['x-forwarded-for'];
     const forwardedFirst = Array.isArray(forwarded) ? forwarded[0] : forwarded;
     const forwardedIp =
-      typeof forwardedFirst === 'string' ? forwardedFirst.split(',')[0]?.trim() : undefined;
+      typeof forwardedFirst === 'string'
+        ? forwardedFirst.split(',')[0]?.trim()
+        : undefined;
     const requestIp = forwardedIp || req.ip || req.socket?.remoteAddress;
 
     if (!requestIp || !configured.includes(requestIp)) {

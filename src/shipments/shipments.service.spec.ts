@@ -12,7 +12,6 @@ describe('ShipmentsService', () => {
         {
           provide: PrismaService,
           useValue: {
-            runWithRetry: jest.fn(),
             shipment: {
               findMany: jest.fn(),
               findUnique: jest.fn(),
