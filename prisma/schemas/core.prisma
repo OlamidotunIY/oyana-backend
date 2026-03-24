@@ -21,3 +21,56 @@ enum State {
   Oyo
   Abuja
 }
+
+// ============================================================================
+// AUTH: User sessions, OTP codes, Social accounts
+// ============================================================================
+
+model UserSession {
+  id               String   @id @default(uuid()) @db.Uuid
+  profileId        String   @map("profile_id") @db.Uuid
+  refreshTokenHash String   @unique @map("refresh_token_hash")
+  userAgent        String?  @map("user_agent")
+  ip               String?
+  expiresAt        DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastSeenAt       DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+model OtpCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String
+  codeHash  String    @map("code_hash")
+  // mode: 'signin' | 'signup' | 'password_reset'
+  mode      String
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+model SocialAccount {
+  id         String   @id @default(uuid()) @db.Uuid
+  profileId  String   @map("profile_id") @db.Uuid
+  // provider: 'google'
+  provider   String
+  providerId String   @map("provider_id")
+  email      String?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@index([profileId])
+  @@map("social_accounts")
+}

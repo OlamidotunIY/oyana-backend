@@ -1,6 +1,7 @@
 model Profile {
-  id                String        @id @db.Uuid // Same as auth.users.id
+  id                String        @id @db.Uuid
   email             String        @unique
+  passwordHash      String?       @map("password_hash")
   roles             UserType[]    @default([individual]) @map("user_roles")
   firstName         String?       @map("first_name")
   lastName          String?       @map("last_name")
@@ -16,21 +17,23 @@ model Profile {
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  customerShipments         Shipment[]           @relation("CustomerShipments")
+  sessions                  UserSession[]
+  socialAccounts            SocialAccount[]
+  customerShipments         Shipment[]                 @relation("CustomerShipments")
   providerMembers           ProviderMember[]
-  contactForProviders       Provider[]           @relation("ProviderContact")
+  contactForProviders       Provider[]                 @relation("ProviderContact")
   adminSessions             AdminSession[]
   shipmentEventActors       ShipmentEvent[]
-  cancelledShipments        Shipment[]           @relation("ShipmentCanceller")
-  walletAccounts            WalletAccount[]      @relation("ProfileWallet")
+  cancelledShipments        Shipment[]                 @relation("ShipmentCanceller")
+  walletAccounts            WalletAccount[]            @relation("ProfileWallet")
   ratingsMade               Rating[]
   shipmentBidAwards         ShipmentBidAward[]
-  initiatedKycChecks        ProviderKycCheck[]   @relation("ProviderKycCheckInitiator")
-  uploadedKycMedia          ProviderKycMedia[]   @relation("ProviderKycMediaUploader")
+  initiatedKycChecks        ProviderKycCheck[]         @relation("ProviderKycCheckInitiator")
+  uploadedKycMedia          ProviderKycMedia[]         @relation("ProviderKycMediaUploader")
   podUploads                PodUpload[]
   shipmentAssignmentsDriver ShipmentAssignment[]
-  refundsInitiated          Refund[]             @relation("RefundInitiator")
-  refundsApproved           Refund[]             @relation("RefundApprover")
+  refundsInitiated          Refund[]                   @relation("RefundInitiator")
+  refundsApproved           Refund[]                   @relation("RefundApprover")
   waybillReviews            Waybill[]
   userAddresses             UserAddress[]
   phoneVerificationAttempts PhoneVerificationAttempt[]
@@ -38,18 +41,18 @@ model Profile {
   savedBankAccounts         WalletSavedBankAccount[]
   walletWithdrawals         WalletWithdrawal[]
   walletIdempotencyKeys     WalletIdempotencyKey[]
-  supportTickets            SupportTicket[]       @relation("SupportTicketOwner")
-  assignedSupportTickets    SupportTicket[]       @relation("SupportTicketAssignee")
-  supportTicketMessages     SupportTicketMessage[] @relation("SupportTicketMessageAuthor")
-  disputeCases              DisputeCase[]         @relation("DisputeOwner")
-  resolvedDisputes          DisputeCase[]         @relation("DisputeResolver")
-  disputeEvents             DisputeEvent[]        @relation("DisputeEventActor")
-  invoices                  Invoice[]             @relation("ProfileInvoices")
-  fraudFlagsRaised          FraudFlag[]           @relation("FraudRaisedBy")
-  fraudFlagsAssigned        FraudFlag[]           @relation("FraudAssignedTo")
-  fraudFlagsResolved        FraudFlag[]           @relation("FraudResolvedBy")
-  platformConfigUpdates     PlatformConfig[]      @relation("PlatformConfigUpdater")
-  notifications             Notification[]        @relation("ProfileNotifications")
+  supportTickets            SupportTicket[]            @relation("SupportTicketOwner")
+  assignedSupportTickets    SupportTicket[]            @relation("SupportTicketAssignee")
+  supportTicketMessages     SupportTicketMessage[]     @relation("SupportTicketMessageAuthor")
+  disputeCases              DisputeCase[]              @relation("DisputeOwner")
+  resolvedDisputes          DisputeCase[]              @relation("DisputeResolver")
+  disputeEvents             DisputeEvent[]             @relation("DisputeEventActor")
+  invoices                  Invoice[]                  @relation("ProfileInvoices")
+  fraudFlagsRaised          FraudFlag[]                @relation("FraudRaisedBy")
+  fraudFlagsAssigned        FraudFlag[]                @relation("FraudAssignedTo")
+  fraudFlagsResolved        FraudFlag[]                @relation("FraudResolvedBy")
+  platformConfigUpdates     PlatformConfig[]           @relation("PlatformConfigUpdater")
+  notifications             Notification[]             @relation("ProfileNotifications")
 
   @@map("profiles")
 }

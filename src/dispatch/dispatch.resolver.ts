@@ -4,7 +4,6 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
 import {
   AssignShipmentDto,
   CreateDispatchBatchDto,
@@ -17,6 +16,7 @@ import {
 } from '../graphql';
 import { UserType } from '../graphql/enums';
 import { DispatchService } from './dispatch.service';
+import { AuthUser } from 'src/graphql/types/auth';
 
 @Resolver(() => DispatchBatch)
 export class DispatchResolver {
@@ -32,7 +32,7 @@ export class DispatchResolver {
   @Query(() => [DispatchOffer])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
-  async myDispatchOffers(@CurrentUser() user: SupabaseUser): Promise<DispatchOffer[]> {
+  async myDispatchOffers(@CurrentUser() user: AuthUser): Promise<DispatchOffer[]> {
     return this.dispatchService.myDispatchOffers(user.id);
   }
 
@@ -58,7 +58,7 @@ export class DispatchResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async respondToDispatchOffer(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateDispatchOfferDto,
   ): Promise<DispatchOffer> {
     return this.dispatchService.respondToDispatchOffer(user.id, input);
@@ -68,7 +68,7 @@ export class DispatchResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async markEnRoutePickup(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<Shipment> {
     return this.dispatchService.markEnRoutePickup(user.id, shipmentId);
@@ -78,7 +78,7 @@ export class DispatchResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async confirmPickup(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<Shipment> {
     return this.dispatchService.confirmPickup(user.id, shipmentId);
@@ -88,7 +88,7 @@ export class DispatchResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async confirmDropoff(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<Shipment> {
     return this.dispatchService.confirmDropoff(user.id, shipmentId);

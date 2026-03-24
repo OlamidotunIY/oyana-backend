@@ -13,8 +13,8 @@ import { GraphQLModule } from '@nestjs/graphql';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
 import type { Context } from 'graphql-ws';
-import { SupabaseModule } from 'src/auth/supabase/supabase.module';
-import { SupabaseService } from 'src/auth/supabase/supabase.service';
+import { JwtService } from '@nestjs/jwt';
+import { AuthModule } from 'src/auth/auth.module';
 
 type WsExtra = {
   userId?: string;
@@ -61,7 +61,8 @@ function extractRequestIdFromHeaders(
 
   if (Array.isArray(headerValue)) {
     const value = headerValue.find(
-      (item): item is string => typeof item === 'string' && item.trim().length > 0,
+      (item): item is string =>
+        typeof item === 'string' && item.trim().length > 0,
     );
     return value?.trim() ?? randomUUID();
   }
@@ -109,7 +110,10 @@ function parseGraphQLError(error: unknown): ParsedGraphQLError {
         }
       }
 
-      if (typeof responseMessage === 'string' && responseMessage.trim().length > 0) {
+      if (
+        typeof responseMessage === 'string' &&
+        responseMessage.trim().length > 0
+      ) {
         return {
           message: responseMessage,
           statusCode,
@@ -117,7 +121,10 @@ function parseGraphQLError(error: unknown): ParsedGraphQLError {
       }
 
       const responseError = responseObject.error;
-      if (typeof responseError === 'string' && responseError.trim().length > 0) {
+      if (
+        typeof responseError === 'string' &&
+        responseError.trim().length > 0
+      ) {
         return {
           message: responseError,
           statusCode,
@@ -149,13 +156,10 @@ function parseGraphQLError(error: unknown): ParsedGraphQLError {
 }
 
 export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
-  imports: [ConfigModule, SupabaseModule],
-  inject: [ConfigService, SupabaseService],
+  imports: [ConfigModule, AuthModule],
+  inject: [ConfigService, JwtService],
   driver: ApolloDriver,
-  useFactory: async (
-    configService: ConfigService,
-    supabaseService: SupabaseService,
-  ) => {
+  useFactory: async (configService: ConfigService, jwtService: JwtService) => {
     const isProduction = configService.get('NODE_ENV') === 'production';
     const logger = new Logger('GraphQL');
     const graphQLErrorLoggingPlugin: ApolloServerPlugin<any> = {
@@ -174,9 +178,12 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
               requestContext.operationName ??
               requestContext.request?.operationName ??
               'anonymous';
-            const operationType = requestContext.operation?.operation ?? 'unknown';
+            const operationType =
+              requestContext.operation?.operation ?? 'unknown';
             const userId =
-              contextValue?.req?.user?.id ?? contextValue?.user?.id ?? 'anonymous';
+              contextValue?.req?.user?.id ??
+              contextValue?.user?.id ??
+              'anonymous';
 
             for (const graphQLError of requestContext.errors ?? []) {
               const parsedError = parseGraphQLError(
@@ -216,9 +223,8 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
                   'requestId',
                 )
               ) {
-                (
-                  graphQLError.extensions as Record<string, unknown>
-                ).requestId = requestId;
+                (graphQLError.extensions as Record<string, unknown>).requestId =
+                  requestId;
               }
             }
           },
@@ -337,10 +343,21 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
               ...(authorization ? { authorization } : {}),
             };
 
-            // Verify session with Supabase
-            const user = await supabaseService.verifySession(authorization);
-
-            if (!user?.id) {
+            // Verify JWT token from connectionParams
+            const token = authorization?.startsWith('Bearer ')
+              ? authorization.slice(7)
+              : authorization;
+            if (!token) {
+              throw new UnauthorizedException('Unauthorized');
+            }
+            let user: { id: string; email: string };
+            try {
+              const payload = jwtService.verify<{ sub: string; email: string }>(
+                token,
+                { secret: configService.getOrThrow('JWT_SECRET') },
+              );
+              user = { id: payload.sub, email: payload.email };
+            } catch {
               throw new UnauthorizedException('Unauthorized');
             }
 

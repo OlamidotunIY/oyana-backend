@@ -9,7 +9,6 @@ import { KycModule } from './kyc/kyc.module';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { GqlConfig } from './config/graphql-ws';
-import { SupabaseModule } from './auth/supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { DatabaseModule } from './database/database.module';
@@ -28,7 +27,6 @@ import { QueueModule } from './queue/queue.module';
     EventEmitterModule.forRoot(),
     DatabaseModule,
     QueueModule,
-    SupabaseModule,
     AuthModule,
     GqlConfig,
     WalletModule,

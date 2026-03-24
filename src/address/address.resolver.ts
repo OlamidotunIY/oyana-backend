@@ -4,13 +4,13 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
 import { CreateUserAddressDto, UserAddress } from '../graphql';
 import { UserType } from '../graphql/enums';
 import { AddressService } from './address.service';
 import { SearchAddressInput } from './dto/search-address.input';
 import { AddressSuggestion } from './types/address-suggestion.type';
 import { ResolvedAddress } from './types/resolved-address.type';
+import { AuthUser } from 'src/graphql/types/auth';
 
 @Resolver()
 export class AddressResolver {
@@ -19,7 +19,7 @@ export class AddressResolver {
   @Query(() => [UserAddress])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
-  async myUserAddresses(@CurrentUser() user: SupabaseUser): Promise<UserAddress[]> {
+  async myUserAddresses(@CurrentUser() user: AuthUser): Promise<UserAddress[]> {
     return this.addressService.getMyUserAddresses(user.id);
   }
 
@@ -27,7 +27,7 @@ export class AddressResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
   async createUserAddress(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateUserAddressDto,
   ): Promise<UserAddress> {
     return this.addressService.createUserAddress(user.id, input);

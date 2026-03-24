@@ -19,41 +19,11 @@ input AddShipmentItemDto {
   weightKg: Float
 }
 
-input AdminDashboardFilterDto {
-  fleetLimit: Int
-  fleetSearch: String
-  from: DateTime
-  interval: AdminDashboardInterval
-  shipmentMode: ShipmentMode
-  to: DateTime
-}
-
-enum AdminDashboardInterval {
-  DAILY
-  HOURLY
-}
-
-enum AdminFleetStatus {
-  DELAYED
-  IN_TRANSIT
-  STATIONARY
-}
-
 type AddressSuggestion {
   description: String!
   mainText: String
   placeId: String!
   secondaryText: String
-}
-
-type AdminFinanceSummary {
-  currency: String!
-  overdueInvoiceAmountMinor: BigInt!
-  overdueInvoiceCount: Int!
-  pendingRefundAmountMinor: BigInt!
-  pendingRefundCount: Int!
-  totalEscrowMinor: BigInt!
-  totalWalletBalanceMinor: BigInt!
 }
 
 type AdminDashboard {
@@ -68,6 +38,15 @@ type AdminDashboard {
   rangeFrom: DateTime!
   rangeTo: DateTime!
   wallet: AdminDashboardWalletSummary!
+}
+
+input AdminDashboardFilterDto {
+  fleetLimit: Int
+  fleetSearch: String
+  from: DateTime
+  interval: AdminDashboardInterval
+  shipmentMode: ShipmentMode
+  to: DateTime
 }
 
 type AdminDashboardFleetPoint {
@@ -86,6 +65,11 @@ type AdminDashboardFleetRow {
   status: AdminFleetStatus!
   to: String
   trackingCode: String!
+}
+
+enum AdminDashboardInterval {
+  DAILY
+  HOURLY
 }
 
 type AdminDashboardNotificationMetric {
@@ -118,6 +102,22 @@ type AdminDashboardWalletSummary {
   balanceMinor: BigInt!
   currency: String!
   escrowMinor: BigInt!
+}
+
+type AdminFinanceSummary {
+  currency: String!
+  overdueInvoiceAmountMinor: BigInt!
+  overdueInvoiceCount: Int!
+  pendingRefundAmountMinor: BigInt!
+  pendingRefundCount: Int!
+  totalEscrowMinor: BigInt!
+  totalWalletBalanceMinor: BigInt!
+}
+
+enum AdminFleetStatus {
+  DELAYED
+  IN_TRANSIT
+  STATIONARY
 }
 
 type AdminOverview {
@@ -467,12 +467,6 @@ enum FraudTargetType {
   WALLET
 }
 
-enum NotificationAudience {
-  ADMIN
-  CUSTOMER
-  PROVIDER
-}
-
 type Invoice {
   createdAt: DateTime!
   currency: String!
@@ -608,6 +602,12 @@ input MyKycChecksFilterDto {
   checkType: String
   limit: Int
   status: String
+}
+
+enum NotificationAudience {
+  ADMIN
+  CUSTOMER
+  PROVIDER
 }
 
 type PaymentIntent {

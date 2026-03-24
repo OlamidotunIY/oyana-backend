@@ -10,14 +10,11 @@ import { GqlExecutionContext } from '@nestjs/graphql';
 import { PrismaService } from '../../database/prisma.service';
 import { UserType } from '../../graphql/enums';
 import { ROLES_KEY, type AppUserRole } from '../decorators/roles.decorator';
-import type { SupabaseUser } from '../supabase/supabase.types';
-import {
-  normalizeProfileRoles,
-  resolveProfileRole,
-} from '../utils/roles.util';
+import type { AuthUser } from '../auth.types';
+import { normalizeProfileRoles, resolveProfileRole } from '../utils/roles.util';
 
 type RequestWithUser = {
-  user?: SupabaseUser;
+  user?: AuthUser;
   userRole?: UserType;
   userRoles?: UserType[];
 };

@@ -44,16 +44,12 @@ export class AddressService {
   }
 
   async getMyUserAddresses(profileId: string): Promise<UserAddress[]> {
-    const addresses = await this.prisma.runWithRetry(
-      'AddressService.getMyUserAddresses',
-      () =>
-        this.prisma.userAddress.findMany({
-          where: { profileId },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-    );
+    const addresses = await this.prisma.userAddress.findMany({
+      where: { profileId },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
     return addresses.map((address) => this.toGraphqlUserAddress(address));
   }
@@ -101,24 +97,20 @@ export class AddressService {
       throw new BadRequestException('Resolved country code is invalid');
     }
 
-    const address = await this.prisma.runWithRetry(
-      'AddressService.createUserAddress',
-      () =>
-        this.prisma.userAddress.create({
-          data: {
-            id: randomUUID(),
-            profileId,
-            address: addressLine,
-            city,
-            state,
-            postalCode,
-            label: input.label?.trim() || undefined,
-            countryCode,
-            lat: resolvedAddress.latitude,
-            lng: resolvedAddress.longitude,
-          },
-        }),
-    );
+    const address = await this.prisma.userAddress.create({
+      data: {
+        id: randomUUID(),
+        profileId,
+        address: addressLine,
+        city,
+        state,
+        postalCode,
+        label: input.label?.trim() || undefined,
+        countryCode,
+        lat: resolvedAddress.latitude,
+        lng: resolvedAddress.longitude,
+      },
+    });
 
     return this.toGraphqlUserAddress(address);
   }
@@ -390,7 +382,10 @@ export class AddressService {
   }
 
   private normalizeShortCodeQuery(query: string): string {
-    return query.replace(/\s*\+\s*/g, '+').replace(/\s+/g, ' ').trim();
+    return query
+      .replace(/\s*\+\s*/g, '+')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private async searchSuggestionsByGeocodeQuery(
@@ -426,7 +421,9 @@ export class AddressService {
 
     return (payload.results ?? [])
       .map((result) => this.toAddressSuggestionFromGeocode(result))
-      .filter((suggestion): suggestion is AddressSuggestion => Boolean(suggestion))
+      .filter((suggestion): suggestion is AddressSuggestion =>
+        Boolean(suggestion),
+      )
       .slice(0, limit);
   }
 

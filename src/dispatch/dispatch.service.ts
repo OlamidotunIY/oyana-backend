@@ -83,15 +83,11 @@ export class DispatchService {
   }
 
   async dispatchBatches(): Promise<DispatchBatch[]> {
-    const batches = await this.prisma.runWithRetry(
-      'DispatchService.dispatchBatches',
-      () =>
-        this.prisma.dispatchBatch.findMany({
-          orderBy: {
-            createdAt: 'desc',
-          },
-        }),
-    );
+    const batches = await this.prisma.dispatchBatch.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
     return batches.map((batch) => this.toGraphqlDispatchBatch(batch));
   }
@@ -103,16 +99,12 @@ export class DispatchService {
       return [];
     }
 
-    const offers = await this.prisma.runWithRetry(
-      'DispatchService.myDispatchOffers',
-      () =>
-        this.prisma.dispatchOffer.findMany({
-          where: {
-            providerId,
-          },
-          orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
-        }),
-    );
+    const offers = await this.prisma.dispatchOffer.findMany({
+      where: {
+        providerId,
+      },
+      orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
+    });
 
     return offers.map((offer) => this.toGraphqlDispatchOffer(offer));
   }
@@ -131,144 +123,139 @@ export class DispatchService {
         }
       | undefined;
 
-    const dispatched = await this.prisma.runWithRetry(
-      'DispatchService.dispatchShipmentIfEligible',
-      async () =>
-        this.prisma.$transaction(async (tx) => {
-          const now = new Date();
-          const shipment = await tx.shipment.findUnique({
-            where: {
-              id: shipmentId,
-            },
+    const dispatched = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const shipment = await tx.shipment.findUnique({
+        where: {
+          id: shipmentId,
+        },
+        select: {
+          id: true,
+          trackingCode: true,
+          customerProfileId: true,
+          mode: true,
+          status: true,
+          scheduleType: true,
+          scheduledAt: true,
+          vehicleCategory: true,
+          dispatchBatch: {
             select: {
               id: true,
-              trackingCode: true,
-              customerProfileId: true,
-              mode: true,
               status: true,
-              scheduleType: true,
-              scheduledAt: true,
-              vehicleCategory: true,
-              dispatchBatch: {
-                select: {
-                  id: true,
-                  status: true,
-                },
-              },
-              assignment: {
-                select: {
-                  id: true,
-                },
-              },
             },
-          });
-
-          if (!shipment) {
-            this.logger.warn(
-              `Skipping dispatch job for missing shipment ${shipmentId}`,
-            );
-            return false;
-          }
-
-          if (shipment.mode !== ShipmentMode.DISPATCH) {
-            return false;
-          }
-
-          if (shipment.status !== ShipmentStatus.CREATED) {
-            return false;
-          }
-
-          if (
-            !this.isShipmentDueForDispatch(
-              shipment.scheduleType,
-              shipment.scheduledAt,
-              now,
-            )
-          ) {
-            return false;
-          }
-
-          if (shipment.assignment?.id) {
-            return false;
-          }
-
-          if (shipment.dispatchBatch?.status === DispatchBatchStatus.ASSIGNED) {
-            return false;
-          }
-
-          const eligibleProviders = await this.findEligibleProviders(
-            tx,
-            shipment.vehicleCategory as VehicleCategory,
-          );
-          if (eligibleProviders.length === 0) {
-            return false;
-          }
-
-          const batch = await this.getOrOpenDispatchBatch(tx, shipment.id, now);
-          if (!batch || batch.status === DispatchBatchStatus.ASSIGNED) {
-            return false;
-          }
-
-          await tx.dispatchOffer.createMany({
-            data: eligibleProviders.map((provider) => ({
-              batchId: batch.id,
-              shipmentId: shipment.id,
-              providerId: provider.providerId,
-              vehicleId: provider.vehicleId,
-              status: DispatchOfferStatus.SENT,
-              sentAt: now,
-              metadata: {
-                trigger,
-              },
-            })),
-            skipDuplicates: true,
-          });
-
-          await tx.shipment.update({
-            where: {
-              id: shipment.id,
-            },
-            data: {
-              status: ShipmentStatus.BROADCASTING,
-            },
-          });
-
-          const existingBroadcastEvent = await tx.shipmentEvent.findFirst({
-            where: {
-              shipmentId: shipment.id,
-              eventType: ShipmentEventType.BROADCASTED,
-            },
+          },
+          assignment: {
             select: {
               id: true,
             },
-          });
+          },
+        },
+      });
 
-          if (!existingBroadcastEvent) {
-            await tx.shipmentEvent.create({
-              data: {
-                shipmentId: shipment.id,
-                eventType: ShipmentEventType.BROADCASTED,
-                actorRole: ShipmentActorRole.SYSTEM,
-                metadata: {
-                  trigger,
-                  eligibleProviderCount: eligibleProviders.length,
-                  dispatchBatchId: batch.id,
-                },
-              },
-            });
-          }
+      if (!shipment) {
+        this.logger.warn(
+          `Skipping dispatch job for missing shipment ${shipmentId}`,
+        );
+        return false;
+      }
 
-          notificationContext = {
+      if (shipment.mode !== ShipmentMode.DISPATCH) {
+        return false;
+      }
+
+      if (shipment.status !== ShipmentStatus.CREATED) {
+        return false;
+      }
+
+      if (
+        !this.isShipmentDueForDispatch(
+          shipment.scheduleType,
+          shipment.scheduledAt,
+          now,
+        )
+      ) {
+        return false;
+      }
+
+      if (shipment.assignment?.id) {
+        return false;
+      }
+
+      if (shipment.dispatchBatch?.status === DispatchBatchStatus.ASSIGNED) {
+        return false;
+      }
+
+      const eligibleProviders = await this.findEligibleProviders(
+        tx,
+        shipment.vehicleCategory as VehicleCategory,
+      );
+      if (eligibleProviders.length === 0) {
+        return false;
+      }
+
+      const batch = await this.getOrOpenDispatchBatch(tx, shipment.id, now);
+      if (!batch || batch.status === DispatchBatchStatus.ASSIGNED) {
+        return false;
+      }
+
+      await tx.dispatchOffer.createMany({
+        data: eligibleProviders.map((provider) => ({
+          batchId: batch.id,
+          shipmentId: shipment.id,
+          providerId: provider.providerId,
+          vehicleId: provider.vehicleId,
+          status: DispatchOfferStatus.SENT,
+          sentAt: now,
+          metadata: {
+            trigger,
+          },
+        })),
+        skipDuplicates: true,
+      });
+
+      await tx.shipment.update({
+        where: {
+          id: shipment.id,
+        },
+        data: {
+          status: ShipmentStatus.BROADCASTING,
+        },
+      });
+
+      const existingBroadcastEvent = await tx.shipmentEvent.findFirst({
+        where: {
+          shipmentId: shipment.id,
+          eventType: ShipmentEventType.BROADCASTED,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!existingBroadcastEvent) {
+        await tx.shipmentEvent.create({
+          data: {
             shipmentId: shipment.id,
-            trackingCode: shipment.trackingCode,
-            customerProfileId: shipment.customerProfileId,
-            providerIds: eligibleProviders.map((provider) => provider.providerId),
-          };
+            eventType: ShipmentEventType.BROADCASTED,
+            actorRole: ShipmentActorRole.SYSTEM,
+            metadata: {
+              trigger,
+              eligibleProviderCount: eligibleProviders.length,
+              dispatchBatchId: batch.id,
+            },
+          },
+        });
+      }
 
-          return true;
-        }),
-      retryOptions,
-    );
+      notificationContext = {
+        shipmentId: shipment.id,
+        trackingCode: shipment.trackingCode,
+        customerProfileId: shipment.customerProfileId,
+        providerIds: eligibleProviders.map((provider) => provider.providerId),
+      };
+
+      return true;
+    });
 
     if (dispatched && notificationContext) {
       await this.notifications.notifyCustomer(
@@ -487,7 +474,9 @@ export class DispatchService {
         });
 
         if (!currentShipment) {
-          throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+          throw new NotFoundException(
+            `Shipment with id ${shipmentId} not found`,
+          );
         }
 
         const allowedStatuses = new Set<string>([
@@ -523,7 +512,10 @@ export class DispatchService {
     return this.toGraphqlShipment(shipment);
   }
 
-  async confirmPickup(profileId: string, shipmentId: string): Promise<Shipment> {
+  async confirmPickup(
+    profileId: string,
+    shipmentId: string,
+  ): Promise<Shipment> {
     const providerId = await this.resolveProviderIdForProfile(profileId);
 
     if (!providerId) {
@@ -540,7 +532,9 @@ export class DispatchService {
         });
 
         if (!currentShipment) {
-          throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+          throw new NotFoundException(
+            `Shipment with id ${shipmentId} not found`,
+          );
         }
 
         const allowedStatuses = new Set<string>([
@@ -603,7 +597,9 @@ export class DispatchService {
           });
 
           if (!currentShipment) {
-            throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+            throw new NotFoundException(
+              `Shipment with id ${shipmentId} not found`,
+            );
           }
 
           const allowedStatuses = new Set<string>([
@@ -669,7 +665,9 @@ export class DispatchService {
     }
 
     if (!this.canRespondToOffer(offer.status)) {
-      throw new BadRequestException('Dispatch offer has already been responded to');
+      throw new BadRequestException(
+        'Dispatch offer has already been responded to',
+      );
     }
 
     const updatedOffer = await this.prisma.runWithRetry(
@@ -1081,7 +1079,8 @@ export class DispatchService {
 
   private canRespondToOffer(status: string): boolean {
     return (
-      status === DispatchOfferStatus.SENT || status === DispatchOfferStatus.VIEWED
+      status === DispatchOfferStatus.SENT ||
+      status === DispatchOfferStatus.VIEWED
     );
   }
 

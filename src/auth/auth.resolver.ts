@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import {
   SignUpInput,
   SignInInput,
+  SignInWithGoogleInput,
   RequestOtpInput,
   VerifyOtpInput,
   RequestPhoneOtpInput,
@@ -17,7 +18,7 @@ import { Roles } from './decorators/roles.decorator';
 import { GqlAuthGuard } from './guards/gql-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
-import type { SupabaseUser } from './supabase/supabase.types';
+import type { AuthUser } from './auth.types';
 import { UserType } from '../graphql/enums';
 
 @Resolver()
@@ -32,9 +33,17 @@ export class AuthResolver {
   @Mutation(() => AuthResponse)
   async signIn(
     @Args('input') input: SignInInput,
-    @Context() context: { res: ExpressResponse },
+    @Context() context: { req: any; res: ExpressResponse },
   ): Promise<AuthResponse> {
-    return this.authService.signIn(input, context.res);
+    return this.authService.signIn(input, context.req, context.res);
+  }
+
+  @Mutation(() => AuthResponse)
+  async signInWithGoogle(
+    @Args('input') input: SignInWithGoogleInput,
+    @Context() context: { req: any; res: ExpressResponse },
+  ): Promise<AuthResponse> {
+    return this.authService.signInWithGoogle(input, context.req, context.res);
   }
 
   @Mutation(() => MessageResponse)
@@ -47,16 +56,16 @@ export class AuthResolver {
   @Mutation(() => AuthResponse)
   async verifyOtp(
     @Args('input') input: VerifyOtpInput,
-    @Context() context: { res: ExpressResponse },
+    @Context() context: { req: any; res: ExpressResponse },
   ): Promise<AuthResponse> {
-    return this.authService.verifyOtp(input, context.res);
+    return this.authService.verifyOtp(input, context.req, context.res);
   }
 
   @Mutation(() => MessageResponse)
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async requestPhoneOtp(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: RequestPhoneOtpInput,
   ): Promise<MessageResponse> {
     return this.authService.requestPhoneOtp(user.id, input);
@@ -66,7 +75,7 @@ export class AuthResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async verifyPhoneOtp(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: VerifyPhoneOtpInput,
   ): Promise<MessageResponse> {
     return this.authService.verifyPhoneOtp(user.id, input);
@@ -82,14 +91,8 @@ export class AuthResolver {
   @Mutation(() => MessageResponse)
   async resetPassword(
     @Args('input') input: ResetPasswordInput,
-    @Context() context: any,
   ): Promise<MessageResponse> {
-    const authHeader = context.req?.headers?.authorization;
-    if (!authHeader) {
-      throw new Error('Authorization header required');
-    }
-    const token = authHeader.replace('Bearer ', '');
-    return this.authService.resetPassword(input, token);
+    return this.authService.resetPassword(input);
   }
 
   @Mutation(() => AuthResponse)
@@ -98,7 +101,7 @@ export class AuthResolver {
     refreshToken: string | null,
     @Context()
     context: {
-      req?: { cookies?: Record<string, string> };
+      req: any;
       res: ExpressResponse;
     },
   ): Promise<AuthResponse> {
@@ -109,13 +112,18 @@ export class AuthResolver {
       throw new UnauthorizedException('Refresh token is required');
     }
 
-    return this.authService.refreshToken(resolvedRefreshToken, context.res);
+    return this.authService.refreshToken(
+      resolvedRefreshToken,
+      context.req,
+      context.res,
+    );
   }
 
   @Mutation(() => MessageResponse)
   async logout(
-    @Context() context: { res: ExpressResponse },
+    @Context() context: { req: any; res: ExpressResponse },
   ): Promise<MessageResponse> {
-    return this.authService.logout(context.res);
+    const refreshToken = context.req?.cookies?.['oyana-refreshToken'];
+    return this.authService.logout(refreshToken, context.res);
   }
 }

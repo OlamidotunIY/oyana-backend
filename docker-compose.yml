@@ -1,5 +1,30 @@
 services:
-  # Redis for GraphQL subscriptions
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: oyana-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-oyana}
+      POSTGRES_USER: ${POSTGRES_USER:-oyana}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oyana_dev_password}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - oyana-network
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-oyana} -d ${POSTGRES_DB:-oyana}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for GraphQL subscriptions & BullMQ
   redis:
     image: redis:7-alpine
     container_name: oyana-redis
@@ -27,21 +52,27 @@ services:
     container_name: oyana-backend
     restart: unless-stopped
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3500}
-      DATABASE_URL: ${DATABASE_URL}
-      DIRECT_URL: ${DIRECT_URL}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:3001}
-      JWT_SECRET: ${JWT_SECRET:-your-jwt-secret-change-this}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM:-Oyana <noreply@oyana.com>}
     ports:
       - '${PORT:-3500}:3500'
     networks:
@@ -59,17 +90,16 @@ services:
     healthcheck:
       disable: true
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL}
-      DIRECT_URL: ${DIRECT_URL}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
+      DIRECT_URL: ${DIRECT_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
       PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED: ${PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED:-true}
       PREMBLY_RAW_PAYLOAD_CLEANUP_INTERVAL_MINUTES: ${PREMBLY_RAW_PAYLOAD_CLEANUP_INTERVAL_MINUTES:-360}
       DISPATCH_RECONCILE_INTERVAL_SECONDS: ${DISPATCH_RECONCILE_INTERVAL_SECONDS:-120}
@@ -85,4 +115,5 @@ networks:
     driver: bridge
 
 volumes:
+  postgres_data:
   redis_data:
