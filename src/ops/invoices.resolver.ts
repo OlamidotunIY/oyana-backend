@@ -4,7 +4,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import type { AuthUser } from '../auth/auth.types';
 import {
   CreateInvoiceDto,
   Invoice,
@@ -20,7 +20,7 @@ export class InvoicesResolver {
   @Query(() => [Invoice])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
-  async myInvoices(@CurrentUser() user: SupabaseUser): Promise<Invoice[]> {
+  async myInvoices(@CurrentUser() user: AuthUser): Promise<Invoice[]> {
     return this.invoicesService.myInvoices(user.id);
   }
 
@@ -28,7 +28,7 @@ export class InvoicesResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async invoice(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
   ): Promise<Invoice | null> {
     return this.invoicesService.invoice(user.id, id);
@@ -38,7 +38,7 @@ export class InvoicesResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN)
   async createInvoice(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateInvoiceDto,
   ): Promise<Invoice> {
     return this.invoicesService.createInvoice(user.id, input);
@@ -48,7 +48,7 @@ export class InvoicesResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN)
   async updateInvoiceStatus(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateInvoiceStatusDto,
   ): Promise<Invoice> {
     return this.invoicesService.updateInvoiceStatus(user.id, input);

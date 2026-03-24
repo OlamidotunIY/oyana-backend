@@ -16,7 +16,7 @@ import {
 } from '../graphql';
 import { UserType } from '../graphql/enums';
 import { DispatchService } from './dispatch.service';
-import { AuthUser } from 'src/graphql/types/auth';
+import type { AuthUser } from '../auth/auth.types';
 
 @Resolver(() => DispatchBatch)
 export class DispatchResolver {

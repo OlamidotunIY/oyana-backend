@@ -4,7 +4,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import type { AuthUser } from '../auth/auth.types';
 import {
   AddDisputeCommentDto,
   CreateDisputeDto,
@@ -22,7 +22,7 @@ export class DisputesResolver {
   @Query(() => [DisputeCase])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
-  async myDisputes(@CurrentUser() user: SupabaseUser): Promise<DisputeCase[]> {
+  async myDisputes(@CurrentUser() user: AuthUser): Promise<DisputeCase[]> {
     return this.disputesService.myDisputes(user.id);
   }
 
@@ -30,7 +30,7 @@ export class DisputesResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async dispute(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
   ): Promise<DisputeCase | null> {
     return this.disputesService.dispute(user.id, id);
@@ -40,7 +40,7 @@ export class DisputesResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async createDispute(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateDisputeDto,
   ): Promise<DisputeCase> {
     return this.disputesService.createDispute(user.id, input);
@@ -50,7 +50,7 @@ export class DisputesResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async addDisputeComment(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: AddDisputeCommentDto,
   ): Promise<DisputeEvent> {
     return this.disputesService.addDisputeComment(user.id, input);
@@ -60,7 +60,7 @@ export class DisputesResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN)
   async resolveDispute(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: ResolveDisputeDto,
   ): Promise<DisputeCase> {
     return this.disputesService.resolveDispute(user.id, input);

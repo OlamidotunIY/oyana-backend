@@ -1,6 +1,4 @@
-import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { SupabaseService } from '../auth/supabase/supabase.service';
 import { DispatchResolver } from './dispatch.resolver';
 import { DispatchService } from './dispatch.service';
 
@@ -14,19 +12,6 @@ describe('DispatchResolver', () => {
         {
           provide: DispatchService,
           useValue: {},
-        },
-        {
-          provide: SupabaseService,
-          useValue: {
-            verifySession: jest.fn().mockResolvedValue(null),
-            getClient: jest.fn(),
-          },
-        },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn(),
-          },
         },
       ],
     }).compile();

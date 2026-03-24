@@ -20,7 +20,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import type { AuthUser } from '../auth/auth.types';
 import { UserType } from '../graphql/enums';
 
 @Resolver(() => WalletAccount)
@@ -30,9 +30,7 @@ export class WalletResolver {
   @Query(() => WalletAccount, { nullable: true })
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
-  async myWallet(
-    @CurrentUser() user: SupabaseUser,
-  ): Promise<WalletAccount | null> {
+  async myWallet(@CurrentUser() user: AuthUser): Promise<WalletAccount | null> {
     if (!user?.id) {
       return null;
     }
@@ -44,7 +42,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async myWalletCompliance(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<WalletCompliance> {
     return this.walletService.getWalletCompliance(user.id);
   }
@@ -53,7 +51,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async mySavedFundingCards(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<WalletCardMethod[]> {
     return this.walletService.getSavedFundingCards(user.id);
   }
@@ -62,7 +60,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async mySavedWithdrawalAccounts(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<WalletSavedBankAccount[]> {
     return this.walletService.getSavedWithdrawalAccounts(user.id);
   }
@@ -80,7 +78,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async myWalletTransactions(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input', { nullable: true }) input?: WalletTransactionsInput,
   ): Promise<WalletTransactionsConnection> {
     return this.walletService.getMyWalletTransactions(user.id, input);
@@ -90,7 +88,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async walletTransactions(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('walletAccountId') walletAccountId: string,
   ): Promise<Transaction[]> {
     return this.walletService.getWalletTransactions(user.id, walletAccountId);
@@ -100,7 +98,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async createWalletFunding(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateWalletFundingInput,
   ): Promise<WalletFundingResult> {
     return this.walletService.createWalletFunding(user.id, input);
@@ -110,7 +108,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async confirmWalletFunding(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: ConfirmWalletFundingInput,
   ): Promise<WalletFundingResult> {
     return this.walletService.confirmWalletFunding(user.id, input);
@@ -120,7 +118,7 @@ export class WalletResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async createWalletWithdrawal(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateWalletWithdrawalInput,
   ): Promise<WalletWithdrawal> {
     return this.walletService.createWalletWithdrawal(user.id, input);

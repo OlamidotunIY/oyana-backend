@@ -21,14 +21,14 @@ Use one Dockerfile: `./Dockerfile`.
 Use the same core variables for both services:
 
 ```
-DATABASE_URL=your-supabase-connection-string
-DIRECT_URL=your-supabase-direct-connection-string
-SUPABASE_URL=your-supabase-url
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+DATABASE_URL=your-postgres-connection-string
+DIRECT_URL=your-postgres-direct-connection-string
 NODE_ENV=production
 REDIS_HOST=your-redis-host
 REDIS_PORT=6379
+GOOGLE_CLOUD_PROJECT_ID=your-gcp-project-id
+GOOGLE_CLOUD_KEY_FILENAME=/etc/secrets/gcp-service-account.json
+PREMBLY_KYC_BUCKET=your-kyc-bucket
 DISPATCH_RECONCILE_INTERVAL_SECONDS=120
 DISPATCH_WORKER_BATCH_SIZE=100
 PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED=true

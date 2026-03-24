@@ -13,7 +13,6 @@ import {
   ProviderKycProfile as PrismaProviderKycProfile,
   Vehicle as PrismaVehicle,
 } from '@prisma/client';
-import axios from 'axios';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import {
@@ -33,6 +32,7 @@ import {
   VehicleStatus,
 } from '../graphql';
 import { resolveProfileRole } from '../auth/utils/roles.util';
+import { GoogleStorageService } from '../storage/google-storage.service';
 import { PremblyClient } from './prembly.client';
 
 type KycCheckType = 'nin_face' | 'phone' | 'vehicle_plate' | 'vehicle_vin';
@@ -65,6 +65,7 @@ export class KycService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    private readonly googleStorageService: GoogleStorageService,
     private readonly premblyClient: PremblyClient,
   ) {}
 
@@ -131,9 +132,7 @@ export class KycService {
       );
     }
 
-    const bucket =
-      this.configService.get<string>('PREMBLY_KYC_BUCKET')?.trim() ||
-      'kyc-verifications';
+    const bucket = this.getKycBucketName();
     const expiresInSeconds = Math.max(
       Number(
         this.configService.get<string>('PREMBLY_KYC_UPLOAD_URL_TTL_SECONDS') ??
@@ -143,24 +142,12 @@ export class KycService {
     );
 
     const storagePath = this.buildKycStoragePath(providerId, input.fileName);
-    const supabase = this.supabaseService.getClient() as any;
-    const storage = supabase.storage.from(bucket);
-    const uploadResult = await storage.createSignedUploadUrl(storagePath);
-
-    if (uploadResult.error || !uploadResult.data) {
-      throw new BadRequestException(
-        uploadResult.error?.message ?? 'Unable to create KYC upload URL',
-      );
-    }
-
-    const uploadUrl =
-      this.readString(uploadResult.data.signedUrl) ??
-      this.readString(uploadResult.data.signed_url) ??
-      this.readString(uploadResult.data.url);
-
-    if (!uploadUrl) {
-      throw new BadRequestException('Supabase upload URL was not returned');
-    }
+    const uploadUrl = await this.googleStorageService.createSignedUploadUrl({
+      bucketName: bucket,
+      objectPath: storagePath,
+      expiresInSeconds,
+      contentType: mimeType,
+    });
 
     const media = await this.prisma.providerKycMedia.create({
       data: {
@@ -1358,36 +1345,23 @@ export class KycService {
     bucket: string,
     path: string,
   ): Promise<string> {
-    const supabase = this.supabaseService.getClient() as any;
-    const storage = supabase.storage.from(bucket);
-
-    const signedResult = await storage.createSignedUrl(path, 90);
-    if (signedResult.error || !signedResult.data) {
-      throw new BadRequestException(
-        signedResult.error?.message ?? 'Unable to fetch KYC media',
-      );
-    }
-
-    const signedUrl =
-      this.readString(signedResult.data.signedUrl) ??
-      this.readString(signedResult.data.signed_url) ??
-      this.readString(signedResult.data.url);
-
-    if (!signedUrl) {
-      throw new BadRequestException('Signed media URL was not returned');
-    }
-
-    const response = await axios.get<ArrayBuffer>(signedUrl, {
-      responseType: 'arraybuffer',
-    });
-
-    const body = response.data;
-    const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
+    const buffer = await this.googleStorageService.downloadAsBuffer(
+      bucket,
+      path,
+    );
     if (buffer.length === 0) {
       throw new BadRequestException('Uploaded media is empty');
     }
 
     return buffer.toString('base64');
+  }
+
+  private getKycBucketName(): string {
+    return (
+      this.configService.get<string>('PREMBLY_KYC_BUCKET')?.trim() ||
+      this.configService.get<string>('STORAGE_BUCKET_NAME')?.trim() ||
+      'kyc-verifications'
+    );
   }
 
   private async updateVehicleVerificationSnapshot(

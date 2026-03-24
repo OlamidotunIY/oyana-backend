@@ -4,7 +4,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import type { AuthUser } from '../auth/auth.types';
 import {
   AdminFinanceSummary,
   AdminDashboard,
@@ -38,50 +38,46 @@ export class AdminOpsResolver {
 
   @Query(() => AdminDashboard)
   async adminDashboard(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input', { nullable: true }) input?: AdminDashboardFilterDto,
   ): Promise<AdminDashboard> {
     return this.adminOpsService.adminDashboard(user.id, input);
   }
 
   @Query(() => AdminOverview)
-  async adminOverview(
-    @CurrentUser() user: SupabaseUser,
-  ): Promise<AdminOverview> {
+  async adminOverview(@CurrentUser() user: AuthUser): Promise<AdminOverview> {
     return this.adminOpsService.adminOverview(user.id);
   }
 
   @Query(() => [Shipment])
-  async adminLiveShipments(
-    @CurrentUser() user: SupabaseUser,
-  ): Promise<Shipment[]> {
+  async adminLiveShipments(@CurrentUser() user: AuthUser): Promise<Shipment[]> {
     return this.adminOpsService.adminLiveShipments(user.id);
   }
 
   @Query(() => [DispatchBatch])
   async adminDispatchQueue(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<DispatchBatch[]> {
     return this.adminOpsService.adminDispatchQueue(user.id);
   }
 
   @Query(() => [Shipment])
   async adminMarketplaceBoard(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<Shipment[]> {
     return this.adminOpsService.adminMarketplaceBoard(user.id);
   }
 
   @Query(() => [AdminProviderOverview])
   async adminProviders(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<AdminProviderOverview[]> {
     return this.adminOpsService.adminProviders(user.id);
   }
 
   @Query(() => ProviderKycStatus, { nullable: true })
   async adminProviderKyc(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('providerId') providerId: string,
   ): Promise<ProviderKycStatus | null> {
     return this.adminOpsService.adminProviderKyc(user.id, providerId);
@@ -89,48 +85,42 @@ export class AdminOpsResolver {
 
   @Query(() => [ProviderKycCheck])
   async adminProviderKycChecks(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('providerId') providerId: string,
   ): Promise<ProviderKycCheck[]> {
     return this.adminOpsService.adminProviderKycChecks(user.id, providerId);
   }
 
   @Query(() => [DisputeCase])
-  async adminDisputes(
-    @CurrentUser() user: SupabaseUser,
-  ): Promise<DisputeCase[]> {
+  async adminDisputes(@CurrentUser() user: AuthUser): Promise<DisputeCase[]> {
     return this.adminOpsService.adminDisputes(user.id);
   }
 
   @Query(() => [FraudFlag])
-  async adminFraudFlags(
-    @CurrentUser() user: SupabaseUser,
-  ): Promise<FraudFlag[]> {
+  async adminFraudFlags(@CurrentUser() user: AuthUser): Promise<FraudFlag[]> {
     return this.adminOpsService.adminFraudFlags(user.id);
   }
 
   @Query(() => [SLARule])
-  async adminSlaRules(@CurrentUser() user: SupabaseUser): Promise<SLARule[]> {
+  async adminSlaRules(@CurrentUser() user: AuthUser): Promise<SLARule[]> {
     return this.adminOpsService.adminSlaRules(user.id);
   }
 
   @Query(() => AdminFinanceSummary)
   async adminFinanceSummary(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<AdminFinanceSummary> {
     return this.adminOpsService.adminFinanceSummary(user.id);
   }
 
   @Query(() => [PlatformConfig])
-  async adminConfig(
-    @CurrentUser() user: SupabaseUser,
-  ): Promise<PlatformConfig[]> {
+  async adminConfig(@CurrentUser() user: AuthUser): Promise<PlatformConfig[]> {
     return this.adminOpsService.adminConfig(user.id);
   }
 
   @Mutation(() => FraudFlag)
   async flagFraudCase(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: FlagFraudCaseDto,
   ): Promise<FraudFlag> {
     return this.adminOpsService.flagFraudCase(user.id, input);
@@ -138,7 +128,7 @@ export class AdminOpsResolver {
 
   @Mutation(() => FraudFlag)
   async updateFraudFlagStatus(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateFraudFlagStatusDto,
   ): Promise<FraudFlag> {
     return this.adminOpsService.updateFraudFlagStatus(user.id, input);
@@ -146,7 +136,7 @@ export class AdminOpsResolver {
 
   @Mutation(() => SLARule)
   async createSlaRule(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateSlaRuleDto,
   ): Promise<SLARule> {
     return this.adminOpsService.createSlaRule(user.id, input);
@@ -154,7 +144,7 @@ export class AdminOpsResolver {
 
   @Mutation(() => SLARule)
   async updateSlaRule(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateSlaRuleDto,
   ): Promise<SLARule> {
     return this.adminOpsService.updateSlaRule(user.id, input);
@@ -162,7 +152,7 @@ export class AdminOpsResolver {
 
   @Mutation(() => Refund)
   async approveRefund(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: ApproveRefundDto,
   ): Promise<Refund> {
     return this.adminOpsService.approveRefund(user.id, input);
@@ -170,7 +160,7 @@ export class AdminOpsResolver {
 
   @Mutation(() => PlatformConfig)
   async updatePlatformConfig(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: UpdatePlatformConfigDto,
   ): Promise<PlatformConfig> {
     return this.adminOpsService.updatePlatformConfig(user.id, input);

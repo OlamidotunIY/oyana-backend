@@ -18,7 +18,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import type { AuthUser } from '../auth/auth.types';
 import { UserType } from '../graphql/enums';
 
 @Resolver(() => Shipment)
@@ -29,7 +29,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL)
   async shipments(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('filter', { type: () => ShipmentQueryFilter, nullable: true })
     filter?: ShipmentQueryFilter,
   ): Promise<Shipment[]> {
@@ -40,7 +40,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async shipment(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
   ): Promise<Shipment | null> {
     return this.shipmentsService.getShipmentByIdForViewer(user.id, id);
@@ -50,7 +50,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async shipmentTimeline(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
   ): Promise<ShipmentEvent[]> {
     return this.shipmentsService.getShipmentTimelineForViewer(user.id, id);
@@ -60,7 +60,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async shipmentTracking(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
   ): Promise<ShipmentTracking> {
     return this.shipmentsService.getShipmentTrackingForViewer(user.id, id);
@@ -77,7 +77,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
   async myShipmentDashboard(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<ShipmentDashboard> {
     return this.shipmentsService.getCustomerShipmentDashboard(user.id);
   }
@@ -86,7 +86,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS, UserType.ADMIN)
   async getProviderDashboardQuary(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<ProviderDashboardQuary> {
     return this.shipmentsService.getProviderDashboardQuary(user.id);
   }
@@ -95,7 +95,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS, UserType.ADMIN)
   async providerDashboard(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<ProviderDashboardQuary> {
     return this.shipmentsService.getProviderDashboardQuary(user.id);
   }
@@ -104,7 +104,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
   async createShipment(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateShipmentDto,
   ): Promise<Shipment> {
     return this.shipmentsService.createShipment({
@@ -117,7 +117,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
   async updateShipment(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
     @Args('input') input: UpdateShipmentDto,
   ): Promise<Shipment> {
@@ -128,7 +128,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL)
   async cancelShipment(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CancelShipmentDto,
   ): Promise<Shipment> {
     return this.shipmentsService.cancelShipment(user.id, input);
@@ -138,7 +138,7 @@ export class ShipmentsResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL)
   async addShipmentItem(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: AddShipmentItemDto,
   ): Promise<ShipmentItem> {
     return this.shipmentsService.addShipmentItem(user.id, input);

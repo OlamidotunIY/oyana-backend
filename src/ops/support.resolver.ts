@@ -4,7 +4,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import type { AuthUser } from '../auth/auth.types';
 import {
   CreateSupportTicketDto,
   ReplySupportTicketDto,
@@ -23,7 +23,7 @@ export class SupportResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async mySupportTickets(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
   ): Promise<SupportTicket[]> {
     return this.supportService.mySupportTickets(user.id);
   }
@@ -32,7 +32,7 @@ export class SupportResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async supportTicket(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
   ): Promise<SupportTicket | null> {
     return this.supportService.supportTicket(user.id, id);
@@ -42,7 +42,7 @@ export class SupportResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async createSupportTicket(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateSupportTicketDto,
   ): Promise<SupportTicket> {
     return this.supportService.createSupportTicket(user.id, input);
@@ -52,7 +52,7 @@ export class SupportResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async replySupportTicket(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: ReplySupportTicketDto,
   ): Promise<SupportTicketMessage> {
     return this.supportService.replySupportTicket(user.id, input);
@@ -62,7 +62,7 @@ export class SupportResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async updateSupportTicketStatus(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateSupportTicketStatusDto,
   ): Promise<SupportTicket> {
     return this.supportService.updateSupportTicketStatus(user.id, input);

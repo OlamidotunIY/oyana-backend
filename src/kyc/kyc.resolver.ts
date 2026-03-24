@@ -21,7 +21,7 @@ import {
   Vehicle,
 } from '../graphql';
 import { KycService } from './kyc.service';
-import { AuthUser } from 'src/graphql/types/auth';
+import type { AuthUser } from '../auth/auth.types';
 
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard)

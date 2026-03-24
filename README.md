@@ -34,16 +34,21 @@ $ yarn install
 ## Docker Setup
 
 Docker Compose runs:
+
 1. `backend` (API)
 2. `worker` (BullMQ jobs)
 3. `redis`
 
-PostgreSQL is external (Supabase) and must be set in `.env`:
+PostgreSQL can be local or external and must be set in `.env`:
 
 ```bash
-DATABASE_URL="postgresql://...pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://...db.[PROJECT_REF].supabase.co:5432/postgres"
+DATABASE_URL="postgresql://username:password@host:5432/oyana"
+DIRECT_URL="postgresql://username:password@host:5432/oyana"
 ```
+
+KYC uploads use Google Cloud Storage signed URLs. Configure either
+`GOOGLE_CLOUD_KEY_FILENAME` or the `GOOGLE_CLOUD_CLIENT_EMAIL` and
+`GOOGLE_CLOUD_PRIVATE_KEY` pair, plus `PREMBLY_KYC_BUCKET`.
 
 Quick start:
 

@@ -15,7 +15,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import type { SupabaseUser } from '../auth/supabase/supabase.types';
+import type { AuthUser } from '../auth/auth.types';
 import { UserType } from '../graphql/enums';
 
 @Resolver(() => ShipmentBid)
@@ -26,7 +26,7 @@ export class MarketPlaceResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async marketplaceShipments(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('filter', {
       type: () => MarketplaceShipmentsFilterDto,
       nullable: true,
@@ -40,7 +40,7 @@ export class MarketPlaceResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async shipmentBids(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<ShipmentBid[]> {
     return this.marketPlaceService.shipmentBids(user.id, shipmentId);
@@ -49,16 +49,14 @@ export class MarketPlaceResolver {
   @Query(() => [ShipmentBid])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
-  async myBids(@CurrentUser() user: SupabaseUser): Promise<ShipmentBid[]> {
+  async myBids(@CurrentUser() user: AuthUser): Promise<ShipmentBid[]> {
     return this.marketPlaceService.myBids(user.id);
   }
 
   @Query(() => [Shipment])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
-  async myFreightRequests(
-    @CurrentUser() user: SupabaseUser,
-  ): Promise<Shipment[]> {
+  async myFreightRequests(@CurrentUser() user: AuthUser): Promise<Shipment[]> {
     return this.marketPlaceService.myFreightRequests(user.id);
   }
 
@@ -66,7 +64,7 @@ export class MarketPlaceResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
   async freightRequestBids(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('shipmentId') shipmentId: string,
   ): Promise<ShipmentBid[]> {
     return this.marketPlaceService.freightRequestBids(user.id, shipmentId);
@@ -76,7 +74,7 @@ export class MarketPlaceResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async createShipmentBid(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: CreateShipmentBidDto,
   ): Promise<ShipmentBid> {
     return this.marketPlaceService.createShipmentBid(user.id, input);
@@ -86,7 +84,7 @@ export class MarketPlaceResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async updateShipmentBid(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
     @Args('input') input: UpdateShipmentBidDto,
   ): Promise<ShipmentBid> {
@@ -97,7 +95,7 @@ export class MarketPlaceResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.BUSINESS)
   async withdrawBid(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('id') id: string,
   ): Promise<ShipmentBid> {
     return this.marketPlaceService.withdrawBid(user.id, id);
@@ -107,7 +105,7 @@ export class MarketPlaceResolver {
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
   async awardShipmentBid(
-    @CurrentUser() user: SupabaseUser,
+    @CurrentUser() user: AuthUser,
     @Args('input') input: AwardShipmentBidDto,
   ): Promise<ShipmentBidAward> {
     return this.marketPlaceService.awardShipmentBid(user.id, input);

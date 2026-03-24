@@ -1,5 +1,5 @@
 // ============================================================================
-// AUTH SERVICE — Self-managed JWT auth (replaces Supabase)
+// AUTH SERVICE — Self-managed JWT auth
 // ============================================================================
 import {
   BadRequestException,

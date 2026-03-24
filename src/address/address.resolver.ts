@@ -10,7 +10,7 @@ import { AddressService } from './address.service';
 import { SearchAddressInput } from './dto/search-address.input';
 import { AddressSuggestion } from './types/address-suggestion.type';
 import { ResolvedAddress } from './types/resolved-address.type';
-import { AuthUser } from 'src/graphql/types/auth';
+import type { AuthUser } from '../auth/auth.types';
 
 @Resolver()
 export class AddressResolver {
