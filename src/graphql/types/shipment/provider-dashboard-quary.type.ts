@@ -1,8 +1,13 @@
-import { Field, ObjectType } from '@nestjs/graphql';
+import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import { ProviderKycStatus } from '../provider/provider-kyc-status.type';
 import { Vehicle } from '../provider/vehicle.type';
 import { WalletAccount } from '../wallet/wallet-account.type';
-import { ShipmentDashboard } from './shipment-dashboard.type';
+import {
+  ProviderDispatchStats,
+  ProviderEarningsSummary,
+  ProviderPerformance,
+  ShipmentDashboard,
+} from './shipment-dashboard.type';
 import { Shipment } from './shipment.type';
 
 @ObjectType()
@@ -24,4 +29,19 @@ export class ProviderDashboardQuary {
 
   @Field(() => [Vehicle])
   vehicles: Vehicle[];
+
+  @Field(() => Int)
+  cancelledShipmentsCount: number;
+
+  @Field(() => Float)
+  completionRate: number;
+
+  @Field(() => ProviderDispatchStats)
+  dispatchStats: ProviderDispatchStats;
+
+  @Field(() => ProviderEarningsSummary)
+  earningsSummary: ProviderEarningsSummary;
+
+  @Field(() => ProviderPerformance)
+  performance: ProviderPerformance;
 }

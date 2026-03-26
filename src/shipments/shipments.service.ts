@@ -18,6 +18,7 @@ import {
   ProviderDashboardQuary,
   Shipment,
   ShipmentActorRole,
+  ShipmentAssignmentStatus,
   ShipmentDashboard,
   ShipmentEvent,
   ShipmentEventType,
@@ -30,16 +31,22 @@ import {
   ShipmentScheduleType,
   ShipmentStatus,
   ShipmentTracking,
+  TransactionDirection,
+  TransactionStatus,
   UpdateShipmentDto,
   UserType,
+  UserAddress,
   Vehicle,
   VehicleStatus,
   WalletAccount,
+  State,
 } from '../graphql';
 import type {
   ShipmentEvent as PrismaShipmentEvent,
+  ShipmentAssignment as PrismaShipmentAssignment,
   ShipmentItem as PrismaShipmentItem,
   ShipmentMilestone as PrismaShipmentMilestone,
+  UserAddress as PrismaUserAddress,
   Prisma,
   Shipment as PrismaShipment,
   Vehicle as PrismaVehicle,
@@ -192,6 +199,11 @@ export class ShipmentsService {
       orderBy: {
         createdAt: 'desc',
       },
+      include: {
+        items: true,
+        pickupAddress: true,
+        dropoffAddress: true,
+      },
     });
 
     return shipments.map((shipment) => this.toGraphqlShipment(shipment));
@@ -272,18 +284,9 @@ export class ShipmentsService {
     const shipment = await this.prisma.shipment.findUnique({
       where: { id },
       include: {
-        pickupAddress: {
-          select: {
-            address: true,
-            city: true,
-          },
-        },
-        dropoffAddress: {
-          select: {
-            address: true,
-            city: true,
-          },
-        },
+        items: true,
+        pickupAddress: true,
+        dropoffAddress: true,
       },
     });
 
@@ -339,18 +342,9 @@ export class ShipmentsService {
         id: shipmentId,
       },
       include: {
-        pickupAddress: {
-          select: {
-            address: true,
-            city: true,
-          },
-        },
-        dropoffAddress: {
-          select: {
-            address: true,
-            city: true,
-          },
-        },
+        items: true,
+        pickupAddress: true,
+        dropoffAddress: true,
       },
     });
 
@@ -530,6 +524,29 @@ export class ShipmentsService {
         activeAssignments: [],
         completedShipments: [],
         vehicles: [],
+        cancelledShipmentsCount: 0,
+        completionRate: 0,
+        dispatchStats: {
+          offersReceived: 0,
+          offersAccepted: 0,
+          offersDeclined: 0,
+          offersExpired: 0,
+          acceptanceRate: 0,
+        },
+        earningsSummary: {
+          totalEarningsMinor: BigInt(0),
+          earningsThisMonthMinor: BigInt(0),
+          currency: wallet?.currency ?? 'NGN',
+        },
+        performance: {
+          ratingAvg: 0,
+          ratingCount: 0,
+          priorityScore: 0,
+          isAvailable: false,
+          teamMembersCount: 0,
+          penaltiesCount: 0,
+          penaltyPoints: 0,
+        },
       };
     }
 
@@ -543,6 +560,16 @@ export class ShipmentsService {
       completedShipments,
       kycStatus,
       vehicles,
+      providerRecord,
+      offersReceived,
+      offersAccepted,
+      offersDeclined,
+      offersExpired,
+      totalEarningsAgg,
+      monthEarningsAgg,
+      teamMembersCount,
+      cancelledShipmentsCount,
+      penaltiesAgg,
     ] = await Promise.all([
       this.prisma.shipment.count({
         where: {
@@ -664,6 +691,58 @@ export class ShipmentsService {
           createdAt: 'desc',
         },
       }),
+      this.prisma.provider.findUnique({
+        where: { id: providerId },
+        select: {
+          ratingAvg: true,
+          ratingCount: true,
+          priorityScore: true,
+          isAvailable: true,
+        },
+      }),
+      this.prisma.dispatchOffer.count({ where: { providerId } }),
+      this.prisma.dispatchOffer.count({
+        where: { providerId, status: 'accepted' },
+      }),
+      this.prisma.dispatchOffer.count({
+        where: { providerId, status: 'declined' },
+      }),
+      this.prisma.dispatchOffer.count({
+        where: { providerId, status: 'expired' },
+      }),
+      wallet?.id
+        ? this.prisma.walletTransaction.aggregate({
+            where: {
+              walletAccountId: wallet.id,
+              direction: TransactionDirection.CREDIT,
+              status: TransactionStatus.COMPLETED,
+            },
+            _sum: { amountMinor: true },
+          })
+        : Promise.resolve({ _sum: { amountMinor: null } }),
+      wallet?.id
+        ? this.prisma.walletTransaction.aggregate({
+            where: {
+              walletAccountId: wallet.id,
+              direction: TransactionDirection.CREDIT,
+              status: TransactionStatus.COMPLETED,
+              createdAt: { gte: monthStart },
+            },
+            _sum: { amountMinor: true },
+          })
+        : Promise.resolve({ _sum: { amountMinor: null } }),
+      this.prisma.providerMember.count({ where: { providerId } }),
+      this.prisma.shipment.count({
+        where: {
+          assignment: { is: { providerId } },
+          status: ShipmentStatus.CANCELLED,
+        },
+      }),
+      this.prisma.providerPenalty.aggregate({
+        where: { providerId },
+        _count: { id: true },
+        _sum: { points: true },
+      }),
     ]);
 
     const pendingPaymentAmountMinor = pendingPaymentShipments.reduce<bigint>(
@@ -677,6 +756,19 @@ export class ShipmentsService {
       wallet?.currency ??
       this.getAllowedShipmentCurrencies()[0] ??
       'NGN';
+
+    const completedCount = completedShipments.length;
+    const completionRate =
+      completedCount + cancelledShipmentsCount > 0
+        ? Math.round(
+            (completedCount / (completedCount + cancelledShipmentsCount)) * 100,
+          )
+        : 0;
+
+    const acceptanceRate =
+      offersReceived > 0
+        ? Math.round((offersAccepted / offersReceived) * 100)
+        : 0;
 
     return {
       myShipmentDashboard: {
@@ -708,6 +800,31 @@ export class ShipmentsService {
         this.toGraphqlShipment(shipment),
       ),
       vehicles: vehicles.map((vehicle) => this.toGraphqlVehicle(vehicle)),
+      cancelledShipmentsCount,
+      completionRate,
+      dispatchStats: {
+        offersReceived,
+        offersAccepted,
+        offersDeclined,
+        offersExpired,
+        acceptanceRate,
+      },
+      earningsSummary: {
+        totalEarningsMinor: totalEarningsAgg._sum.amountMinor ?? BigInt(0),
+        earningsThisMonthMinor: monthEarningsAgg._sum.amountMinor ?? BigInt(0),
+        currency: wallet?.currency ?? 'NGN',
+      },
+      performance: {
+        ratingAvg: providerRecord?.ratingAvg
+          ? Number(providerRecord.ratingAvg)
+          : 0,
+        ratingCount: providerRecord?.ratingCount ?? 0,
+        priorityScore: providerRecord?.priorityScore ?? 0,
+        isAvailable: providerRecord?.isAvailable ?? false,
+        teamMembersCount,
+        penaltiesCount: penaltiesAgg._count.id,
+        penaltyPoints: penaltiesAgg._sum.points ?? 0,
+      },
     };
   }
 
@@ -924,6 +1041,61 @@ export class ShipmentsService {
     }
 
     return this.toGraphqlShipment(shipment);
+  }
+
+  async markMarketplaceEnRoutePickup(
+    viewerProfileId: string,
+    shipmentId: string,
+  ): Promise<Shipment> {
+    return this.updateProviderMarketplaceShipmentStatus(
+      viewerProfileId,
+      shipmentId,
+      {
+        allowedStatuses: [
+          ShipmentStatus.ASSIGNED,
+          ShipmentStatus.EN_ROUTE_PICKUP,
+        ],
+        nextStatus: ShipmentStatus.EN_ROUTE_PICKUP,
+      },
+    );
+  }
+
+  async confirmMarketplacePickup(
+    viewerProfileId: string,
+    shipmentId: string,
+  ): Promise<Shipment> {
+    return this.updateProviderMarketplaceShipmentStatus(
+      viewerProfileId,
+      shipmentId,
+      {
+        allowedStatuses: [
+          ShipmentStatus.ASSIGNED,
+          ShipmentStatus.EN_ROUTE_PICKUP,
+          ShipmentStatus.PICKED_UP,
+        ],
+        nextStatus: ShipmentStatus.PICKED_UP,
+      },
+    );
+  }
+
+  async confirmMarketplaceDropoff(
+    viewerProfileId: string,
+    shipmentId: string,
+  ): Promise<Shipment> {
+    return this.updateProviderMarketplaceShipmentStatus(
+      viewerProfileId,
+      shipmentId,
+      {
+        allowedStatuses: [
+          ShipmentStatus.PICKED_UP,
+          ShipmentStatus.EN_ROUTE_DROPOFF,
+          ShipmentStatus.DELIVERED,
+          ShipmentStatus.COMPLETED,
+        ],
+        nextStatus: ShipmentStatus.COMPLETED,
+        completeAssignment: true,
+      },
+    );
   }
 
   async cancelShipment(
@@ -1576,7 +1748,13 @@ export class ShipmentsService {
     return (priceMinor * BigInt(commissionRateBps)) / BigInt(10000);
   }
 
-  private toGraphqlShipment(shipment: PrismaShipment): Shipment {
+  private toGraphqlShipment(
+    shipment: PrismaShipment & {
+      items?: PrismaShipmentItem[];
+      pickupAddress?: PrismaUserAddress | null;
+      dropoffAddress?: PrismaUserAddress | null;
+    },
+  ): Shipment {
     return {
       ...shipment,
       scheduledAt: shipment.scheduledAt ?? undefined,
@@ -1588,7 +1766,195 @@ export class ShipmentsService {
       cancelledAt: shipment.cancelledAt ?? undefined,
       cancelledByProfileId: shipment.cancelledByProfileId ?? undefined,
       cancellationReason: shipment.cancellationReason ?? undefined,
+      items: shipment.items?.map((item) => this.toGraphqlShipmentItem(item)),
+      pickupAddress: shipment.pickupAddress
+        ? this.toGraphqlUserAddress(shipment.pickupAddress)
+        : undefined,
+      dropoffAddress: shipment.dropoffAddress
+        ? this.toGraphqlUserAddress(shipment.dropoffAddress)
+        : undefined,
     };
+  }
+
+  private toGraphqlUserAddress(address: PrismaUserAddress): UserAddress {
+    return {
+      id: address.id,
+      profileId: address.profileId,
+      address: address.address,
+      city: address.city,
+      state: address.state as State,
+      postalCode: address.postalCode,
+      label: address.label ?? undefined,
+      countryCode: address.countryCode,
+      lat: address.lat ?? undefined,
+      lng: address.lng ?? undefined,
+      createdAt: address.createdAt,
+      updatedAt: address.updatedAt,
+    };
+  }
+
+  private async updateProviderMarketplaceShipmentStatus(
+    viewerProfileId: string,
+    shipmentId: string,
+    options: {
+      allowedStatuses: ShipmentStatus[];
+      nextStatus: ShipmentStatus;
+      completeAssignment?: boolean;
+    },
+  ): Promise<Shipment> {
+    const viewerRole = await this.requireUserRole(viewerProfileId, [
+      UserType.BUSINESS,
+      UserType.ADMIN,
+    ]);
+    const providerId = await this.resolveProviderIdForProfile(viewerProfileId);
+
+    if (!providerId) {
+      throw new ForbiddenException('No provider account found for this user');
+    }
+
+    const assignment = await this.requireProviderOwnedActiveAssignment(
+      providerId,
+      shipmentId,
+    );
+    const statusChanged = options.nextStatus !== assignment.shipment.status;
+    const eventType = ShipmentsService.STATUS_TO_EVENT_TYPE[options.nextStatus];
+    const milestoneType =
+      ShipmentsService.STATUS_TO_MILESTONE[options.nextStatus];
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const currentShipment = await tx.shipment.findUnique({
+        where: { id: shipmentId },
+        select: {
+          id: true,
+          trackingCode: true,
+          customerProfileId: true,
+          status: true,
+          mode: true,
+        },
+      });
+
+      if (!currentShipment) {
+        throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+      }
+
+      if (currentShipment.mode !== ShipmentMode.MARKETPLACE) {
+        throw new BadRequestException('Shipment is not a marketplace request');
+      }
+
+      if (!options.allowedStatuses.includes(currentShipment.status)) {
+        throw new BadRequestException(
+          `Cannot update marketplace shipment from status ${currentShipment.status}`,
+        );
+      }
+
+      if (options.completeAssignment) {
+        await tx.shipmentAssignment.update({
+          where: { id: assignment.id },
+          data: {
+            status: ShipmentAssignmentStatus.COMPLETED,
+            completedAt: assignment.completedAt ?? new Date(),
+          },
+        });
+      }
+
+      const updatedShipment = await tx.shipment.update({
+        where: { id: shipmentId },
+        data: {
+          status: options.nextStatus,
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      if (statusChanged && eventType) {
+        await tx.shipmentEvent.create({
+          data: {
+            shipmentId,
+            eventType,
+            actorProfileId: viewerProfileId,
+            actorRole:
+              viewerRole === UserType.ADMIN
+                ? ShipmentActorRole.ADMIN
+                : ShipmentActorRole.PROVIDER,
+            metadata: {
+              previousStatus: currentShipment.status,
+              nextStatus: options.nextStatus,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
+
+      if (statusChanged && milestoneType) {
+        await this.markShipmentMilestoneReached(
+          tx,
+          shipmentId,
+          milestoneType,
+          options.nextStatus === ShipmentStatus.COMPLETED
+            ? ShipmentMilestoneStatus.VERIFIED
+            : ShipmentMilestoneStatus.REACHED,
+        );
+      }
+
+      return {
+        shipment: updatedShipment,
+        trackingCode: currentShipment.trackingCode,
+        customerProfileId: currentShipment.customerProfileId,
+        previousStatus: currentShipment.status,
+      };
+    });
+
+    if (statusChanged) {
+      await this.notifyShipmentStatusChange({
+        shipmentId,
+        trackingCode: result.trackingCode,
+        status: options.nextStatus,
+        actorProfileId: viewerProfileId,
+        customerProfileId: result.customerProfileId,
+        details: {
+          previousStatus: result.previousStatus,
+        },
+      });
+    }
+
+    return this.toGraphqlShipment(result.shipment);
+  }
+
+  private async requireProviderOwnedActiveAssignment(
+    providerId: string,
+    shipmentId: string,
+  ): Promise<
+    PrismaShipmentAssignment & {
+      shipment: Pick<PrismaShipment, 'status'>;
+    }
+  > {
+    const assignment = await this.prisma.shipmentAssignment.findFirst({
+      where: {
+        shipmentId,
+        providerId,
+      },
+      include: {
+        shipment: {
+          select: {
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!assignment) {
+      throw new ForbiddenException(
+        'This shipment is not assigned to the authenticated provider',
+      );
+    }
+
+    if (assignment.status !== ShipmentAssignmentStatus.ACTIVE) {
+      throw new BadRequestException(
+        `Shipment assignment is ${assignment.status} and cannot be updated`,
+      );
+    }
+
+    return assignment;
   }
 
   private async notifyShipmentStatusChange(input: {

@@ -126,6 +126,39 @@ export class ShipmentsResolver {
 
   @Mutation(() => Shipment)
   @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS, UserType.ADMIN)
+  async markMarketplaceEnRoutePickup(
+    @CurrentUser() user: AuthUser,
+    @Args('shipmentId') shipmentId: string,
+  ): Promise<Shipment> {
+    return this.shipmentsService.markMarketplaceEnRoutePickup(
+      user.id,
+      shipmentId,
+    );
+  }
+
+  @Mutation(() => Shipment)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS, UserType.ADMIN)
+  async confirmMarketplacePickup(
+    @CurrentUser() user: AuthUser,
+    @Args('shipmentId') shipmentId: string,
+  ): Promise<Shipment> {
+    return this.shipmentsService.confirmMarketplacePickup(user.id, shipmentId);
+  }
+
+  @Mutation(() => Shipment)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS, UserType.ADMIN)
+  async confirmMarketplaceDropoff(
+    @CurrentUser() user: AuthUser,
+    @Args('shipmentId') shipmentId: string,
+  ): Promise<Shipment> {
+    return this.shipmentsService.confirmMarketplaceDropoff(user.id, shipmentId);
+  }
+
+  @Mutation(() => Shipment)
+  @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL)
   async cancelShipment(
     @CurrentUser() user: AuthUser,

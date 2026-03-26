@@ -8,4 +8,7 @@ export class MarketplaceShipmentsResult {
 
   @Field({ nullable: true })
   nextCursor?: string;
+
+  @Field({ nullable: true })
+  reason?: string;
 }

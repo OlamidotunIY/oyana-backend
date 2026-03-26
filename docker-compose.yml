@@ -59,8 +59,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${PORT:-3500}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
-      DIRECT_URL: ${DIRECT_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oyana}:${POSTGRES_PASSWORD:-oyana_dev_password}@postgres:5432/${POSTGRES_DB:-oyana}
+      DIRECT_URL: postgresql://${POSTGRES_USER:-oyana}:${POSTGRES_PASSWORD:-oyana_dev_password}@postgres:5432/${POSTGRES_DB:-oyana}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:3001}
@@ -103,8 +103,8 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
-      DIRECT_URL: ${DIRECT_URL:-postgresql://oyana:oyana_dev_password@postgres:5432/oyana}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oyana}:${POSTGRES_PASSWORD:-oyana_dev_password}@postgres:5432/${POSTGRES_DB:-oyana}
+      DIRECT_URL: postgresql://${POSTGRES_USER:-oyana}:${POSTGRES_PASSWORD:-oyana_dev_password}@postgres:5432/${POSTGRES_DB:-oyana}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED: ${PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED:-true}
@@ -113,6 +113,8 @@ services:
       DISPATCH_WORKER_BATCH_SIZE: ${DISPATCH_WORKER_BATCH_SIZE:-100}
       DISPATCH_RECONCILE_DB_MAX_RETRIES: ${DISPATCH_RECONCILE_DB_MAX_RETRIES:-4}
       DISPATCH_RECONCILE_DB_BASE_DELAY_MS: ${DISPATCH_RECONCILE_DB_BASE_DELAY_MS:-500}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
     networks:
       - oyana-network
     command: node dist/src/worker.js

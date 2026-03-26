@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from './database/database.module';
 import { DispatchModule } from './dispatch/dispatch.module';
 import { KycModule } from './kyc/kyc.module';
@@ -13,6 +14,7 @@ import { WorkerBootstrapService } from './workers/worker-bootstrap.service';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    EventEmitterModule.forRoot(),
     DatabaseModule,
     QueueModule,
     DispatchModule,

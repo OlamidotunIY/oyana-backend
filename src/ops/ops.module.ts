@@ -8,9 +8,10 @@ import { InvoicesService } from './invoices.service';
 import { SupportResolver } from './support.resolver';
 import { SupportService } from './support.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, AuthModule],
   providers: [
     SupportResolver,
     SupportService,

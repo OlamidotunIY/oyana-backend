@@ -81,11 +81,6 @@ export class AuthService {
           'Business name is required for business signup',
         );
       }
-      if (!input.businessAddress) {
-        throw new BadRequestException(
-          'Business address is required for business signup',
-        );
-      }
     }
 
     const existing = await this.prisma.profile.findUnique({

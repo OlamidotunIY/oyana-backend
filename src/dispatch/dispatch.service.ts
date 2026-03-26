@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -13,6 +14,7 @@ import type {
   Shipment as PrismaShipment,
   ShipmentAssignment as PrismaShipmentAssignment,
 } from '@prisma/client';
+import { PubSub } from 'graphql-subscriptions';
 import { PrismaService } from '../database/prisma.service';
 import type { DispatchShipmentJobTrigger } from '../queue/queue.constants';
 import {
@@ -37,9 +39,13 @@ import {
 } from '../graphql';
 import { NotificationsService } from '../notifications/notifications.service';
 
+export const DISPATCH_PUBSUB = 'DISPATCH_PUBSUB';
+
 const DEFAULT_DISPATCH_WORKER_BATCH_SIZE = 100;
 const DEFAULT_DISPATCH_RECONCILE_DB_MAX_RETRIES = 4;
 const DEFAULT_DISPATCH_RECONCILE_DB_BASE_DELAY_MS = 500;
+const DEFAULT_DISPATCH_MAX_RADIUS_KM = 50;
+const DEFAULT_DISPATCH_ROUTE_ALIGN_KM = 5;
 const DISPATCH_ACCEPT_CONFLICT_MESSAGE =
   'Dispatch offer can no longer be accepted because shipment is already assigned';
 
@@ -58,14 +64,27 @@ export class DispatchService {
   private readonly logger = new Logger(DispatchService.name);
   private readonly dispatchWorkerBatchSize: number;
   private readonly dispatchReconcileDbRetryOptions: DbRetryOptions;
+  private readonly dispatchMaxRadiusKm: number;
+  private readonly dispatchRouteAlignKm: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    @Inject(DISPATCH_PUBSUB) private readonly pubSub: PubSub,
   ) {
     this.dispatchWorkerBatchSize = this.parsePositiveInt(
       process.env.DISPATCH_WORKER_BATCH_SIZE,
       DEFAULT_DISPATCH_WORKER_BATCH_SIZE,
+      1,
+    );
+    this.dispatchMaxRadiusKm = this.parsePositiveInt(
+      process.env.DISPATCH_MAX_RADIUS_KM,
+      DEFAULT_DISPATCH_MAX_RADIUS_KM,
+      1,
+    );
+    this.dispatchRouteAlignKm = this.parsePositiveInt(
+      process.env.DISPATCH_ROUTE_ALIGN_KM,
+      DEFAULT_DISPATCH_ROUTE_ALIGN_KM,
       1,
     );
     this.dispatchReconcileDbRetryOptions = {
@@ -138,6 +157,12 @@ export class DispatchService {
           scheduleType: true,
           scheduledAt: true,
           vehicleCategory: true,
+          pickupAddress: {
+            select: {
+              lat: true,
+              lng: true,
+            },
+          },
           dispatchBatch: {
             select: {
               id: true,
@@ -188,6 +213,8 @@ export class DispatchService {
       const eligibleProviders = await this.findEligibleProviders(
         tx,
         shipment.vehicleCategory as VehicleCategory,
+        shipment.pickupAddress?.lat ?? null,
+        shipment.pickupAddress?.lng ?? null,
       );
       if (eligibleProviders.length === 0) {
         return false;
@@ -285,6 +312,20 @@ export class DispatchService {
           body: `Shipment ${notificationContext.trackingCode} is ready for response.`,
           entityType: 'shipment',
           entityId: notificationContext.shipmentId,
+        });
+      }
+
+      // Real-time subscription: push offers to subscribed providers via WebSocket
+      const sentOffers = await this.prisma.dispatchOffer.findMany({
+        where: {
+          shipmentId: notificationContext.shipmentId,
+          providerId: { in: [...providerIds] },
+          status: DispatchOfferStatus.SENT,
+        },
+      });
+      for (const offer of sentOffers) {
+        await this.pubSub.publish(`DISPATCH_OFFER_SENT.${offer.providerId}`, {
+          dispatchOfferSent: this.toGraphqlDispatchOffer(offer),
         });
       }
     }
@@ -1143,7 +1184,11 @@ export class DispatchService {
   private async findEligibleProviders(
     tx: Prisma.TransactionClient,
     vehicleCategory: VehicleCategory,
+    pickupLat: number | null,
+    pickupLng: number | null,
   ): Promise<EligibleDispatchProvider[]> {
+    const hasPickupCoords = pickupLat !== null && pickupLng !== null;
+
     const providers = await tx.provider.findMany({
       where: {
         isAvailable: true,
@@ -1155,39 +1200,113 @@ export class DispatchService {
         },
       },
       orderBy: [
-        {
-          priorityScore: 'desc',
-        },
-        {
-          ratingAvg: 'desc',
-        },
-        {
-          createdAt: 'asc',
-        },
+        { priorityScore: 'desc' },
+        { ratingAvg: 'desc' },
+        { createdAt: 'asc' },
       ],
       select: {
         id: true,
+        contactProfile: {
+          select: {
+            userAddresses: {
+              where: { lat: { not: null }, lng: { not: null } },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+              select: { lat: true, lng: true },
+            },
+          },
+        },
         vehicles: {
           where: {
             category: vehicleCategory,
             status: 'active',
           },
-          orderBy: {
-            createdAt: 'asc',
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: { id: true },
+        },
+        shipmentAssignments: {
+          where: {
+            status: ShipmentAssignmentStatus.ACTIVE,
+            shipment: {
+              status: {
+                in: [
+                  ShipmentStatus.EN_ROUTE_PICKUP,
+                  ShipmentStatus.PICKED_UP,
+                  ShipmentStatus.EN_ROUTE_DROPOFF,
+                ],
+              },
+            },
           },
           take: 1,
           select: {
-            id: true,
+            shipment: {
+              select: {
+                dropoffAddress: { select: { lat: true, lng: true } },
+              },
+            },
           },
         },
       },
     });
 
     const eligibleProviders: EligibleDispatchProvider[] = [];
+
     for (const provider of providers) {
       const vehicle = provider.vehicles[0];
       if (!vehicle?.id) {
         continue;
+      }
+
+      // Provider must have an active address with coordinates to be eligible
+      const providerAddress = provider.contactProfile?.userAddresses[0];
+      if (!providerAddress?.lat || !providerAddress?.lng) {
+        this.logger.debug(
+          `Skipping provider ${provider.id}: no active address with coordinates`,
+        );
+        continue;
+      }
+
+      // Location proximity: provider must be within max radius of the pickup address
+      if (hasPickupCoords) {
+        const distanceToPickup = this.haversineDistanceKm(
+          providerAddress.lat,
+          providerAddress.lng,
+          pickupLat!,
+          pickupLng!,
+        );
+        if (distanceToPickup > this.dispatchMaxRadiusKm) {
+          this.logger.debug(
+            `Skipping provider ${provider.id}: ${distanceToPickup.toFixed(1)}km away from pickup (max ${this.dispatchMaxRadiusKm}km)`,
+          );
+          continue;
+        }
+      }
+
+      // Route alignment: if the provider has an ongoing dispatch, only include
+      // them if the new shipment's pickup aligns with their current route
+      // (i.e. new pickup is near their ongoing dropoff)
+      const ongoingAssignment = provider.shipmentAssignments[0];
+      if (ongoingAssignment) {
+        const ongoingDropoff = ongoingAssignment.shipment?.dropoffAddress;
+        if (!ongoingDropoff?.lat || !ongoingDropoff?.lng || !hasPickupCoords) {
+          this.logger.debug(
+            `Skipping provider ${provider.id}: ongoing dispatch but cannot determine route alignment`,
+          );
+          continue;
+        }
+        const distanceToOngoingDropoff = this.haversineDistanceKm(
+          pickupLat!,
+          pickupLng!,
+          ongoingDropoff.lat,
+          ongoingDropoff.lng,
+        );
+        if (distanceToOngoingDropoff > this.dispatchRouteAlignKm) {
+          this.logger.debug(
+            `Skipping provider ${provider.id}: new pickup is ${distanceToOngoingDropoff.toFixed(1)}km from ongoing dropoff (max ${this.dispatchRouteAlignKm}km for route alignment)`,
+          );
+          continue;
+        }
       }
 
       eligibleProviders.push({
@@ -1197,6 +1316,25 @@ export class DispatchService {
     }
 
     return eligibleProviders;
+  }
+
+  private haversineDistanceKm(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
+    const toRadians = (value: number) => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+    const deltaLat = toRadians(lat2 - lat1);
+    const deltaLon = toRadians(lon2 - lon1);
+    const a =
+      Math.sin(deltaLat / 2) ** 2 +
+      Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(deltaLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
   }
 
   private parsePositiveInt(
@@ -1247,9 +1385,7 @@ export class DispatchService {
     return assignment;
   }
 
-  private async resolveProviderIdForProfile(
-    profileId: string,
-  ): Promise<string | null> {
+  async resolveProviderIdForProfile(profileId: string): Promise<string | null> {
     const provider = await this.prisma.provider.findFirst({
       where: {
         profileId,

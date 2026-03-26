@@ -1,5 +1,6 @@
-import { UseGuards } from '@nestjs/common';
-import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
+import { ForbiddenException, Inject, UseGuards } from '@nestjs/common';
+import { Args, Mutation, Query, Resolver, Subscription } from '@nestjs/graphql';
+import { PubSub } from 'graphql-subscriptions';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
@@ -15,12 +16,15 @@ import {
   UpdateDispatchOfferDto,
 } from '../graphql';
 import { UserType } from '../graphql/enums';
-import { DispatchService } from './dispatch.service';
+import { DispatchService, DISPATCH_PUBSUB } from './dispatch.service';
 import type { AuthUser } from '../auth/auth.types';
 
 @Resolver(() => DispatchBatch)
 export class DispatchResolver {
-  constructor(private readonly dispatchService: DispatchService) {}
+  constructor(
+    private readonly dispatchService: DispatchService,
+    @Inject(DISPATCH_PUBSUB) private readonly pubSub: PubSub,
+  ) {}
 
   @Query(() => [DispatchBatch])
   @UseGuards(GqlAuthGuard, RolesGuard)
@@ -122,5 +126,32 @@ export class DispatchResolver {
     @Args('id') id: string,
   ): Promise<ShipmentAssignment> {
     return this.dispatchService.cancelShipmentAssignment(id);
+  }
+
+  /**
+   * Real-time subscription: providers receive their dispatch offers instantly
+   * when a shipment is broadcasted. Subscribe over WebSocket.
+   *
+   * Authentication: connect with `Authorization: Bearer <token>` in
+   * connectionParams so the server can identify your provider account.
+   */
+  @Subscription(() => DispatchOffer, {
+    resolve: (payload: { dispatchOfferSent: DispatchOffer }) =>
+      payload.dispatchOfferSent,
+  })
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
+  async dispatchOfferSent(@CurrentUser() user: AuthUser) {
+    const providerId = await this.dispatchService.resolveProviderIdForProfile(
+      user.id,
+    );
+    if (!providerId) {
+      throw new ForbiddenException(
+        'No provider account found for the authenticated user',
+      );
+    }
+    return this.pubSub.asyncIterableIterator(
+      `DISPATCH_OFFER_SENT.${providerId}`,
+    );
   }
 }

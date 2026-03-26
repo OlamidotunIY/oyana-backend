@@ -5,9 +5,10 @@ import { PremblyClient } from './prembly.client';
 import { KycService } from './kyc.service';
 import { KycResolver } from './kyc.resolver';
 import { StorageModule } from '../storage/storage.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [StorageModule],
+  imports: [StorageModule, AuthModule],
   controllers: [KycController],
   providers: [KycService, KycResolver, PremblyClient, MobileClientGuard],
   exports: [KycService],

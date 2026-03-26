@@ -1,4 +1,4 @@
-import { Field, Int, ObjectType } from '@nestjs/graphql';
+import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import { ShipmentMode, ShipmentStatus } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
 
@@ -57,4 +57,58 @@ export class ShipmentDashboard {
 
   @Field(() => [ShipmentDashboardRecentShipment])
   recentShipments: ShipmentDashboardRecentShipment[];
+}
+
+@ObjectType()
+export class ProviderDispatchStats {
+  @Field(() => Int)
+  offersReceived: number;
+
+  @Field(() => Int)
+  offersAccepted: number;
+
+  @Field(() => Int)
+  offersDeclined: number;
+
+  @Field(() => Int)
+  offersExpired: number;
+
+  @Field(() => Float)
+  acceptanceRate: number;
+}
+
+@ObjectType()
+export class ProviderEarningsSummary {
+  @Field(() => GraphQLBigInt)
+  totalEarningsMinor: bigint;
+
+  @Field(() => GraphQLBigInt)
+  earningsThisMonthMinor: bigint;
+
+  @Field()
+  currency: string;
+}
+
+@ObjectType()
+export class ProviderPerformance {
+  @Field(() => Float)
+  ratingAvg: number;
+
+  @Field(() => Int)
+  ratingCount: number;
+
+  @Field(() => Int)
+  priorityScore: number;
+
+  @Field()
+  isAvailable: boolean;
+
+  @Field(() => Int)
+  teamMembersCount: number;
+
+  @Field(() => Int)
+  penaltiesCount: number;
+
+  @Field(() => Int)
+  penaltyPoints: number;
 }

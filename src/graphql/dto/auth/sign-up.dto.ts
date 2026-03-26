@@ -50,6 +50,7 @@ export class SignUpInput {
 
   // Business-specific fields
   @Field({ nullable: true })
+  @IsOptional()
   @ValidateIf((o: SignUpInput) =>
     (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
   )
@@ -58,6 +59,7 @@ export class SignUpInput {
   phoneNumber?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
   @ValidateIf((o: SignUpInput) =>
     (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
   )
@@ -66,6 +68,7 @@ export class SignUpInput {
   businessName?: string;
 
   @Field({ nullable: true })
+  @IsOptional()
   @ValidateIf((o: SignUpInput) =>
     (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
   )

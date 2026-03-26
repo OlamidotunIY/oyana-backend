@@ -46,6 +46,50 @@ export class MarketPlaceService {
       return { items: [] };
     }
 
+    // Validate provider has an active address with coordinates
+    const providerRecord = await this.prisma.provider.findUnique({
+      where: { id: providerId },
+      select: { profileId: true },
+    });
+
+    const activeAddress = providerRecord?.profileId
+      ? await this.prisma.userAddress.findFirst({
+          where: {
+            profileId: providerRecord.profileId,
+            lat: { not: null },
+            lng: { not: null },
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { lat: true, lng: true },
+        })
+      : null;
+
+    if (!activeAddress?.lat || !activeAddress?.lng) {
+      return {
+        items: [],
+        reason:
+          'Your provider account does not have an active address with location coordinates. Please add an address to access marketplace freight shipments.',
+      };
+    }
+
+    // Validate provider has at least one active truck or van
+    const hasTruckOrVan = await this.prisma.vehicle.findFirst({
+      where: {
+        providerId,
+        status: 'active',
+        category: { in: ['truck', 'van'] },
+      },
+      select: { id: true },
+    });
+
+    if (!hasTruckOrVan) {
+      return {
+        items: [],
+        reason:
+          'You do not have any active truck or van vehicles registered. Please add a truck or van vehicle to access marketplace freight shipments.',
+      };
+    }
+
     const vehicleCategories = filter?.vehicleCategories?.length
       ? filter.vehicleCategories
       : await this.getProviderVehicleCategories(providerId);
@@ -178,7 +222,26 @@ export class MarketPlaceService {
         })
       : shipments;
 
-    const items = distanceFiltered.map((shipment) =>
+    const sortedByProximity = distanceFiltered
+      .map((shipment) => ({
+        shipment,
+        distanceToPickup: this.calculateDistanceKm(
+          activeAddress.lat,
+          activeAddress.lng,
+          shipment.pickupAddress?.lat ?? null,
+          shipment.pickupAddress?.lng ?? null,
+        ),
+      }))
+      .sort((a, b) => {
+        if (a.distanceToPickup === null && b.distanceToPickup === null)
+          return 0;
+        if (a.distanceToPickup === null) return 1;
+        if (b.distanceToPickup === null) return -1;
+        return a.distanceToPickup - b.distanceToPickup;
+      })
+      .map(({ shipment }) => shipment);
+
+    const items = sortedByProximity.map((shipment) =>
       this.toGraphqlShipment(shipment, {
         pickupAddressSummary: this.toAddressSummary(shipment.pickupAddress),
         dropoffAddressSummary: this.toAddressSummary(shipment.dropoffAddress),
@@ -805,6 +868,8 @@ export class MarketPlaceService {
   ): Shipment {
     return {
       ...shipment,
+      pickupAddress: undefined,
+      dropoffAddress: undefined,
       scheduledAt: shipment.scheduledAt ?? undefined,
       packageDescription: shipment.packageDescription ?? undefined,
       packageValueMinor: shipment.packageValueMinor ?? undefined,

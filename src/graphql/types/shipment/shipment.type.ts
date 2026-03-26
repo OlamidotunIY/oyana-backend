@@ -6,6 +6,8 @@ import {
   VehicleCategory,
 } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
+import { UserAddress } from './shipment-location.type';
+import { ShipmentItem } from './shipment-item.type';
 
 @ObjectType()
 export class Shipment {
@@ -41,6 +43,15 @@ export class Shipment {
 
   @Field({ nullable: true })
   dropoffAddressSummary?: string;
+
+  @Field(() => UserAddress, { nullable: true })
+  pickupAddress?: UserAddress;
+
+  @Field(() => UserAddress, { nullable: true })
+  dropoffAddress?: UserAddress;
+
+  @Field(() => [ShipmentItem], { nullable: true })
+  items?: ShipmentItem[];
 
   @Field({ nullable: true })
   scheduledAt?: Date;
