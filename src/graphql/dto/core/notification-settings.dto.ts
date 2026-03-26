@@ -35,7 +35,7 @@ export class UpdateNotificationSettingsInput {
 export class UpsertPushDeviceInput {
   @Field(() => String)
   @IsString()
-  @Matches(/^ExponentPushToken\[[^\]]+\]$/, {
+  @Matches(/^(Exponent|Expo)PushToken\[[^\]]+\]$/, {
     message: 'expoPushToken must be a valid Expo push token',
   })
   expoPushToken: string;

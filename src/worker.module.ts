@@ -8,6 +8,7 @@ import { QueueModule } from './queue/queue.module';
 import { DispatchQueueProcessor } from './workers/dispatch-queue.processor';
 import { MaintenanceQueueProcessor } from './workers/maintenance-queue.processor';
 import { WorkerBootstrapService } from './workers/worker-bootstrap.service';
+import { EnvValidationService } from './config/env-validation.service';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { WorkerBootstrapService } from './workers/worker-bootstrap.service';
     DispatchQueueProcessor,
     MaintenanceQueueProcessor,
     WorkerBootstrapService,
+    EnvValidationService,
   ],
 })
 export class WorkerAppModule {}

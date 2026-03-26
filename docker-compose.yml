@@ -51,6 +51,8 @@ services:
       target: production
     container_name: oyana-backend
     restart: unless-stopped
+    env_file:
+      - ./.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,23 +65,6 @@ services:
       DIRECT_URL: postgresql://${POSTGRES_USER:-oyana}:${POSTGRES_PASSWORD:-oyana_dev_password}@postgres:5432/${POSTGRES_DB:-oyana}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:3001}
-      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CLOUD_PROJECT_ID: ${GOOGLE_CLOUD_PROJECT_ID}
-      GOOGLE_CLOUD_KEY_FILENAME: ${GOOGLE_CLOUD_KEY_FILENAME}
-      GOOGLE_CLOUD_CLIENT_EMAIL: ${GOOGLE_CLOUD_CLIENT_EMAIL}
-      GOOGLE_CLOUD_PRIVATE_KEY: ${GOOGLE_CLOUD_PRIVATE_KEY}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_FROM: ${SMTP_FROM:-Oyana <noreply@oyana.com>}
-      STORAGE_BUCKET_NAME: ${STORAGE_BUCKET_NAME:-oyana-storage}
-      PREMBLY_KYC_BUCKET: ${PREMBLY_KYC_BUCKET:-kyc-verifications}
-      PREMBLY_KYC_UPLOAD_URL_TTL_SECONDS: ${PREMBLY_KYC_UPLOAD_URL_TTL_SECONDS:-900}
     ports:
       - '${PORT:-3500}:3500'
     networks:
@@ -94,6 +79,8 @@ services:
     pull_policy: never
     container_name: oyana-worker
     restart: unless-stopped
+    env_file:
+      - ./.env
     healthcheck:
       disable: true
     depends_on:
@@ -107,14 +94,6 @@ services:
       DIRECT_URL: postgresql://${POSTGRES_USER:-oyana}:${POSTGRES_PASSWORD:-oyana_dev_password}@postgres:5432/${POSTGRES_DB:-oyana}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED: ${PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED:-true}
-      PREMBLY_RAW_PAYLOAD_CLEANUP_INTERVAL_MINUTES: ${PREMBLY_RAW_PAYLOAD_CLEANUP_INTERVAL_MINUTES:-360}
-      DISPATCH_RECONCILE_INTERVAL_SECONDS: ${DISPATCH_RECONCILE_INTERVAL_SECONDS:-120}
-      DISPATCH_WORKER_BATCH_SIZE: ${DISPATCH_WORKER_BATCH_SIZE:-100}
-      DISPATCH_RECONCILE_DB_MAX_RETRIES: ${DISPATCH_RECONCILE_DB_MAX_RETRIES:-4}
-      DISPATCH_RECONCILE_DB_BASE_DELAY_MS: ${DISPATCH_RECONCILE_DB_BASE_DELAY_MS:-500}
-      JWT_SECRET: ${JWT_SECRET:-change-this-secret-in-production}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
     networks:
       - oyana-network
     command: node dist/src/worker.js

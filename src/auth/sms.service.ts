@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
+import twilio from 'twilio';
 
 @Injectable()
 export class SmsService {
@@ -20,34 +20,44 @@ export class SmsService {
       return;
     }
 
-    if (provider === 'termii') {
-      const apiKey = this.configService.get<string>('SMS_TERMII_API_KEY', '');
-      const senderId = this.configService.get<string>(
-        'SMS_TERMII_SENDER_ID',
-        'Oyana',
+    if (provider === 'twilio') {
+      const accountSid = this.configService.get<string>(
+        'SMS_TWILIO_ACCOUNT_SID',
+        '',
       );
-      const channel = this.configService.get<string>(
-        'SMS_TERMII_CHANNEL',
-        'generic',
+      const authToken = this.configService.get<string>(
+        'SMS_TWILIO_AUTH_TOKEN',
+        '',
       );
-      const baseUrl = this.configService.get<string>(
-        'SMS_TERMII_BASE_URL',
-        'https://api.ng.termii.com/api',
+      const messagingServiceSid = this.configService.get<string>(
+        'SMS_TWILIO_MESSAGING_SERVICE_SID',
+        '',
+      );
+      const fromNumber = this.configService.get<string>(
+        'SMS_TWILIO_FROM_NUMBER',
+        '',
       );
 
-      if (!apiKey) {
+      if (!accountSid || !authToken) {
         throw new BadRequestException(
-          'SMS provider is not configured. Add SMS_TERMII_API_KEY or switch SMS_PROVIDER to console.',
+          'SMS provider is not configured. Add SMS_TWILIO_ACCOUNT_SID and SMS_TWILIO_AUTH_TOKEN or switch SMS_PROVIDER to console.',
         );
       }
 
-      await axios.post(`${baseUrl}/sms/send`, {
-        api_key: apiKey,
+      if (!messagingServiceSid && !fromNumber) {
+        throw new BadRequestException(
+          'Twilio SMS requires SMS_TWILIO_MESSAGING_SERVICE_SID or SMS_TWILIO_FROM_NUMBER.',
+        );
+      }
+
+      const client = twilio(accountSid, authToken);
+
+      await client.messages.create({
         to: phoneE164,
-        from: senderId,
-        sms: message,
-        type: 'plain',
-        channel,
+        body: message,
+        ...(messagingServiceSid
+          ? { messagingServiceSid }
+          : { from: fromNumber }),
       });
 
       return;

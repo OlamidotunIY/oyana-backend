@@ -18,6 +18,7 @@ import { GqlAuthGuard } from './auth/guards/gql-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { OpsModule } from './ops/ops.module';
 import { QueueModule } from './queue/queue.module';
+import { EnvValidationService } from './config/env-validation.service';
 
 @Module({
   imports: [
@@ -39,6 +40,12 @@ import { QueueModule } from './queue/queue.module';
     OpsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, BigIntScalar, GqlAuthGuard, RolesGuard],
+  providers: [
+    AppService,
+    BigIntScalar,
+    GqlAuthGuard,
+    RolesGuard,
+    EnvValidationService,
+  ],
 })
 export class AppModule {}
