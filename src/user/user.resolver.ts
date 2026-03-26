@@ -1,12 +1,18 @@
 import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
 import { UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
-import { Profile } from '../graphql/types/core/profile.type';
+import {
+  NotificationSettings,
+  Profile,
+  PushDevice,
+} from '../graphql/types/core';
 import {
   ActivateRoleInput,
   SetProviderAvailabilityInput,
+  UpdateNotificationSettingsInput,
   UpdateProfileInput,
-} from '../graphql/dto/core/profile.dto';
+  UpsertPushDeviceInput,
+} from '../graphql/dto/core';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -53,5 +59,34 @@ export class UserResolver {
     @Args('input') input: SetProviderAvailabilityInput,
   ): Promise<Profile> {
     return this.userService.setProviderAvailability(user.id, input);
+  }
+
+  @Query(() => NotificationSettings)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  async myNotificationSettings(
+    @CurrentUser() user: AuthUser,
+  ): Promise<NotificationSettings> {
+    return this.userService.getNotificationSettings(user.id);
+  }
+
+  @Mutation(() => NotificationSettings)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  async updateNotificationSettings(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: UpdateNotificationSettingsInput,
+  ): Promise<NotificationSettings> {
+    return this.userService.updateNotificationSettings(user.id, input);
+  }
+
+  @Mutation(() => PushDevice)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  async upsertPushDevice(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: UpsertPushDeviceInput,
+  ): Promise<PushDevice> {
+    return this.userService.upsertPushDevice(user.id, input);
   }
 }

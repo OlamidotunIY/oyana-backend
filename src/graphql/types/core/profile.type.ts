@@ -9,6 +9,12 @@ export class Profile {
   @Field()
   email: string;
 
+  @Field(() => Boolean)
+  emailVerified: boolean;
+
+  @Field(() => Date, { nullable: true })
+  emailVerifiedAt: Date | null;
+
   @Field(() => [UserType])
   roles: UserType[];
 
@@ -32,6 +38,18 @@ export class Profile {
 
   @Field(() => String, { nullable: true })
   referralCode: string | null;
+
+  @Field(() => Boolean)
+  notificationsEnabled: boolean;
+
+  @Field(() => Date, { nullable: true })
+  notificationPromptedAt: Date | null;
+
+  @Field(() => Boolean)
+  pushPermissionGranted: boolean;
+
+  @Field(() => String, { nullable: true })
+  pushPermissionStatus: string | null;
 
   @Field(() => String, { nullable: true })
   businessName?: string | null;

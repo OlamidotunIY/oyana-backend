@@ -45,15 +45,17 @@ model UserSession {
 
 model OtpCode {
   id        String    @id @default(uuid()) @db.Uuid
-  email     String
+  email     String?
+  phoneE164 String?   @map("phone_e164")
   codeHash  String    @map("code_hash")
-  // mode: 'signin' | 'signup' | 'password_reset'
+  // mode: 'signin' | 'signup' | 'email_verification' | 'password_reset' | 'phone_verification'
   mode      String
   expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
   usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([email])
+  @@index([phoneE164])
   @@index([expiresAt])
   @@map("otp_codes")
 }

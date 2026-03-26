@@ -1,20 +1,26 @@
 model Profile {
-  id                String        @id @db.Uuid
-  email             String        @unique
-  passwordHash      String?       @map("password_hash")
-  roles             UserType[]    @default([individual]) @map("user_roles")
-  firstName         String?       @map("first_name")
-  lastName          String?       @map("last_name")
-  phoneE164         String?       @unique @map("phone_e164")
-  phoneVerified     Boolean       @default(false) @map("phone_verified")
-  phoneVerifiedAt   DateTime?     @map("phone_verified_at") @db.Timestamptz(6)
-  state             State
-  referralCode      String?       @map("referral_code")
-  preferredLanguage String        @default("en") @map("preferred_language")
-  status            ProfileStatus @default(active)
-  lastLoginAt       DateTime?     @map("last_login_at") @db.Timestamptz(6)
-  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                     String        @id @db.Uuid
+  email                  String        @unique
+  emailVerified          Boolean       @default(false) @map("email_verified")
+  emailVerifiedAt        DateTime?     @map("email_verified_at") @db.Timestamptz(6)
+  passwordHash           String?       @map("password_hash")
+  roles                  UserType[]    @default([individual]) @map("user_roles")
+  firstName              String?       @map("first_name")
+  lastName               String?       @map("last_name")
+  phoneE164              String?       @unique @map("phone_e164")
+  phoneVerified          Boolean       @default(false) @map("phone_verified")
+  phoneVerifiedAt        DateTime?     @map("phone_verified_at") @db.Timestamptz(6)
+  state                  State
+  referralCode           String?       @map("referral_code")
+  preferredLanguage      String        @default("en") @map("preferred_language")
+  notificationsEnabled   Boolean       @default(false) @map("notifications_enabled")
+  notificationPromptedAt DateTime?     @map("notification_prompted_at") @db.Timestamptz(6)
+  pushPermissionGranted  Boolean       @default(false) @map("push_permission_granted")
+  pushPermissionStatus   String?       @map("push_permission_status")
+  status                 ProfileStatus @default(active)
+  lastLoginAt            DateTime?     @map("last_login_at") @db.Timestamptz(6)
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   sessions                  UserSession[]
@@ -53,6 +59,7 @@ model Profile {
   fraudFlagsResolved        FraudFlag[]                @relation("FraudResolvedBy")
   platformConfigUpdates     PlatformConfig[]           @relation("PlatformConfigUpdater")
   notifications             Notification[]             @relation("ProfileNotifications")
+  pushDevices               PushDevice[]
 
   @@map("profiles")
 }

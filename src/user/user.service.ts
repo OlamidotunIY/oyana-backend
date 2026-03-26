@@ -9,15 +9,23 @@ import { PrismaService } from '../database/prisma.service';
 import {
   ActivateRoleInput,
   SetProviderAvailabilityInput,
+  UpdateNotificationSettingsInput,
   UpdateProfileInput,
-} from '../graphql/dto/core/profile.dto';
+  UpsertPushDeviceInput,
+} from '../graphql/dto/core';
 import { PreferredLanguage, UserType } from '../graphql/enums';
-import { Profile } from '../graphql/types/core';
+import {
+  NotificationSettings,
+  Profile,
+  PushDevice,
+} from '../graphql/types/core';
 import { normalizeProfileRoles } from '../auth/utils/roles.util';
 
 type ProfileRecord = {
   id: string;
   email: string;
+  emailVerified: boolean;
+  emailVerifiedAt: Date | null;
   roles: Profile['roles'];
   firstName: string | null;
   lastName: string | null;
@@ -27,6 +35,10 @@ type ProfileRecord = {
   state: Profile['state'];
   referralCode: string | null;
   preferredLanguage: string;
+  notificationsEnabled: boolean;
+  notificationPromptedAt: Date | null;
+  pushPermissionGranted: boolean;
+  pushPermissionStatus: string | null;
   status: Profile['status'];
   lastLoginAt: Date | null;
   createdAt: Date;
@@ -70,6 +82,8 @@ export class UserService {
     return {
       id: profile.id,
       email: profile.email,
+      emailVerified: profile.emailVerified,
+      emailVerifiedAt: profile.emailVerifiedAt,
       roles: normalizeProfileRoles(profile),
       firstName: profile.firstName,
       lastName: profile.lastName,
@@ -81,6 +95,10 @@ export class UserService {
       preferredLanguage: this.normalizePreferredLanguage(
         profile.preferredLanguage,
       ),
+      notificationsEnabled: profile.notificationsEnabled,
+      notificationPromptedAt: profile.notificationPromptedAt,
+      pushPermissionGranted: profile.pushPermissionGranted,
+      pushPermissionStatus: profile.pushPermissionStatus,
       status: profile.status,
       lastLoginAt: profile.lastLoginAt,
       createdAt: profile.createdAt,
@@ -101,6 +119,8 @@ export class UserService {
       select: {
         id: true,
         email: true,
+        emailVerified: true,
+        emailVerifiedAt: true,
         roles: true,
         firstName: true,
         lastName: true,
@@ -110,6 +130,10 @@ export class UserService {
         state: true,
         referralCode: true,
         preferredLanguage: true,
+        notificationsEnabled: true,
+        notificationPromptedAt: true,
+        pushPermissionGranted: true,
+        pushPermissionStatus: true,
         status: true,
         lastLoginAt: true,
         createdAt: true,
@@ -169,6 +193,8 @@ export class UserService {
       select: {
         id: true,
         email: true,
+        emailVerified: true,
+        emailVerifiedAt: true,
         roles: true,
         firstName: true,
         lastName: true,
@@ -178,6 +204,10 @@ export class UserService {
         state: true,
         referralCode: true,
         preferredLanguage: true,
+        notificationsEnabled: true,
+        notificationPromptedAt: true,
+        pushPermissionGranted: true,
+        pushPermissionStatus: true,
         status: true,
         lastLoginAt: true,
         createdAt: true,
@@ -236,6 +266,12 @@ export class UserService {
     input: UpdateProfileInput,
   ): Promise<Profile> {
     const updateData: any = {};
+    const currentProfile = await this.prisma.profile.findUnique({
+      where: { id: profileId },
+      select: {
+        phoneE164: true,
+      },
+    });
 
     if (input.firstName !== undefined) {
       updateData.firstName = input.firstName;
@@ -248,6 +284,10 @@ export class UserService {
     // If phoneE164 is provided, update it
     if (input.phoneE164 !== undefined) {
       updateData.phoneE164 = input.phoneE164;
+      if (currentProfile?.phoneE164 !== input.phoneE164) {
+        updateData.phoneVerified = false;
+        updateData.phoneVerifiedAt = null;
+      }
     }
 
     // If preferredLanguage is provided, update it
@@ -271,6 +311,8 @@ export class UserService {
       select: {
         id: true,
         email: true,
+        emailVerified: true,
+        emailVerifiedAt: true,
         roles: true,
         firstName: true,
         lastName: true,
@@ -280,6 +322,10 @@ export class UserService {
         state: true,
         referralCode: true,
         preferredLanguage: true,
+        notificationsEnabled: true,
+        notificationPromptedAt: true,
+        pushPermissionGranted: true,
+        pushPermissionStatus: true,
         status: true,
         lastLoginAt: true,
         createdAt: true,
@@ -385,12 +431,18 @@ export class UserService {
         select: {
           id: true,
           email: true,
+          emailVerified: true,
+          emailVerifiedAt: true,
           roles: true,
           firstName: true,
           lastName: true,
           phoneE164: true,
           phoneVerified: true,
           phoneVerifiedAt: true,
+          notificationsEnabled: true,
+          notificationPromptedAt: true,
+          pushPermissionGranted: true,
+          pushPermissionStatus: true,
           state: true,
           referralCode: true,
           preferredLanguage: true,
@@ -500,6 +552,121 @@ export class UserService {
     }
 
     return profile;
+  }
+
+  async getNotificationSettings(
+    profileId: string,
+  ): Promise<NotificationSettings> {
+    const profile = await this.prisma.profile.findUnique({
+      where: { id: profileId },
+      select: {
+        notificationsEnabled: true,
+        notificationPromptedAt: true,
+        pushPermissionGranted: true,
+        pushPermissionStatus: true,
+        pushDevices: {
+          where: {
+            isActive: true,
+          },
+          orderBy: {
+            lastSeenAt: 'desc',
+          },
+          take: 1,
+          select: {
+            lastSeenAt: true,
+          },
+        },
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return {
+      notificationsEnabled: profile.notificationsEnabled,
+      notificationPromptedAt: profile.notificationPromptedAt,
+      pushPermissionGranted: profile.pushPermissionGranted,
+      pushPermissionStatus: profile.pushPermissionStatus,
+      hasActivePushDevice: profile.pushDevices.length > 0,
+      lastPushDeviceSeenAt: profile.pushDevices[0]?.lastSeenAt ?? null,
+    };
+  }
+
+  async updateNotificationSettings(
+    profileId: string,
+    input: UpdateNotificationSettingsInput,
+  ): Promise<NotificationSettings> {
+    const data: Prisma.ProfileUpdateInput = {};
+
+    if (typeof input.notificationsEnabled === 'boolean') {
+      data.notificationsEnabled = input.notificationsEnabled;
+    }
+
+    if (typeof input.pushPermissionGranted === 'boolean') {
+      data.pushPermissionGranted = input.pushPermissionGranted;
+    }
+
+    if (input.pushPermissionStatus !== undefined) {
+      data.pushPermissionStatus = input.pushPermissionStatus?.trim() || null;
+
+      if (input.pushPermissionGranted === undefined) {
+        data.pushPermissionGranted = input.pushPermissionStatus === 'granted';
+      }
+    }
+
+    if (input.markPrompted) {
+      data.notificationPromptedAt = new Date();
+    }
+
+    await this.prisma.profile.update({
+      where: { id: profileId },
+      data,
+    });
+
+    return this.getNotificationSettings(profileId);
+  }
+
+  async upsertPushDevice(
+    profileId: string,
+    input: UpsertPushDeviceInput,
+  ): Promise<PushDevice> {
+    const nextPermissionStatus = input.pushPermissionStatus?.trim() || null;
+
+    await this.prisma.profile.update({
+      where: { id: profileId },
+      data: {
+        pushPermissionStatus: nextPermissionStatus,
+        pushPermissionGranted:
+          nextPermissionStatus != null
+            ? nextPermissionStatus === 'granted'
+            : undefined,
+        notificationPromptedAt:
+          nextPermissionStatus != null ? new Date() : undefined,
+      },
+    });
+
+    return this.prisma.pushDevice.upsert({
+      where: { expoPushToken: input.expoPushToken },
+      update: {
+        profileId,
+        deviceId: input.deviceId?.trim() || null,
+        platform: input.platform?.trim() || null,
+        appVersion: input.appVersion?.trim() || null,
+        pushPermissionStatus: nextPermissionStatus,
+        isActive: input.isActive ?? true,
+        lastSeenAt: new Date(),
+      },
+      create: {
+        profileId,
+        expoPushToken: input.expoPushToken,
+        deviceId: input.deviceId?.trim() || null,
+        platform: input.platform?.trim() || null,
+        appVersion: input.appVersion?.trim() || null,
+        pushPermissionStatus: nextPermissionStatus,
+        isActive: input.isActive ?? true,
+      },
+    });
   }
 
   private async ensureProviderForProfile(

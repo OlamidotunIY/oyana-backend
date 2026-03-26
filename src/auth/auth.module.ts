@@ -8,6 +8,7 @@ import { AuthEventsListener } from './events/auth.events';
 import { UserModule } from '../user/user.module';
 import { MailService } from './mail.service';
 import { GqlAuthGuard } from './guards/gql-auth.guard';
+import { SmsService } from './sms.service';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { GqlAuthGuard } from './guards/gql-auth.guard';
     AuthResolver,
     AuthEventsListener,
     MailService,
+    SmsService,
     GqlAuthGuard,
   ],
   exports: [AuthService, JwtModule, GqlAuthGuard],

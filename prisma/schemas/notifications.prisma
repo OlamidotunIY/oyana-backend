@@ -39,3 +39,23 @@ model Notification {
   @@index([category, createdAt(sort: Desc)])
   @@map("notifications")
 }
+
+model PushDevice {
+  id                   String   @id @default(uuid()) @db.Uuid
+  profileId            String   @map("profile_id") @db.Uuid
+  expoPushToken        String   @unique @map("expo_push_token")
+  deviceId             String?  @map("device_id")
+  platform             String?
+  appVersion           String?  @map("app_version")
+  pushPermissionStatus String?  @map("push_permission_status")
+  isActive             Boolean  @default(true) @map("is_active")
+  lastSeenAt           DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, isActive])
+  @@index([profileId, lastSeenAt(sort: Desc)])
+  @@map("push_devices")
+}

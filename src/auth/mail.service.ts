@@ -28,11 +28,11 @@ export class MailService {
     await this.transporter.sendMail({
       from: this.from,
       to,
-      subject: 'Your Oyana sign-in code',
+      subject: 'Your Oyana verification code',
       text: `Your verification code is: ${code}\n\nThis code expires in 10 minutes. Do not share it with anyone.`,
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-          <h2 style="color:#1a1a2e">Your sign-in code</h2>
+          <h2 style="color:#1a1a2e">Your verification code</h2>
           <p style="font-size:36px;letter-spacing:8px;font-weight:bold;color:#4f46e5">${code}</p>
           <p style="color:#6b7280">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p>
         </div>

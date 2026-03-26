@@ -3,9 +3,9 @@
 // ============================================================================
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
-  NotImplementedException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -23,6 +23,7 @@ import { PrismaService } from '../database/prisma.service';
 import { UserService } from '../user/user.service';
 import { UserSignedUpEvent } from './events/user-signed-up.event';
 import { MailService } from './mail.service';
+import { SmsService } from './sms.service';
 import type { AuthUser } from './auth.types';
 import {
   ForgotPasswordInput,
@@ -44,6 +45,16 @@ const BCRYPT_OTP_ROUNDS = 10;
 const OTP_TTL_MINUTES = 10;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+const OTP_MODE = {
+  SIGNUP: 'signup',
+  SIGNIN: 'signin',
+  EMAIL_VERIFICATION: 'email_verification',
+  PASSWORD_RESET: 'password_reset',
+  PHONE_VERIFICATION: 'phone_verification',
+} as const;
+
+type OtpModeValue = (typeof OTP_MODE)[keyof typeof OTP_MODE];
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -56,6 +67,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly smsService: SmsService,
   ) {
     this.oauthClient = new OAuth2Client(
       configService.get<string>('GOOGLE_CLIENT_ID'),
@@ -102,6 +114,7 @@ export class AuthService {
       data: {
         id: profileId,
         email: input.email,
+        emailVerified: false,
         passwordHash,
         roles,
         firstName: input.firstName,
@@ -127,8 +140,11 @@ export class AuthService {
 
     this.eventEmitter.emit('user.signed-up', signupEvent);
 
+    await this.sendEmailOtp(input.email, OTP_MODE.EMAIL_VERIFICATION);
+
     return {
-      message: 'Account created successfully. You can now sign in.',
+      message:
+        'Account created successfully. Check your email for a verification code before signing in.',
       success: true,
     };
   }
@@ -144,7 +160,12 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const profile = await this.prisma.profile.findUnique({
       where: { email: input.email },
-      select: { id: true, email: true, passwordHash: true },
+      select: {
+        id: true,
+        email: true,
+        emailVerified: true,
+        passwordHash: true,
+      },
     });
 
     if (!profile || !profile.passwordHash) {
@@ -157,6 +178,13 @@ export class AuthService {
     );
     if (!passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!profile.emailVerified) {
+      await this.sendEmailOtp(profile.email, OTP_MODE.EMAIL_VERIFICATION);
+      throw new ForbiddenException(
+        'Email not verified. We sent a verification code to your email.',
+      );
     }
 
     const fullProfile = await this.userService.getProfileByEmail(input.email);
@@ -181,33 +209,37 @@ export class AuthService {
   // ---------------------------------------------------------------------------
 
   async requestOtp(input: RequestOtpInput): Promise<MessageResponse> {
+    const normalizedMode = this.normalizeOtpMode(input.mode);
+
+    if (
+      normalizedMode !== OTP_MODE.SIGNUP &&
+      normalizedMode !== OTP_MODE.SIGNIN &&
+      normalizedMode !== OTP_MODE.EMAIL_VERIFICATION
+    ) {
+      throw new BadRequestException('Unsupported OTP mode');
+    }
+
     const existing = await this.prisma.profile.findUnique({
       where: { email: input.email },
-      select: { id: true },
+      select: { id: true, emailVerified: true },
     });
 
-    if (input.mode === OtpMode.SIGNUP && existing) {
+    if (normalizedMode === OTP_MODE.SIGNUP && existing?.emailVerified) {
       throw new BadRequestException('Email already registered');
     }
-    if (input.mode === OtpMode.SIGNIN && !existing) {
+
+    if (normalizedMode === OTP_MODE.SIGNIN && !existing) {
       throw new BadRequestException('Email not found');
     }
 
-    const code = this.generateOtpCode();
-    const codeHash = await bcrypt.hash(code, BCRYPT_OTP_ROUNDS);
-    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+    if (normalizedMode === OTP_MODE.EMAIL_VERIFICATION && !existing) {
+      throw new BadRequestException('Email not found');
+    }
 
-    await this.prisma.otpCode.create({
-      data: { email: input.email, codeHash, mode: input.mode, expiresAt },
-    });
-
-    await this.mailService.sendOtpEmail(input.email, code);
+    await this.sendEmailOtp(input.email, normalizedMode);
 
     return {
-      message:
-        input.mode === OtpMode.SIGNUP
-          ? 'Verification code sent. Please check your email to continue signup.'
-          : 'OTP sent to your email',
+      message: 'Verification code sent. Please check your email.',
       success: true,
     };
   }
@@ -220,7 +252,9 @@ export class AuthService {
     const otpRecord = await this.prisma.otpCode.findFirst({
       where: {
         email: input.email,
-        mode: { in: [OtpMode.SIGNUP, OtpMode.SIGNIN] },
+        mode: {
+          in: [OTP_MODE.SIGNUP, OTP_MODE.SIGNIN, OTP_MODE.EMAIL_VERIFICATION],
+        },
         usedAt: null,
         expiresAt: { gt: new Date() },
       },
@@ -246,9 +280,24 @@ export class AuthService {
     if (!profile) {
       const profileId = randomUUID();
       await this.prisma.profile.create({
-        data: { id: profileId, email: input.email, state: 'Lagos' as any },
+        data: {
+          id: profileId,
+          email: input.email,
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+          state: 'Lagos' as any,
+        },
       });
       profile = await this.userService.getProfileByEmail(input.email);
+    } else if (!profile.emailVerified) {
+      await this.prisma.profile.update({
+        where: { id: profile.id },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+      profile = await this.userService.findProfileById(profile.id);
     }
 
     if (!profile) {
@@ -300,9 +349,26 @@ export class AuthService {
     if (!profile) {
       const profileId = randomUUID();
       await this.prisma.profile.create({
-        data: { id: profileId, email, state: 'Lagos' as any },
+        data: {
+          id: profileId,
+          email,
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+          state: 'Lagos' as any,
+        },
       });
       profile = await this.userService.getProfileByEmail(email);
+    }
+
+    if (profile && !profile.emailVerified) {
+      await this.prisma.profile.update({
+        where: { id: profile.id },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+      profile = await this.userService.findProfileById(profile.id);
     }
 
     if (!profile) {
@@ -350,20 +416,7 @@ export class AuthService {
       };
     }
 
-    const code = this.generateOtpCode();
-    const codeHash = await bcrypt.hash(code, BCRYPT_OTP_ROUNDS);
-    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
-
-    await this.prisma.otpCode.create({
-      data: {
-        email: input.email,
-        codeHash,
-        mode: 'password_reset',
-        expiresAt,
-      },
-    });
-
-    await this.mailService.sendPasswordResetEmail(input.email, code);
+    await this.sendEmailOtp(input.email, OTP_MODE.PASSWORD_RESET);
 
     return {
       message: 'If that email is registered, a reset code has been sent.',
@@ -375,7 +428,7 @@ export class AuthService {
     const otpRecord = await this.prisma.otpCode.findFirst({
       where: {
         email: input.email,
-        mode: 'password_reset',
+        mode: OTP_MODE.PASSWORD_RESET,
         usedAt: null,
         expiresAt: { gt: new Date() },
       },
@@ -476,22 +529,86 @@ export class AuthService {
     return { id: session.profile.id, email: session.profile.email };
   }
 
-  // ---------------------------------------------------------------------------
-  // Phone OTP — stubs (not yet supported)
-  // ---------------------------------------------------------------------------
-
   async requestPhoneOtp(
-    _profileId: string,
-    _input: RequestPhoneOtpInput,
+    profileId: string,
+    input: RequestPhoneOtpInput,
   ): Promise<MessageResponse> {
-    throw new NotImplementedException('Phone OTP is not yet supported');
+    const profile = await this.prisma.profile.findUnique({
+      where: { id: profileId },
+      select: { id: true },
+    });
+
+    if (!profile) {
+      throw new UnauthorizedException('Profile not found');
+    }
+
+    const existingPhoneOwner = await this.prisma.profile.findFirst({
+      where: {
+        phoneE164: input.phoneE164,
+        id: { not: profileId },
+      },
+      select: { id: true },
+    });
+
+    if (existingPhoneOwner) {
+      throw new BadRequestException('Phone number is already in use');
+    }
+
+    const code = await this.createOtpRecord({
+      phoneE164: input.phoneE164,
+      mode: OTP_MODE.PHONE_VERIFICATION,
+    });
+
+    await this.smsService.sendOtpSms(input.phoneE164, code);
+
+    return {
+      message: 'Verification code sent to your phone number.',
+      success: true,
+    };
   }
 
   async verifyPhoneOtp(
-    _profileId: string,
-    _input: VerifyPhoneOtpInput,
+    profileId: string,
+    input: VerifyPhoneOtpInput,
   ): Promise<MessageResponse> {
-    throw new NotImplementedException('Phone OTP is not yet supported');
+    const otpRecord = await this.prisma.otpCode.findFirst({
+      where: {
+        phoneE164: input.phoneE164,
+        mode: OTP_MODE.PHONE_VERIFICATION,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otpRecord) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const codeValid = await bcrypt.compare(input.token, otpRecord.codeHash);
+    if (!codeValid) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.otpCode.update({
+        where: { id: otpRecord.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.profile.update({
+        where: { id: profileId },
+        data: {
+          phoneE164: input.phoneE164,
+          phoneVerified: true,
+          phoneVerifiedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return {
+      message: 'Phone number verified successfully.',
+      success: true,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -558,6 +675,66 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private normalizeOtpMode(mode: string): OtpModeValue | null {
+    const normalized = mode.trim().toLowerCase();
+
+    switch (normalized) {
+      case 'signup':
+      case 'sign_up':
+      case 'register':
+      case 'registration':
+        return OTP_MODE.SIGNUP;
+      case 'signin':
+      case 'sign_in':
+      case 'login':
+        return OTP_MODE.SIGNIN;
+      case 'email_verification':
+      case 'verify_email':
+        return OTP_MODE.EMAIL_VERIFICATION;
+      case 'password_reset':
+      case 'forgot_password':
+        return OTP_MODE.PASSWORD_RESET;
+      case 'phone_verification':
+      case 'verify_phone':
+        return OTP_MODE.PHONE_VERIFICATION;
+      default:
+        return null;
+    }
+  }
+
+  private async createOtpRecord(input: {
+    email?: string;
+    phoneE164?: string;
+    mode: OtpModeValue;
+  }): Promise<string> {
+    const code = this.generateOtpCode();
+    const codeHash = await bcrypt.hash(code, BCRYPT_OTP_ROUNDS);
+    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+
+    await this.prisma.otpCode.create({
+      data: {
+        email: input.email ?? null,
+        phoneE164: input.phoneE164 ?? null,
+        codeHash,
+        mode: input.mode,
+        expiresAt,
+      },
+    });
+
+    return code;
+  }
+
+  private async sendEmailOtp(email: string, mode: OtpModeValue): Promise<void> {
+    const code = await this.createOtpRecord({ email, mode });
+
+    if (mode === OTP_MODE.PASSWORD_RESET) {
+      await this.mailService.sendPasswordResetEmail(email, code);
+      return;
+    }
+
+    await this.mailService.sendOtpEmail(email, code);
   }
 
   private generateOtpCode(): string {
