@@ -1,27 +1,64 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
-export class MailService {
+export class MailService implements OnModuleInit {
+  private readonly logger = new Logger(MailService.name);
   private readonly transporter: nodemailer.Transporter;
   private readonly from: string;
+  private readonly host: string;
+  private readonly port: number;
+  private readonly secure: boolean;
 
   constructor(private readonly configService: ConfigService) {
     this.from = configService.get<string>(
       'SMTP_FROM',
       'Oyana <noreply@oyana.com>',
     );
+    this.host = configService.get<string>('SMTP_HOST', 'smtp.gmail.com');
+
+    const configuredPort = Number.parseInt(
+      configService.get<string>('SMTP_PORT', '587'),
+      10,
+    );
+    this.port = Number.isFinite(configuredPort) ? configuredPort : 587;
+
+    const configuredSecure = configService.get<string>('SMTP_SECURE');
+    this.secure =
+      configuredSecure != null
+        ? configuredSecure.trim().toLowerCase() === 'true'
+        : this.port === 465;
 
     this.transporter = nodemailer.createTransport({
-      host: configService.get<string>('SMTP_HOST', 'smtp.gmail.com'),
-      port: configService.get<number>('SMTP_PORT', 587),
-      secure: configService.get<number>('SMTP_PORT', 587) === 465,
+      host: this.host,
+      port: this.port,
+      secure: this.secure,
+      requireTLS: !this.secure,
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 20000,
       auth: {
         user: configService.get<string>('SMTP_USER'),
         pass: configService.get<string>('SMTP_PASS'),
       },
+      tls: {
+        servername: this.host,
+      },
     });
+  }
+
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.transporter.verify();
+      this.logger.log(
+        `SMTP transport verified for ${this.host}:${this.port} (secure=${this.secure})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `SMTP transport verification failed for ${this.host}:${this.port} (secure=${this.secure}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async sendOtpEmail(to: string, code: string): Promise<void> {

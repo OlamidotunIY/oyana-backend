@@ -21,8 +21,8 @@ import type {
 
 import { PrismaService } from '../database/prisma.service';
 import { UserService } from '../user/user.service';
+import { AuthEmailOtpRequestedEvent } from './events';
 import { UserSignedUpEvent } from './events/user-signed-up.event';
-import { MailService } from './mail.service';
 import { SmsService } from './sms.service';
 import type { AuthUser } from './auth.types';
 import {
@@ -66,7 +66,6 @@ export class AuthService {
     private readonly eventEmitter: EventEmitter2,
     private readonly userService: UserService,
     private readonly prisma: PrismaService,
-    private readonly mailService: MailService,
     private readonly smsService: SmsService,
   ) {
     this.oauthClient = new OAuth2Client(
@@ -729,12 +728,10 @@ export class AuthService {
   private async sendEmailOtp(email: string, mode: OtpModeValue): Promise<void> {
     const code = await this.createOtpRecord({ email, mode });
 
-    if (mode === OTP_MODE.PASSWORD_RESET) {
-      await this.mailService.sendPasswordResetEmail(email, code);
-      return;
-    }
-
-    await this.mailService.sendOtpEmail(email, code);
+    this.eventEmitter.emit(
+      'auth.email-otp.requested',
+      new AuthEmailOtpRequestedEvent(email, code, mode),
+    );
   }
 
   private generateOtpCode(): string {
