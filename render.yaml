@@ -1,0 +1,209 @@
+services:
+  - type: web
+    name: oyana-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    dockerCommand: node dist/src/main.js
+    healthCheckPath: /graphql
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3500"
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_DB
+        value: "0"
+      - key: REDIS_USERNAME
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: REDIS_TLS
+        value: "false"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRATION
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "465"
+      - key: SMTP_SECURE
+        value: "true"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
+      - key: PAYSTACK_WALLET_CALLBACK_URL
+        sync: false
+      - key: PAYSTACK_REQUEST_TIMEOUT_MS
+        value: "15000"
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CLOUD_PROJECT_ID
+        sync: false
+      - key: GOOGLE_CLOUD_KEY_FILENAME
+        sync: false
+      - key: GOOGLE_CLOUD_CLIENT_EMAIL
+        sync: false
+      - key: GOOGLE_CLOUD_PRIVATE_KEY
+        sync: false
+      - key: STORAGE_BUCKET_NAME
+        sync: false
+      - key: PREMBLY_BASE_URL
+        sync: false
+      - key: PREMBLY_APP_ID
+        sync: false
+      - key: PREMBLY_API_KEY
+        sync: false
+      - key: PREMBLY_NIN_FACE_ENDPOINT
+        sync: false
+      - key: PREMBLY_PHONE_ENDPOINT
+        sync: false
+      - key: PREMBLY_PLATE_ENDPOINT
+        sync: false
+      - key: PREMBLY_VIN_ENDPOINT
+        sync: false
+      - key: PREMBLY_STATUS_ENDPOINT
+        sync: false
+      - key: PREMBLY_REQUEST_TIMEOUT_MS
+        value: "15000"
+      - key: PREMBLY_WEBHOOK_SECRET
+        sync: false
+      - key: PREMBLY_WEBHOOK_IP_ALLOWLIST
+        sync: false
+      - key: PREMBLY_KYC_BUCKET
+        sync: false
+      - key: PREMBLY_KYC_UPLOAD_URL_TTL_SECONDS
+        value: "900"
+      - key: PREMBLY_KYC_ALLOWED_MIME_TYPES
+        sync: false
+      - key: PREMBLY_KYC_MAX_FILE_SIZE_BYTES
+        value: "5242880"
+      - key: PREMBLY_RAW_PAYLOAD_RETENTION_DAYS
+        value: "180"
+      - key: PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED
+        value: "true"
+      - key: PREMBLY_RAW_PAYLOAD_CLEANUP_INTERVAL_MINUTES
+        value: "360"
+      - key: DISPATCH_RECONCILE_INTERVAL_SECONDS
+        value: "120"
+      - key: DISPATCH_WORKER_BATCH_SIZE
+        value: "100"
+      - key: DISPATCH_RECONCILE_DB_MAX_RETRIES
+        value: "4"
+      - key: DISPATCH_RECONCILE_DB_BASE_DELAY_MS
+        value: "500"
+      - key: SMS_PROVIDER
+        value: console
+      - key: SMS_TWILIO_ACCOUNT_SID
+        sync: false
+      - key: SMS_TWILIO_AUTH_TOKEN
+        sync: false
+      - key: SMS_TWILIO_MESSAGING_SERVICE_SID
+        sync: false
+      - key: SMS_TWILIO_FROM_NUMBER
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
+
+  - type: worker
+    name: oyana-worker
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    dockerCommand: node dist/src/worker.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        sync: false
+      - key: REDIS_DB
+        value: "0"
+      - key: REDIS_USERNAME
+        sync: false
+      - key: REDIS_PASSWORD
+        sync: false
+      - key: REDIS_TLS
+        value: "false"
+      - key: GOOGLE_CLOUD_PROJECT_ID
+        sync: false
+      - key: GOOGLE_CLOUD_KEY_FILENAME
+        sync: false
+      - key: GOOGLE_CLOUD_CLIENT_EMAIL
+        sync: false
+      - key: GOOGLE_CLOUD_PRIVATE_KEY
+        sync: false
+      - key: STORAGE_BUCKET_NAME
+        sync: false
+      - key: PREMBLY_BASE_URL
+        sync: false
+      - key: PREMBLY_APP_ID
+        sync: false
+      - key: PREMBLY_API_KEY
+        sync: false
+      - key: PREMBLY_NIN_FACE_ENDPOINT
+        sync: false
+      - key: PREMBLY_PHONE_ENDPOINT
+        sync: false
+      - key: PREMBLY_PLATE_ENDPOINT
+        sync: false
+      - key: PREMBLY_VIN_ENDPOINT
+        sync: false
+      - key: PREMBLY_STATUS_ENDPOINT
+        sync: false
+      - key: PREMBLY_REQUEST_TIMEOUT_MS
+        value: "15000"
+      - key: PREMBLY_KYC_BUCKET
+        sync: false
+      - key: PREMBLY_KYC_UPLOAD_URL_TTL_SECONDS
+        value: "900"
+      - key: PREMBLY_KYC_ALLOWED_MIME_TYPES
+        sync: false
+      - key: PREMBLY_KYC_MAX_FILE_SIZE_BYTES
+        value: "5242880"
+      - key: PREMBLY_RAW_PAYLOAD_RETENTION_DAYS
+        value: "180"
+      - key: PREMBLY_RAW_PAYLOAD_CLEANUP_ENABLED
+        value: "true"
+      - key: PREMBLY_RAW_PAYLOAD_CLEANUP_INTERVAL_MINUTES
+        value: "360"
+      - key: DISPATCH_RECONCILE_INTERVAL_SECONDS
+        value: "120"
+      - key: DISPATCH_WORKER_BATCH_SIZE
+        value: "100"
+      - key: DISPATCH_RECONCILE_DB_MAX_RETRIES
+        value: "4"
+      - key: DISPATCH_RECONCILE_DB_BASE_DELAY_MS
+        value: "500"

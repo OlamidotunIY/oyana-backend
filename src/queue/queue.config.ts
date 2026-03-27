@@ -32,6 +32,20 @@ const parseBoolean = (
   return normalized === '1' || normalized === 'true' || normalized === 'yes';
 };
 
+const getFirstPresent = (
+  configService: ConfigService,
+  keys: string[],
+): string | undefined => {
+  for (const key of keys) {
+    const value = configService.get<string>(key)?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+};
+
 export const buildRedisConnection = (
   configService: ConfigService,
 ): ConnectionOptions => {
@@ -50,8 +64,14 @@ export const buildRedisConnection = (
     DEFAULT_REDIS_PORT,
   );
   const db = parseNumber(configService.get<string>('REDIS_DB'), 0);
-  const username = configService.get<string>('REDIS_USERNAME')?.trim();
-  const password = configService.get<string>('REDIS_PASSWORD')?.trim();
+  const username = getFirstPresent(configService, [
+    'REDIS_USERNAME',
+    'REDIS_USER',
+  ]);
+  const password = getFirstPresent(configService, [
+    'REDIS_PASSWORD',
+    'REDIS_PASS',
+  ]);
   const tlsEnabled = parseBoolean(configService.get<string>('REDIS_TLS'));
 
   return {

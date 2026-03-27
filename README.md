@@ -59,6 +59,23 @@ $ docker compose logs -f backend
 
 The API will be available at http://localhost:3500
 
+Redis configuration supports either of these env styles:
+
+```bash
+REDIS_URL="redis://default:password@host:6379"
+```
+
+or
+
+```bash
+REDIS_HOST="127.0.0.1"
+REDIS_PORT=6379
+REDIS_USERNAME="default"
+REDIS_PASSWORD="password"
+```
+
+Common provider aliases `REDIS_USER` and `REDIS_PASS` are also accepted.
+
 ## Compile and run the project
 
 ```bash
