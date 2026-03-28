@@ -38,9 +38,8 @@ export class EnvValidationService implements OnModuleInit {
 
     if (runtimeRole === 'app') {
       required.add('JWT_SECRET');
-      required.add('SMTP_HOST');
-      required.add('SMTP_USER');
-      required.add('SMTP_PASS');
+      required.add('RESEND_API_KEY');
+      required.add('RESEND_FROM');
       required.add('PAYSTACK_SECRET_KEY');
       required.add('GOOGLE_MAPS_API_KEY');
     }
