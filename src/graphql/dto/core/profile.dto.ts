@@ -1,13 +1,16 @@
 import { InputType, Field } from '@nestjs/graphql';
+import { GraphQLBigInt } from '../../scalars';
 import {
   IsBoolean,
-  IsUUID,
-  IsString,
+  IsNotEmpty,
   IsOptional,
-  MinLength,
-  MaxLength,
-  Matches,
   IsEnum,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  Min,
+  MinLength,
 } from 'class-validator';
 import { PreferredLanguage, UserStatus, UserType } from '../../enums';
 
@@ -82,6 +85,41 @@ export class UpdateProfileInput {
   @IsOptional()
   @IsEnum(UserStatus, { message: 'Status must be a valid user status' })
   status?: UserStatus;
+}
+
+@InputType()
+export class CreateProfileImageUploadUrlInput {
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  fileName: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mimeType?: string;
+
+  @Field(() => GraphQLBigInt, { nullable: true })
+  @IsOptional()
+  @Min(1)
+  sizeBytes?: bigint;
+}
+
+@InputType()
+export class SetProfileImageInput {
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  storageBucket: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  storagePath: string;
 }
 
 @InputType()

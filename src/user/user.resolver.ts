@@ -4,11 +4,14 @@ import { UserService } from './user.service';
 import {
   NotificationSettings,
   Profile,
+  ProfileImageUploadUrl,
   PushDevice,
 } from '../graphql/types/core';
 import {
   ActivateRoleInput,
+  CreateProfileImageUploadUrlInput,
   SetProviderAvailabilityInput,
+  SetProfileImageInput,
   UpdateNotificationSettingsInput,
   UpdateProfileInput,
   UpsertPushDeviceInput,
@@ -39,6 +42,26 @@ export class UserResolver {
     @Args('input') input: UpdateProfileInput,
   ): Promise<Profile> {
     return this.userService.updateProfile(user.id, input);
+  }
+
+  @Mutation(() => ProfileImageUploadUrl)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  async createProfileImageUploadUrl(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: CreateProfileImageUploadUrlInput,
+  ): Promise<ProfileImageUploadUrl> {
+    return this.userService.createProfileImageUploadUrl(user.id, input);
+  }
+
+  @Mutation(() => Profile)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  async setProfileImage(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: SetProfileImageInput,
+  ): Promise<Profile> {
+    return this.userService.setProfileImage(user.id, input);
   }
 
   @Mutation(() => Profile)

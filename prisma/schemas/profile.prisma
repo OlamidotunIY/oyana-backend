@@ -10,6 +10,8 @@ model Profile {
   phoneE164              String?       @unique @map("phone_e164")
   phoneVerified          Boolean       @default(false) @map("phone_verified")
   phoneVerifiedAt        DateTime?     @map("phone_verified_at") @db.Timestamptz(6)
+  profileImageBucket     String?       @map("profile_image_bucket")
+  profileImagePath       String?       @map("profile_image_path")
   state                  State
   referralCode           String?       @map("referral_code")
   preferredLanguage      String        @default("en") @map("preferred_language")

@@ -4,11 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
   ActivateRoleInput,
+  CreateProfileImageUploadUrlInput,
   SetProviderAvailabilityInput,
+  SetProfileImageInput,
   UpdateNotificationSettingsInput,
   UpdateProfileInput,
   UpsertPushDeviceInput,
@@ -17,53 +20,88 @@ import { PreferredLanguage, UserType } from '../graphql/enums';
 import {
   NotificationSettings,
   Profile,
+  ProfileImageUploadUrl,
   PushDevice,
 } from '../graphql/types/core';
 import { normalizeProfileRoles } from '../auth/utils/roles.util';
+import { GoogleStorageService } from '../storage/google-storage.service';
 
-type ProfileRecord = {
-  id: string;
-  email: string;
-  emailVerified: boolean;
-  emailVerifiedAt: Date | null;
-  roles: Profile['roles'];
-  firstName: string | null;
-  lastName: string | null;
-  phoneE164: string | null;
-  phoneVerified: boolean;
-  phoneVerifiedAt: Date | null;
-  state: Profile['state'];
-  referralCode: string | null;
-  preferredLanguage: string;
-  notificationsEnabled: boolean;
-  notificationPromptedAt: Date | null;
-  pushPermissionGranted: boolean;
-  pushPermissionStatus: string | null;
-  status: Profile['status'];
-  lastLoginAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  contactForProviders: Array<{
-    id: string;
-    businessName: string;
-    isAvailable: boolean;
-    availabilityUpdatedAt: Date | null;
-  }>;
-  providerMembers: Array<{
-    role: string;
-    provider: {
-      id: string;
-      businessName: string;
-      isAvailable: boolean;
-      availabilityUpdatedAt: Date | null;
-    } | null;
-  }>;
-  userAddresses: Array<{ address: string; city: string }>;
-};
+const profileSelection = {
+  id: true,
+  email: true,
+  emailVerified: true,
+  emailVerifiedAt: true,
+  roles: true,
+  firstName: true,
+  lastName: true,
+  phoneE164: true,
+  profileImageBucket: true,
+  profileImagePath: true,
+  phoneVerified: true,
+  phoneVerifiedAt: true,
+  state: true,
+  referralCode: true,
+  preferredLanguage: true,
+  notificationsEnabled: true,
+  notificationPromptedAt: true,
+  pushPermissionGranted: true,
+  pushPermissionStatus: true,
+  status: true,
+  lastLoginAt: true,
+  createdAt: true,
+  updatedAt: true,
+  contactForProviders: {
+    select: {
+      id: true,
+      businessName: true,
+      isAvailable: true,
+      availabilityUpdatedAt: true,
+    },
+    take: 1,
+  },
+  providerMembers: {
+    where: {
+      status: 'active',
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+    take: 1,
+    select: {
+      role: true,
+      provider: {
+        select: {
+          id: true,
+          businessName: true,
+          isAvailable: true,
+          availabilityUpdatedAt: true,
+        },
+      },
+    },
+  },
+  userAddresses: {
+    select: {
+      address: true,
+      city: true,
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+    take: 1,
+  },
+} satisfies Prisma.ProfileSelect;
+
+type ProfileRecord = Prisma.ProfileGetPayload<{
+  select: typeof profileSelection;
+}>;
 
 @Injectable()
 export class UserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly configService: ConfigService,
+    private readonly googleStorageService: GoogleStorageService,
+  ) {}
 
   private normalizePreferredLanguage(
     value: string | null | undefined,
@@ -73,11 +111,12 @@ export class UserService {
       : PreferredLanguage.EN;
   }
 
-  private toGraphqlProfile(profile: ProfileRecord): Profile {
+  private async toGraphqlProfile(profile: ProfileRecord): Promise<Profile> {
     const providerContact = profile.contactForProviders[0] ?? null;
     const membershipProvider = profile.providerMembers[0]?.provider ?? null;
     const activeProvider = providerContact ?? membershipProvider;
     const latestAddress = profile.userAddresses[0] ?? null;
+    const profileImageUrl = await this.resolveProfileImageUrl(profile);
 
     return {
       id: profile.id,
@@ -88,6 +127,7 @@ export class UserService {
       firstName: profile.firstName,
       lastName: profile.lastName,
       phoneE164: profile.phoneE164,
+      profileImageUrl,
       phoneVerified: profile.phoneVerified,
       phoneVerifiedAt: profile.phoneVerifiedAt,
       state: profile.state,
@@ -116,68 +156,7 @@ export class UserService {
   async getProfileByEmail(email: string): Promise<Profile | null> {
     const profile = await this.prisma.profile.findUnique({
       where: { email },
-      select: {
-        id: true,
-        email: true,
-        emailVerified: true,
-        emailVerifiedAt: true,
-        roles: true,
-        firstName: true,
-        lastName: true,
-        phoneE164: true,
-        phoneVerified: true,
-        phoneVerifiedAt: true,
-        state: true,
-        referralCode: true,
-        preferredLanguage: true,
-        notificationsEnabled: true,
-        notificationPromptedAt: true,
-        pushPermissionGranted: true,
-        pushPermissionStatus: true,
-        status: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-        contactForProviders: {
-          select: {
-            id: true,
-            businessName: true,
-            isAvailable: true,
-            availabilityUpdatedAt: true,
-          },
-          take: 1,
-        },
-        providerMembers: {
-          where: {
-            status: 'active',
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          take: 1,
-          select: {
-            role: true,
-            provider: {
-              select: {
-                id: true,
-                businessName: true,
-                isAvailable: true,
-                availabilityUpdatedAt: true,
-              },
-            },
-          },
-        },
-        userAddresses: {
-          select: {
-            address: true,
-            city: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: 1,
-        },
-      },
+      select: profileSelection,
     });
 
     if (!profile) {
@@ -190,68 +169,7 @@ export class UserService {
   async findProfileById(profileId: string): Promise<Profile | null> {
     const profile = await this.prisma.profile.findUnique({
       where: { id: profileId },
-      select: {
-        id: true,
-        email: true,
-        emailVerified: true,
-        emailVerifiedAt: true,
-        roles: true,
-        firstName: true,
-        lastName: true,
-        phoneE164: true,
-        phoneVerified: true,
-        phoneVerifiedAt: true,
-        state: true,
-        referralCode: true,
-        preferredLanguage: true,
-        notificationsEnabled: true,
-        notificationPromptedAt: true,
-        pushPermissionGranted: true,
-        pushPermissionStatus: true,
-        status: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-        contactForProviders: {
-          select: {
-            id: true,
-            businessName: true,
-            isAvailable: true,
-            availabilityUpdatedAt: true,
-          },
-          take: 1,
-        },
-        providerMembers: {
-          where: {
-            status: 'active',
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          take: 1,
-          select: {
-            role: true,
-            provider: {
-              select: {
-                id: true,
-                businessName: true,
-                isAvailable: true,
-                availabilityUpdatedAt: true,
-              },
-            },
-          },
-        },
-        userAddresses: {
-          select: {
-            address: true,
-            city: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: 1,
-        },
-      },
+      select: profileSelection,
     });
 
     if (!profile) {
@@ -308,68 +226,55 @@ export class UserService {
         id: profileId,
         ...updateData,
       },
-      select: {
-        id: true,
-        email: true,
-        emailVerified: true,
-        emailVerifiedAt: true,
-        roles: true,
-        firstName: true,
-        lastName: true,
-        phoneE164: true,
-        phoneVerified: true,
-        phoneVerifiedAt: true,
-        state: true,
-        referralCode: true,
-        preferredLanguage: true,
-        notificationsEnabled: true,
-        notificationPromptedAt: true,
-        pushPermissionGranted: true,
-        pushPermissionStatus: true,
-        status: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-        contactForProviders: {
-          select: {
-            id: true,
-            businessName: true,
-            isAvailable: true,
-            availabilityUpdatedAt: true,
-          },
-          take: 1,
-        },
-        providerMembers: {
-          where: {
-            status: 'active',
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          take: 1,
-          select: {
-            role: true,
-            provider: {
-              select: {
-                id: true,
-                businessName: true,
-                isAvailable: true,
-                availabilityUpdatedAt: true,
-              },
-            },
-          },
-        },
-        userAddresses: {
-          select: {
-            address: true,
-            city: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: 1,
-        },
+      select: profileSelection,
+    });
+
+    return this.toGraphqlProfile(profile);
+  }
+
+  async createProfileImageUploadUrl(
+    profileId: string,
+    input: CreateProfileImageUploadUrlInput,
+  ): Promise<ProfileImageUploadUrl> {
+    const bucket = this.getProfileImageBucketName();
+    const mimeType = input.mimeType?.trim() || 'image/jpeg';
+    const expiresInSeconds = Math.max(
+      Number(
+        this.configService.get<string>('PROFILE_IMAGE_UPLOAD_URL_TTL_SECONDS') ??
+          900,
+      ),
+      60,
+    );
+    const storagePath = this.buildProfileImageStoragePath(
+      profileId,
+      input.fileName,
+    );
+    const uploadUrl = await this.googleStorageService.createSignedUploadUrl({
+      bucketName: bucket,
+      objectPath: storagePath,
+      expiresInSeconds,
+      contentType: mimeType,
+    });
+
+    return {
+      storageBucket: bucket,
+      storagePath,
+      uploadUrl,
+      expiresAt: new Date(Date.now() + expiresInSeconds * 1000),
+    };
+  }
+
+  async setProfileImage(
+    profileId: string,
+    input: SetProfileImageInput,
+  ): Promise<Profile> {
+    const profile = await this.prisma.profile.update({
+      where: { id: profileId },
+      data: {
+        profileImageBucket: input.storageBucket.trim(),
+        profileImagePath: input.storagePath.trim(),
       },
+      select: profileSelection,
     });
 
     return this.toGraphqlProfile(profile);
@@ -428,68 +333,7 @@ export class UserService {
             set: nextRoles,
           },
         },
-        select: {
-          id: true,
-          email: true,
-          emailVerified: true,
-          emailVerifiedAt: true,
-          roles: true,
-          firstName: true,
-          lastName: true,
-          phoneE164: true,
-          phoneVerified: true,
-          phoneVerifiedAt: true,
-          notificationsEnabled: true,
-          notificationPromptedAt: true,
-          pushPermissionGranted: true,
-          pushPermissionStatus: true,
-          state: true,
-          referralCode: true,
-          preferredLanguage: true,
-          status: true,
-          lastLoginAt: true,
-          createdAt: true,
-          updatedAt: true,
-          contactForProviders: {
-            select: {
-              id: true,
-              businessName: true,
-              isAvailable: true,
-              availabilityUpdatedAt: true,
-            },
-            take: 1,
-          },
-          providerMembers: {
-            where: {
-              status: 'active',
-            },
-            orderBy: {
-              createdAt: 'asc',
-            },
-            take: 1,
-            select: {
-              role: true,
-              provider: {
-                select: {
-                  id: true,
-                  businessName: true,
-                  isAvailable: true,
-                  availabilityUpdatedAt: true,
-                },
-              },
-            },
-          },
-          userAddresses: {
-            select: {
-              address: true,
-              city: true,
-            },
-            orderBy: {
-              updatedAt: 'desc',
-            },
-            take: 1,
-          },
-        },
+        select: profileSelection,
       });
 
       if (input.targetRole === UserType.BUSINESS) {
@@ -771,6 +615,60 @@ export class UserService {
         status: 'active',
       },
     });
+  }
+
+  private async resolveProfileImageUrl(
+    profile: Pick<ProfileRecord, 'profileImageBucket' | 'profileImagePath'>,
+  ): Promise<string | null> {
+    if (!profile.profileImageBucket || !profile.profileImagePath) {
+      return null;
+    }
+
+    const expiresInSeconds = Math.max(
+      Number(
+        this.configService.get<string>('PROFILE_IMAGE_URL_TTL_SECONDS') ??
+          604800,
+      ),
+      300,
+    );
+
+    return this.googleStorageService.createSignedReadUrl({
+      bucketName: profile.profileImageBucket,
+      objectPath: profile.profileImagePath,
+      expiresInSeconds,
+    });
+  }
+
+  private getProfileImageBucketName(): string {
+    return (
+      this.configService.get<string>('STORAGE_BUCKET_NAME')?.trim() ||
+      'oyana-storage'
+    );
+  }
+
+  private buildProfileImageStoragePath(
+    profileId: string,
+    rawFileName: string,
+  ): string {
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const cleanFileName = this.sanitizeUploadFileName(rawFileName);
+    const random = Math.random().toString(36).slice(2, 10);
+
+    return `profiles/${profileId}/${year}/${month}/${Date.now()}-${random}-${cleanFileName}`;
+  }
+
+  private sanitizeUploadFileName(fileName: string): string {
+    const trimmed = fileName.trim();
+    if (!trimmed) {
+      return 'profile-image.jpg';
+    }
+
+    const nameOnly = trimmed.replace(/[/\\]/g, '_');
+    const asciiOnly = nameOnly.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    return asciiOnly.length > 0 ? asciiOnly.slice(-120) : 'profile-image.jpg';
   }
 
   private getDefaultBusinessName(profile: {

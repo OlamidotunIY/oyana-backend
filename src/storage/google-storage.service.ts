@@ -13,6 +13,12 @@ type SignedUploadUrlOptions = {
   contentType?: string;
 };
 
+type SignedReadUrlOptions = {
+  bucketName: string;
+  objectPath: string;
+  expiresInSeconds: number;
+};
+
 @Injectable()
 export class GoogleStorageService {
   private readonly storage: Storage;
@@ -39,6 +45,20 @@ export class GoogleStorageService {
     }
 
     const [url] = await file.getSignedUrl(config);
+    return url;
+  }
+
+  async createSignedReadUrl(options: SignedReadUrlOptions): Promise<string> {
+    const file = this.storage
+      .bucket(this.requireBucketName(options.bucketName))
+      .file(options.objectPath);
+
+    const [url] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + options.expiresInSeconds * 1000,
+    });
+
     return url;
   }
 

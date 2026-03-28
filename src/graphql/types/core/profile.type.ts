@@ -27,6 +27,9 @@ export class Profile {
   @Field(() => String, { nullable: true })
   phoneE164: string | null;
 
+  @Field(() => String, { nullable: true })
+  profileImageUrl?: string | null;
+
   @Field(() => Boolean)
   phoneVerified: boolean;
 
@@ -83,4 +86,19 @@ export class Profile {
 
   @Field()
   updatedAt: Date;
+}
+
+@ObjectType()
+export class ProfileImageUploadUrl {
+  @Field()
+  storageBucket: string;
+
+  @Field()
+  storagePath: string;
+
+  @Field()
+  uploadUrl: string;
+
+  @Field()
+  expiresAt: Date;
 }
