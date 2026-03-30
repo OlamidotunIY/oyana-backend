@@ -12,13 +12,13 @@ export class AdminProviderOverview {
   @Field(() => DriverType, { nullable: true })
   driverType?: DriverType | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   fullName?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   firstName?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   lastName?: string | null;
 
   @Field()
@@ -30,16 +30,16 @@ export class AdminProviderOverview {
   @Field(() => Boolean)
   isAvailable: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   activeAddress?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   activeCity?: string | null;
 
   @Field(() => VehicleCategory, { nullable: true })
   primaryVehicleCategory?: VehicleCategory | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   primaryVehiclePlateNumber?: string | null;
 
   @Field(() => Int, { nullable: true })
