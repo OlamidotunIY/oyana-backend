@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  NotFoundException,
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -44,14 +45,24 @@ export class AddressService {
   }
 
   async getMyUserAddresses(profileId: string): Promise<UserAddress[]> {
-    const addresses = await this.prisma.userAddress.findMany({
-      where: { profileId },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+    const [profile, addresses] = await Promise.all([
+      this.prisma.profile.findUnique({
+        where: { id: profileId },
+        select: {
+          activeAddressId: true,
+        },
+      }),
+      this.prisma.userAddress.findMany({
+        where: { profileId },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+    ]);
 
-    return addresses.map((address) => this.toGraphqlUserAddress(address));
+    return addresses.map((address) =>
+      this.toGraphqlUserAddress(address, address.id === profile?.activeAddressId),
+    );
   }
 
   async createUserAddress(
@@ -97,22 +108,75 @@ export class AddressService {
       throw new BadRequestException('Resolved country code is invalid');
     }
 
-    const address = await this.prisma.userAddress.create({
-      data: {
-        id: randomUUID(),
+    const created = await this.prisma.$transaction(async (tx) => {
+      const profile = await tx.profile.findUnique({
+        where: { id: profileId },
+        select: {
+          activeAddressId: true,
+        },
+      });
+
+      if (!profile) {
+        throw new NotFoundException('Profile not found');
+      }
+
+      const address = await tx.userAddress.create({
+        data: {
+          id: randomUUID(),
+          profileId,
+          address: addressLine,
+          city,
+          state,
+          postalCode,
+          label: input.label?.trim() || undefined,
+          countryCode,
+          lat: resolvedAddress.latitude,
+          lng: resolvedAddress.longitude,
+        },
+      });
+
+      const isActive = input.setAsActive === true || !profile.activeAddressId;
+      if (isActive) {
+        await tx.profile.update({
+          where: { id: profileId },
+          data: {
+            activeAddressId: address.id,
+          },
+        });
+      }
+
+      return {
+        address,
+        isActive,
+      };
+    });
+
+    return this.toGraphqlUserAddress(created.address, created.isActive);
+  }
+
+  async setActiveUserAddress(
+    profileId: string,
+    addressId: string,
+  ): Promise<UserAddress> {
+    const address = await this.prisma.userAddress.findFirst({
+      where: {
+        id: addressId,
         profileId,
-        address: addressLine,
-        city,
-        state,
-        postalCode,
-        label: input.label?.trim() || undefined,
-        countryCode,
-        lat: resolvedAddress.latitude,
-        lng: resolvedAddress.longitude,
       },
     });
 
-    return this.toGraphqlUserAddress(address);
+    if (!address) {
+      throw new NotFoundException('Address not found');
+    }
+
+    await this.prisma.profile.update({
+      where: { id: profileId },
+      data: {
+        activeAddressId: address.id,
+      },
+    });
+
+    return this.toGraphqlUserAddress(address, true);
   }
 
   async searchAddresses(
@@ -493,12 +557,16 @@ export class AddressService {
     return apiKey;
   }
 
-  private toGraphqlUserAddress(address: PrismaUserAddress): UserAddress {
+  private toGraphqlUserAddress(
+    address: PrismaUserAddress,
+    isActive = false,
+  ): UserAddress {
     return {
       ...address,
       label: address.label ?? undefined,
       lat: address.lat ?? undefined,
       lng: address.lng ?? undefined,
+      isActive,
     };
   }
 }

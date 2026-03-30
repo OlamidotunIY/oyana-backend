@@ -8,4 +8,4 @@ export * from './verify-phone-otp.dto';
 export * from './forgot-password.dto';
 export * from './reset-password.dto';
 export * from './complete-signup.dto';
-export { OtpMode, UserType, State } from '../../enums';
+export { OtpMode, RegistrationIntent, State, UserType } from '../../enums';

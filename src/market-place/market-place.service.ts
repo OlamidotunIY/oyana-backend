@@ -28,41 +28,42 @@ import {
   VehicleCategory,
 } from '../graphql';
 import { resolveProfileRole } from '../auth/utils/roles.util';
+import { UserService } from '../user/user.service';
 
 const DEFAULT_MARKETPLACE_TAKE = 20;
 const MAX_MARKETPLACE_TAKE = 50;
 
 @Injectable()
 export class MarketPlaceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userService: UserService,
+  ) {}
 
   async marketplaceShipments(
     profileId: string,
     filter?: MarketplaceShipmentsFilterDto,
   ): Promise<MarketplaceShipmentsResult> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      return { items: [] };
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     // Validate provider has an active address with coordinates
     const providerRecord = await this.prisma.provider.findUnique({
       where: { id: providerId },
-      select: { profileId: true },
+      select: {
+        contactProfile: {
+          select: {
+            activeAddress: {
+              select: {
+                lat: true,
+                lng: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    const activeAddress = providerRecord?.profileId
-      ? await this.prisma.userAddress.findFirst({
-          where: {
-            profileId: providerRecord.profileId,
-            lat: { not: null },
-            lng: { not: null },
-          },
-          orderBy: { createdAt: 'desc' },
-          select: { lat: true, lng: true },
-        })
-      : null;
+    const activeAddress = providerRecord?.contactProfile?.activeAddress ?? null;
 
     if (!activeAddress?.lat || !activeAddress?.lng) {
       return {
@@ -260,11 +261,7 @@ export class MarketPlaceService {
     profileId: string,
     shipmentId: string,
   ): Promise<ShipmentBid[]> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      return [];
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const bids = await this.prisma.shipmentBid.findMany({
       where: {
@@ -289,11 +286,7 @@ export class MarketPlaceService {
   }
 
   async myBids(profileId: string): Promise<ShipmentBid[]> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      return [];
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const bids = await this.prisma.shipmentBid.findMany({
       where: {
@@ -470,11 +463,7 @@ export class MarketPlaceService {
     profileId: string,
     input: CreateShipmentBidDto,
   ): Promise<ShipmentBid> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      throw new ForbiddenException('No provider account found for this user');
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const shipment = await this.prisma.shipment.findUnique({
       where: { id: input.shipmentId },
@@ -563,11 +552,7 @@ export class MarketPlaceService {
     id: string,
     input: UpdateShipmentBidDto,
   ): Promise<ShipmentBid> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      throw new ForbiddenException('No provider account found for this user');
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const bid = await this.prisma.shipmentBid.findFirst({
       where: {
@@ -606,11 +591,7 @@ export class MarketPlaceService {
   }
 
   async withdrawBid(profileId: string, id: string): Promise<ShipmentBid> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      throw new ForbiddenException('No provider account found for this user');
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const bid = await this.prisma.shipmentBid.findFirst({
       where: {
@@ -790,6 +771,17 @@ export class MarketPlaceService {
     });
 
     return providerMember?.providerId ?? null;
+  }
+
+  private async requireOperationalProviderId(profileId: string): Promise<string> {
+    await this.userService.assertDriverOnboardingComplete(profileId);
+
+    const providerId = await this.resolveProviderIdForProfile(profileId);
+    if (!providerId) {
+      throw new ForbiddenException('No provider account found for this user');
+    }
+
+    return providerId;
   }
 
   private async requireUserRole(

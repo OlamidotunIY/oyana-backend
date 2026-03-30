@@ -1,5 +1,6 @@
 import { InputType, Field } from '@nestjs/graphql';
 import {
+  IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -27,4 +28,9 @@ export class CreateUserAddressDto {
     message: 'countryCode must be a 2-letter ISO code',
   })
   countryCode?: string;
+
+  @Field(() => Boolean, { nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  setAsActive?: boolean;
 }

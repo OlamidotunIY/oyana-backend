@@ -38,6 +38,7 @@ import {
   NotificationCategory,
 } from '../graphql';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserService } from '../user/user.service';
 
 export const DISPATCH_PUBSUB = 'DISPATCH_PUBSUB';
 
@@ -70,6 +71,7 @@ export class DispatchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly userService: UserService,
     @Inject(DISPATCH_PUBSUB) private readonly pubSub: PubSub,
   ) {
     this.dispatchWorkerBatchSize = this.parsePositiveInt(
@@ -112,11 +114,7 @@ export class DispatchService {
   }
 
   async myDispatchOffers(profileId: string): Promise<DispatchOffer[]> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      return [];
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const offers = await this.prisma.dispatchOffer.findMany({
       where: {
@@ -397,11 +395,7 @@ export class DispatchService {
     profileId: string,
     input: UpdateDispatchOfferDto,
   ): Promise<DispatchOffer> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      throw new ForbiddenException('No provider account found for this user');
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     if (
       input.status !== DispatchOfferStatus.ACCEPTED &&
@@ -474,11 +468,7 @@ export class DispatchService {
     profileId: string,
     shipmentId: string,
   ): Promise<Shipment> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      throw new ForbiddenException('No provider account found for this user');
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     await this.requireProviderOwnedActiveAssignment(providerId, shipmentId);
 
@@ -527,11 +517,7 @@ export class DispatchService {
     profileId: string,
     shipmentId: string,
   ): Promise<Shipment> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      throw new ForbiddenException('No provider account found for this user');
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     await this.requireProviderOwnedActiveAssignment(providerId, shipmentId);
 
@@ -581,11 +567,7 @@ export class DispatchService {
     profileId: string,
     shipmentId: string,
   ): Promise<Shipment> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-
-    if (!providerId) {
-      throw new ForbiddenException('No provider account found for this user');
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const assignment = await this.requireProviderOwnedActiveAssignment(
       providerId,
@@ -1413,6 +1395,17 @@ export class DispatchService {
     });
 
     return providerMember?.providerId ?? null;
+  }
+
+  private async requireOperationalProviderId(profileId: string): Promise<string> {
+    await this.userService.assertDriverOnboardingComplete(profileId);
+
+    const providerId = await this.resolveProviderIdForProfile(profileId);
+    if (!providerId) {
+      throw new ForbiddenException('No provider account found for this user');
+    }
+
+    return providerId;
   }
 
   private toGraphqlDispatchBatch(batch: PrismaDispatchBatch): DispatchBatch {

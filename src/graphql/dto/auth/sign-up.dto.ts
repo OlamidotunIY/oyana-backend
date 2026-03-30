@@ -1,15 +1,13 @@
 import { Field, InputType } from '@nestjs/graphql';
 import {
   IsEmail,
-  IsNotEmpty,
   IsString,
   MinLength,
   IsEnum,
   IsOptional,
-  ValidateIf,
   IsArray,
 } from 'class-validator';
-import { UserType, State } from '../../enums';
+import { RegistrationIntent, State, UserType } from '../../enums';
 
 @InputType()
 export class SignUpInput {
@@ -28,51 +26,43 @@ export class SignUpInput {
   @IsEnum(UserType, { each: true })
   roles?: UserType[];
 
-  // Common fields for both individual and business
-  @Field()
-  @IsNotEmpty()
-  @IsString()
-  firstName: string;
+  @Field(() => RegistrationIntent, { nullable: true })
+  @IsOptional()
+  @IsEnum(RegistrationIntent)
+  registrationIntent?: RegistrationIntent;
 
-  @Field()
-  @IsNotEmpty()
+  @Field({ nullable: true })
+  @IsOptional()
   @IsString()
-  lastName: string;
+  firstName?: string;
 
-  @Field(() => State)
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @Field(() => State, { nullable: true })
+  @IsOptional()
   @IsEnum(State)
-  state: State;
+  state?: State;
 
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
   referralCode?: string;
 
-  // Business-specific fields
   @Field({ nullable: true })
   @IsOptional()
-  @ValidateIf((o: SignUpInput) =>
-    (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
-  )
-  @IsNotEmpty()
   @IsString()
   phoneNumber?: string;
 
   @Field({ nullable: true })
   @IsOptional()
-  @ValidateIf((o: SignUpInput) =>
-    (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
-  )
-  @IsNotEmpty()
   @IsString()
   businessName?: string;
 
   @Field({ nullable: true })
   @IsOptional()
-  @ValidateIf((o: SignUpInput) =>
-    (o.roles ?? [UserType.INDIVIDUAL]).includes(UserType.BUSINESS),
-  )
-  @IsNotEmpty()
   @IsString()
   businessAddress?: string;
 }

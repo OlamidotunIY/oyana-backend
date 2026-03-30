@@ -36,12 +36,14 @@ import {
   WalletTransactionsConnection,
   WalletTransactionsInput,
   WalletWithdrawal,
+  UserType,
 } from '../graphql';
 import {
   PaystackBank,
   PaystackService,
   PaystackVerifyTransactionData,
 } from './paystack.service';
+import { UserService } from '../user/user.service';
 
 const IDEMPOTENCY_OPERATION_CREATE_FUNDING = 'wallet_funding_create';
 const IDEMPOTENCY_OPERATION_CREATE_WITHDRAWAL = 'wallet_withdrawal_create';
@@ -56,6 +58,7 @@ export class WalletService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paystackService: PaystackService,
+    private readonly userService: UserService,
   ) {}
 
   async getWalletByOwnerId(ownerId: string): Promise<WalletAccount | null> {
@@ -1481,12 +1484,17 @@ export class WalletService {
       select: {
         id: true,
         email: true,
+        roles: true,
         phoneVerified: true,
       },
     });
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
+    }
+
+    if (profile.roles.includes(UserType.BUSINESS)) {
+      await this.userService.assertDriverOnboardingComplete(ownerProfileId);
     }
 
     return profile;

@@ -1,5 +1,13 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
-import { ProfileStatus, PreferredLanguage, State, UserType } from '../../enums';
+import {
+  DriverType,
+  OnboardingStep,
+  ProfileStatus,
+  PreferredLanguage,
+  PublicRole,
+  State,
+  UserType,
+} from '../../enums';
 
 @ObjectType()
 export class Profile {
@@ -57,6 +65,12 @@ export class Profile {
   @Field(() => String, { nullable: true })
   businessName?: string | null;
 
+  @Field(() => PublicRole)
+  publicRole: PublicRole;
+
+  @Field(() => DriverType, { nullable: true })
+  driverType?: DriverType | null;
+
   @Field(() => String, { nullable: true })
   providerId?: string | null;
 
@@ -71,6 +85,15 @@ export class Profile {
 
   @Field(() => String, { nullable: true })
   city?: string | null;
+
+  @Field(() => String, { nullable: true })
+  activeAddressId?: string | null;
+
+  @Field(() => OnboardingStep)
+  onboardingStep: OnboardingStep;
+
+  @Field(() => Boolean)
+  onboardingCompleted: boolean;
 
   @Field(() => PreferredLanguage)
   preferredLanguage: PreferredLanguage;

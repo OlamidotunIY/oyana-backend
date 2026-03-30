@@ -5,6 +5,7 @@
 model Provider {
   id                      String   @id @default(uuid()) @db.Uuid
   businessName            String   @map("business_name")
+  driverType              VehicleCategory? @map("driver_type")
   profileId               String?  @unique @map("contact_profile_id") @db.Uuid
   status                  String   @default("pending")
   isAvailable             Boolean  @default(false) @map("is_available")

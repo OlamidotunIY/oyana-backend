@@ -13,6 +13,7 @@ model Profile {
   profileImageBucket     String?       @map("profile_image_bucket")
   profileImagePath       String?       @map("profile_image_path")
   state                  State
+  activeAddressId        String?       @map("active_address_id") @db.Uuid
   referralCode           String?       @map("referral_code")
   preferredLanguage      String        @default("en") @map("preferred_language")
   notificationsEnabled   Boolean       @default(false) @map("notifications_enabled")
@@ -62,7 +63,9 @@ model Profile {
   platformConfigUpdates     PlatformConfig[]           @relation("PlatformConfigUpdater")
   notifications             Notification[]             @relation("ProfileNotifications")
   pushDevices               PushDevice[]
+  activeAddress             UserAddress?                @relation("ActiveUserAddress", fields: [activeAddressId], references: [id], onDelete: SetNull)
 
+  @@index([activeAddressId])
   @@map("profiles")
 }
 
@@ -93,9 +96,10 @@ model UserAddress {
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  profile          Profile    @relation(fields: [profileId], references: [id])
-  pickupShipments  Shipment[] @relation("PickupAddress")
-  dropoffShipments Shipment[] @relation("DropoffAddress")
+  profile                     Profile    @relation(fields: [profileId], references: [id])
+  profilesUsingAsActiveAddress Profile[] @relation("ActiveUserAddress")
+  pickupShipments             Shipment[] @relation("PickupAddress")
+  dropoffShipments            Shipment[] @relation("DropoffAddress")
 
   @@index([profileId, createdAt(sort: Desc)])
   @@map("user_addresses")

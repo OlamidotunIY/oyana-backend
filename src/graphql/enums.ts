@@ -16,6 +16,12 @@ export const UserType = {
 } as const;
 export type UserType = (typeof UserType)[keyof typeof UserType];
 
+export const RegistrationIntent = {
+  DRIVER: 'driver',
+} as const;
+export type RegistrationIntent =
+  (typeof RegistrationIntent)[keyof typeof RegistrationIntent];
+
 // ============================================================================
 // CORE ENUMS
 // ============================================================================
@@ -43,6 +49,27 @@ export const PreferredLanguage = {
 } as const;
 export type PreferredLanguage =
   (typeof PreferredLanguage)[keyof typeof PreferredLanguage];
+
+export const PublicRole = {
+  SHIPPER: 'shipper',
+  RIDER: 'rider',
+  VAN_DRIVER: 'van_driver',
+  TRUCK_DRIVER: 'truck_driver',
+  ADMIN: 'admin',
+} as const;
+export type PublicRole = (typeof PublicRole)[keyof typeof PublicRole];
+
+export const OnboardingStep = {
+  EMAIL_VERIFICATION: 'email_verification',
+  PHONE_INPUT: 'phone_input',
+  PHONE_VERIFICATION: 'phone_verification',
+  DRIVER_REGISTRATION: 'driver_registration',
+  ADDRESS: 'address',
+  NOTIFICATION_PERMISSION: 'notification_permission',
+  COMPLETED: 'completed',
+} as const;
+export type OnboardingStep =
+  (typeof OnboardingStep)[keyof typeof OnboardingStep];
 
 // ============================================================================
 // PROVIDER ENUMS
@@ -74,6 +101,13 @@ export const VehicleCategory = {
 } as const;
 export type VehicleCategory =
   (typeof VehicleCategory)[keyof typeof VehicleCategory];
+
+export const DriverType = {
+  BIKE: 'bike',
+  VAN: 'van',
+  TRUCK: 'truck',
+} as const;
+export type DriverType = (typeof DriverType)[keyof typeof DriverType];
 
 export { VehicleCategory as VehicleType };
 
@@ -421,13 +455,17 @@ export type WaybillStatus = (typeof WaybillStatus)[keyof typeof WaybillStatus];
 
 registerEnumType(OtpMode, { name: 'OtpMode' });
 registerEnumType(UserType, { name: 'UserType' });
+registerEnumType(RegistrationIntent, { name: 'RegistrationIntent' });
 registerEnumType(ProfileStatus, { name: 'ProfileStatus' });
 registerEnumType(State, { name: 'State' });
 registerEnumType(PreferredLanguage, { name: 'PreferredLanguage' });
+registerEnumType(PublicRole, { name: 'PublicRole' });
+registerEnumType(OnboardingStep, { name: 'OnboardingStep' });
 registerEnumType(ProviderType, { name: 'ProviderType' });
 registerEnumType(ProviderStatus, { name: 'ProviderStatus' });
 registerEnumType(ProviderMemberRole, { name: 'ProviderMemberRole' });
 registerEnumType(VehicleCategory, { name: 'VehicleCategory' });
+registerEnumType(DriverType, { name: 'DriverType' });
 registerEnumType(VehicleStatus, { name: 'VehicleStatus' });
 registerEnumType(ShipmentMode, { name: 'ShipmentMode' });
 registerEnumType(ShipmentScheduleType, { name: 'ShipmentScheduleType' });

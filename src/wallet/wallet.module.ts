@@ -5,9 +5,10 @@ import { WalletResolver } from './wallet.resolver';
 import { WalletController } from './wallet.controller';
 import { PaystackService } from './paystack.service';
 import { AuthModule } from '../auth/auth.module';
+import { UserModule } from '../user/user.module';
 
 @Module({
-  imports: [ConfigModule, AuthModule],
+  imports: [ConfigModule, AuthModule, UserModule],
   controllers: [WalletController],
   providers: [WalletService, WalletResolver, PaystackService],
 })

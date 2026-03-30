@@ -1,7 +1,8 @@
-import { InputType, Field } from '@nestjs/graphql';
+import { InputType, Field, Int } from '@nestjs/graphql';
 import { GraphQLBigInt } from '../../scalars';
 import {
   IsBoolean,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsEnum,
@@ -12,7 +13,12 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { PreferredLanguage, UserStatus, UserType } from '../../enums';
+import {
+  DriverType,
+  PreferredLanguage,
+  UserStatus,
+  UserType,
+} from '../../enums';
 
 @InputType()
 export class CreateProfileInput {
@@ -138,6 +144,42 @@ export class ActivateRoleInput {
 
 @InputType()
 export class SetProviderAvailabilityInput {
+  @Field(() => Boolean)
+  @IsBoolean({ message: 'isAvailable must be a boolean value' })
+  isAvailable: boolean;
+}
+
+@InputType()
+export class CompleteDriverRegistrationInput {
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2, { message: 'First name must be at least 2 characters long' })
+  @MaxLength(50, { message: 'First name must not exceed 50 characters' })
+  firstName: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2, { message: 'Last name must be at least 2 characters long' })
+  @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
+  lastName: string;
+
+  @Field(() => DriverType)
+  @IsEnum(DriverType, { message: 'Driver type must be a valid value' })
+  driverType: DriverType;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(24, { message: 'Plate number must not exceed 24 characters' })
+  plateNumber: string;
+
+  @Field(() => Int)
+  @IsInt({ message: 'capacityKg must be a whole number' })
+  @Min(1, { message: 'capacityKg must be greater than zero' })
+  capacityKg: number;
+
   @Field(() => Boolean)
   @IsBoolean({ message: 'isAvailable must be a boolean value' })
   isAvailable: boolean;

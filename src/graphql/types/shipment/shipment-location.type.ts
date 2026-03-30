@@ -33,6 +33,9 @@ export class UserAddress {
   @Field({ nullable: true })
   lng?: number;
 
+  @Field(() => Boolean)
+  isActive: boolean;
+
   @Field()
   createdAt: Date;
 

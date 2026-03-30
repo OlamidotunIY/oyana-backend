@@ -28,11 +28,13 @@ import type { AuthUser } from './auth.types';
 import {
   ForgotPasswordInput,
   OtpMode,
+  RegistrationIntent,
   RequestOtpInput,
   RequestPhoneOtpInput,
   ResetPasswordInput,
   SignInInput,
   SignUpInput,
+  State,
   UserType,
   VerifyOtpInput,
   VerifyPhoneOtpInput,
@@ -78,24 +80,14 @@ export class AuthService {
   // ---------------------------------------------------------------------------
 
   async signUp(input: SignUpInput): Promise<MessageResponse> {
-    const roles = this.normalizeSignUpRoles(input.roles);
-    const isBusinessSignup = roles.includes(UserType.BUSINESS);
-
-    if (isBusinessSignup) {
-      if (!input.phoneNumber) {
-        throw new BadRequestException(
-          'Phone number is required for business signup',
-        );
-      }
-      if (!input.businessName) {
-        throw new BadRequestException(
-          'Business name is required for business signup',
-        );
-      }
-    }
+    const normalizedEmail = input.email.trim().toLowerCase();
+    const roles = this.normalizeSignUpRoles(
+      input.roles,
+      input.registrationIntent,
+    );
 
     const existing = await this.prisma.profile.findUnique({
-      where: { email: input.email },
+      where: { email: normalizedEmail },
       select: { id: true },
     });
 
@@ -112,24 +104,24 @@ export class AuthService {
     await this.prisma.profile.create({
       data: {
         id: profileId,
-        email: input.email,
+        email: normalizedEmail,
         emailVerified: false,
         passwordHash,
         roles,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        state: input.state,
-        referralCode: input.referralCode,
-        phoneE164: input.phoneNumber,
+        firstName: input.firstName?.trim() || undefined,
+        lastName: input.lastName?.trim() || undefined,
+        state: input.state ?? this.getDefaultRegistrationState(),
+        referralCode: input.referralCode?.trim() || undefined,
+        phoneE164: input.phoneNumber?.trim() || undefined,
       },
     });
 
     const signupEvent = new UserSignedUpEvent(
       profileId,
-      input.email,
+      normalizedEmail,
       roles,
-      input.firstName,
-      input.lastName,
+      input.firstName?.trim() || undefined,
+      input.lastName?.trim() || undefined,
       input.state,
       input.referralCode,
       input.phoneNumber,
@@ -139,7 +131,7 @@ export class AuthService {
 
     this.eventEmitter.emit('user.signed-up', signupEvent);
 
-    await this.sendEmailOtp(input.email, OTP_MODE.EMAIL_VERIFICATION);
+    await this.sendEmailOtp(normalizedEmail, OTP_MODE.EMAIL_VERIFICATION);
 
     return {
       message:
@@ -284,7 +276,7 @@ export class AuthService {
           email: input.email,
           emailVerified: true,
           emailVerifiedAt: new Date(),
-          state: 'Lagos' as any,
+          state: this.getDefaultRegistrationState(),
         },
       });
       profile = await this.userService.getProfileByEmail(input.email);
@@ -342,21 +334,26 @@ export class AuthService {
     }
 
     const { sub: providerId, email } = payload;
+    const normalizedEmail = email.trim().toLowerCase();
+    const registrationIntent = this.normalizeRegistrationIntent(
+      input.registrationIntent,
+    );
 
-    let profile = await this.userService.getProfileByEmail(email);
+    let profile = await this.userService.getProfileByEmail(normalizedEmail);
 
     if (!profile) {
       const profileId = randomUUID();
       await this.prisma.profile.create({
         data: {
           id: profileId,
-          email,
+          email: normalizedEmail,
           emailVerified: true,
           emailVerifiedAt: new Date(),
-          state: 'Lagos' as any,
+          roles: this.normalizeSignUpRoles(undefined, registrationIntent),
+          state: this.getDefaultRegistrationState(),
         },
       });
-      profile = await this.userService.getProfileByEmail(email);
+      profile = await this.userService.getProfileByEmail(normalizedEmail);
     }
 
     if (profile && !profile.emailVerified) {
@@ -380,9 +377,9 @@ export class AuthService {
         profileId: profile!.id,
         provider: 'google',
         providerId,
-        email,
+        email: normalizedEmail,
       },
-      update: { email },
+      update: { email: normalizedEmail },
     });
 
     const { accessToken, refreshToken } = await this.issueTokens(
@@ -801,9 +798,18 @@ export class AuthService {
     });
   }
 
-  private normalizeSignUpRoles(inputRoles?: UserType[] | null): UserType[] {
+  private normalizeSignUpRoles(
+    inputRoles?: UserType[] | null,
+    registrationIntent?: RegistrationIntent | null,
+  ): UserType[] {
+    const normalizedRegistrationIntent =
+      this.normalizeRegistrationIntent(registrationIntent);
     const requestedRoles =
-      inputRoles && inputRoles.length > 0 ? inputRoles : [UserType.INDIVIDUAL];
+      inputRoles && inputRoles.length > 0
+        ? inputRoles
+        : normalizedRegistrationIntent === RegistrationIntent.DRIVER
+          ? [UserType.BUSINESS, UserType.INDIVIDUAL]
+          : [UserType.INDIVIDUAL];
 
     if (requestedRoles.includes(UserType.ADMIN)) {
       throw new BadRequestException('Admin role cannot be self-assigned');
@@ -816,5 +822,17 @@ export class AuthService {
     }
 
     return Array.from(new Set(normalizedRoles));
+  }
+
+  private normalizeRegistrationIntent(
+    registrationIntent?: RegistrationIntent | null,
+  ): RegistrationIntent | null {
+    return registrationIntent === RegistrationIntent.DRIVER
+      ? RegistrationIntent.DRIVER
+      : null;
+  }
+
+  private getDefaultRegistrationState(): State {
+    return State.LAGOS;
   }
 }

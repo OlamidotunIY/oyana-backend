@@ -9,6 +9,7 @@ import {
 } from '../graphql/types/core';
 import {
   ActivateRoleInput,
+  CompleteDriverRegistrationInput,
   CreateProfileImageUploadUrlInput,
   SetProviderAvailabilityInput,
   SetProfileImageInput,
@@ -72,6 +73,16 @@ export class UserResolver {
     @Args('input') input: ActivateRoleInput,
   ): Promise<Profile> {
     return this.userService.activateRole(user.id, input);
+  }
+
+  @Mutation(() => Profile)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
+  async completeDriverRegistration(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: CompleteDriverRegistrationInput,
+  ): Promise<Profile> {
+    return this.userService.completeDriverRegistration(user.id, input);
   }
 
   @Mutation(() => Profile)

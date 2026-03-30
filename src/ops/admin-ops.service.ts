@@ -41,6 +41,7 @@ import {
 } from '../graphql';
 import { hasAnyProfileRole } from '../auth/utils/roles.util';
 import { NotificationsService } from '../notifications/notifications.service';
+import { normalizeDriverType } from '../user/driver-onboarding.util';
 
 type FraudFlagRow = {
   id: string;
@@ -536,10 +537,34 @@ export class AdminOpsService {
             dispatchOffers: true,
           },
         },
+        contactProfile: {
+          select: {
+            firstName: true,
+            lastName: true,
+            phoneVerified: true,
+            activeAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+          },
+        },
         kycProfile: {
           select: {
             overallStatus: true,
           },
+        },
+        vehicles: {
+          select: {
+            category: true,
+            plateNumber: true,
+            capacityKg: true,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+          take: 1,
         },
       },
       orderBy: {
@@ -551,7 +576,22 @@ export class AdminOpsService {
     return providers.map((provider) => ({
       id: provider.id,
       businessName: provider.businessName,
+      driverType: normalizeDriverType(provider.driverType),
+      fullName:
+        [provider.contactProfile?.firstName, provider.contactProfile?.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim() || null,
+      firstName: provider.contactProfile?.firstName ?? null,
+      lastName: provider.contactProfile?.lastName ?? null,
       status: provider.status,
+      phoneVerified: provider.contactProfile?.phoneVerified ?? false,
+      isAvailable: provider.isAvailable,
+      activeAddress: provider.contactProfile?.activeAddress?.address ?? null,
+      activeCity: provider.contactProfile?.activeAddress?.city ?? null,
+      primaryVehicleCategory: provider.vehicles[0]?.category ?? null,
+      primaryVehiclePlateNumber: provider.vehicles[0]?.plateNumber ?? null,
+      primaryVehicleCapacityKg: provider.vehicles[0]?.capacityKg ?? null,
       activeAssignments: provider._count.shipmentAssignments,
       openOffers: provider._count.dispatchOffers,
       kycStatus: provider.kycProfile?.overallStatus ?? 'unverified',

@@ -5,10 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, VehicleCategory as PrismaVehicleCategory } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
   ActivateRoleInput,
+  CompleteDriverRegistrationInput,
   CreateProfileImageUploadUrlInput,
   SetProviderAvailabilityInput,
   SetProfileImageInput,
@@ -25,6 +26,14 @@ import {
 } from '../graphql/types/core';
 import { normalizeProfileRoles } from '../auth/utils/roles.util';
 import { GoogleStorageService } from '../storage/google-storage.service';
+import {
+  isDriverOnboardingCompleted,
+  mapDriverTypeToVehicleCategory,
+  normalizeDriverType,
+  resolveActiveProvider,
+  resolveOnboardingStep,
+  resolvePublicRole,
+} from './driver-onboarding.util';
 
 const profileSelection = {
   id: true,
@@ -40,6 +49,7 @@ const profileSelection = {
   phoneVerified: true,
   phoneVerifiedAt: true,
   state: true,
+  activeAddressId: true,
   referralCode: true,
   preferredLanguage: true,
   notificationsEnabled: true,
@@ -50,12 +60,30 @@ const profileSelection = {
   lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
+  activeAddress: {
+    select: {
+      id: true,
+      address: true,
+      city: true,
+    },
+  },
   contactForProviders: {
     select: {
       id: true,
       businessName: true,
+      driverType: true,
       isAvailable: true,
       availabilityUpdatedAt: true,
+      vehicles: {
+        select: {
+          category: true,
+          plateNumber: true,
+          capacityKg: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      },
     },
     take: 1,
   },
@@ -73,27 +101,75 @@ const profileSelection = {
         select: {
           id: true,
           businessName: true,
+          driverType: true,
           isAvailable: true,
           availabilityUpdatedAt: true,
+          vehicles: {
+            select: {
+              category: true,
+              plateNumber: true,
+              capacityKg: true,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
         },
       },
     },
-  },
-  userAddresses: {
-    select: {
-      address: true,
-      city: true,
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-    take: 1,
   },
 } satisfies Prisma.ProfileSelect;
 
 type ProfileRecord = Prisma.ProfileGetPayload<{
   select: typeof profileSelection;
 }>;
+
+const driverOnboardingSelection = {
+  roles: true,
+  emailVerified: true,
+  phoneE164: true,
+  phoneVerified: true,
+  notificationPromptedAt: true,
+  activeAddressId: true,
+  contactForProviders: {
+    select: {
+      id: true,
+      driverType: true,
+      vehicles: {
+        select: {
+          category: true,
+          plateNumber: true,
+          capacityKg: true,
+        },
+      },
+    },
+    take: 1,
+  },
+  providerMembers: {
+    where: {
+      status: 'active',
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+    take: 1,
+    select: {
+      provider: {
+        select: {
+          id: true,
+          driverType: true,
+          vehicles: {
+            select: {
+              category: true,
+              plateNumber: true,
+              capacityKg: true,
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.ProfileSelect;
 
 @Injectable()
 export class UserService {
@@ -112,11 +188,9 @@ export class UserService {
   }
 
   private async toGraphqlProfile(profile: ProfileRecord): Promise<Profile> {
-    const providerContact = profile.contactForProviders[0] ?? null;
-    const membershipProvider = profile.providerMembers[0]?.provider ?? null;
-    const activeProvider = providerContact ?? membershipProvider;
-    const latestAddress = profile.userAddresses[0] ?? null;
+    const activeProvider = resolveActiveProvider(profile);
     const profileImageUrl = await this.resolveProfileImageUrl(profile);
+    const onboardingStep = resolveOnboardingStep(profile);
 
     return {
       id: profile.id,
@@ -144,12 +218,17 @@ export class UserService {
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
       businessName: activeProvider?.businessName ?? null,
+      publicRole: resolvePublicRole(profile),
+      driverType: normalizeDriverType(activeProvider?.driverType),
       providerId: activeProvider?.id ?? null,
       providerIsAvailable: activeProvider?.isAvailable ?? null,
       providerAvailabilityUpdatedAt:
         activeProvider?.availabilityUpdatedAt ?? null,
-      primaryAddress: latestAddress?.address ?? null,
-      city: latestAddress?.city ?? null,
+      primaryAddress: profile.activeAddress?.address ?? null,
+      city: profile.activeAddress?.city ?? null,
+      activeAddressId: profile.activeAddressId ?? null,
+      onboardingStep,
+      onboardingCompleted: isDriverOnboardingCompleted(profile),
     };
   }
 
@@ -179,11 +258,29 @@ export class UserService {
     return this.toGraphqlProfile(profile);
   }
 
+  async assertDriverOnboardingComplete(profileId: string): Promise<void> {
+    const profile = await this.prisma.profile.findUnique({
+      where: { id: profileId },
+      select: driverOnboardingSelection,
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    const onboardingStep = resolveOnboardingStep(profile);
+    if (!isDriverOnboardingCompleted(profile)) {
+      throw new ForbiddenException(
+        `Complete driver onboarding before accessing provider operations. Next step: ${onboardingStep}.`,
+      );
+    }
+  }
+
   async updateProfile(
     profileId: string,
     input: UpdateProfileInput,
   ): Promise<Profile> {
-    const updateData: any = {};
+    const updateData: Prisma.ProfileUpdateInput = {};
     const currentProfile = await this.prisma.profile.findUnique({
       where: { id: profileId },
       select: {
@@ -218,14 +315,9 @@ export class UserService {
       updateData.status = input.status;
     }
 
-    // Use upsert to create profile if it doesn't exist
-    const profile = await this.prisma.profile.upsert({
+    const profile = await this.prisma.profile.update({
       where: { id: profileId },
-      update: updateData,
-      create: {
-        id: profileId,
-        ...updateData,
-      },
+      data: updateData,
       select: profileSelection,
     });
 
@@ -240,8 +332,9 @@ export class UserService {
     const mimeType = input.mimeType?.trim() || 'image/jpeg';
     const expiresInSeconds = Math.max(
       Number(
-        this.configService.get<string>('PROFILE_IMAGE_UPLOAD_URL_TTL_SECONDS') ??
-          900,
+        this.configService.get<string>(
+          'PROFILE_IMAGE_UPLOAD_URL_TTL_SECONDS',
+        ) ?? 900,
       ),
       60,
     );
@@ -341,6 +434,113 @@ export class UserService {
       }
 
       return updated;
+    });
+
+    return this.toGraphqlProfile(updatedProfile);
+  }
+
+  async completeDriverRegistration(
+    profileId: string,
+    input: CompleteDriverRegistrationInput,
+  ): Promise<Profile> {
+    const profile = await this.prisma.profile.findUnique({
+      where: { id: profileId },
+      select: {
+        id: true,
+        email: true,
+        roles: true,
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    const vehicleCategory = mapDriverTypeToVehicleCategory(input.driverType);
+    if (!vehicleCategory) {
+      throw new BadRequestException('Driver type is invalid');
+    }
+
+    const normalizedFirstName = input.firstName.trim();
+    const normalizedLastName = input.lastName.trim();
+    const businessName = `${normalizedFirstName} ${normalizedLastName}`.trim();
+    const nextRoles = Array.from(
+      new Set([
+        ...normalizeProfileRoles(profile),
+        UserType.BUSINESS,
+        UserType.INDIVIDUAL,
+      ]),
+    );
+
+    const updatedProfile = await this.prisma.$transaction(async (tx) => {
+      await tx.profile.update({
+        where: { id: profileId },
+        data: {
+          firstName: normalizedFirstName,
+          lastName: normalizedLastName,
+          roles: {
+            set: nextRoles,
+          },
+        },
+      });
+
+      const providerId = await this.ensureProviderForProfile(
+        tx,
+        {
+          id: profile.id,
+          email: profile.email,
+          firstName: normalizedFirstName,
+          lastName: normalizedLastName,
+        },
+        businessName,
+        {
+          driverType: vehicleCategory,
+          isAvailable: input.isAvailable,
+        },
+      );
+
+      const existingVehicle = await tx.vehicle.findFirst({
+        where: {
+          providerId,
+          category: vehicleCategory,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        select: {
+          id: true,
+        },
+      });
+
+      const normalizedPlateNumber = input.plateNumber.trim().toUpperCase();
+
+      if (existingVehicle) {
+        await tx.vehicle.update({
+          where: {
+            id: existingVehicle.id,
+          },
+          data: {
+            plateNumber: normalizedPlateNumber,
+            capacityKg: input.capacityKg,
+            status: 'active',
+          },
+        });
+      } else {
+        await tx.vehicle.create({
+          data: {
+            providerId,
+            category: vehicleCategory,
+            plateNumber: normalizedPlateNumber,
+            capacityKg: input.capacityKg,
+            status: 'active',
+          },
+        });
+      }
+
+      return tx.profile.findUniqueOrThrow({
+        where: { id: profileId },
+        select: profileSelection,
+      });
     });
 
     return this.toGraphqlProfile(updatedProfile);
@@ -522,7 +722,19 @@ export class UserService {
       lastName: string | null;
     },
     businessName?: string,
-  ): Promise<void> {
+    options?: {
+      driverType?: PrismaVehicleCategory | null;
+      isAvailable?: boolean;
+    },
+  ): Promise<string> {
+    const providerUpdateData: Prisma.ProviderUpdateInput = {
+      businessName: businessName?.trim() || undefined,
+      driverType: options?.driverType ?? undefined,
+      isAvailable: options?.isAvailable ?? undefined,
+      availabilityUpdatedAt:
+        typeof options?.isAvailable === 'boolean' ? new Date() : undefined,
+    };
+
     const existingMembership = await tx.providerMember.findFirst({
       where: {
         profileId: profile.id,
@@ -555,13 +767,13 @@ export class UserService {
       await tx.provider.updateMany({
         where: {
           id: existingMembership.providerId,
-          profileId: null,
         },
         data: {
           profileId: profile.id,
+          ...providerUpdateData,
         },
       });
-      return;
+      return existingMembership.providerId;
     }
 
     const existingProvider = await tx.provider.findUnique({
@@ -592,15 +804,27 @@ export class UserService {
           status: 'active',
         },
       });
-      return;
+
+      await tx.provider.update({
+        where: {
+          id: existingProvider.id,
+        },
+        data: providerUpdateData,
+      });
+
+      return existingProvider.id;
     }
 
     const fallbackBusinessName = this.getDefaultBusinessName(profile);
     const provider = await tx.provider.create({
       data: {
         businessName: businessName?.trim() || fallbackBusinessName,
+        driverType: options?.driverType ?? undefined,
         profileId: profile.id,
         status: 'pending',
+        isAvailable: options?.isAvailable ?? false,
+        availabilityUpdatedAt:
+          typeof options?.isAvailable === 'boolean' ? new Date() : undefined,
       },
       select: {
         id: true,
@@ -615,6 +839,8 @@ export class UserService {
         status: 'active',
       },
     });
+
+    return provider.id;
   }
 
   private async resolveProfileImageUrl(

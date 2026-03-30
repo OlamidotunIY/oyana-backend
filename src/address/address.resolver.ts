@@ -33,6 +33,16 @@ export class AddressResolver {
     return this.addressService.createUserAddress(user.id, input);
   }
 
+  @Mutation(() => UserAddress)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
+  async setActiveUserAddress(
+    @CurrentUser() user: AuthUser,
+    @Args('addressId') addressId: string,
+  ): Promise<UserAddress> {
+    return this.addressService.setActiveUserAddress(user.id, addressId);
+  }
+
   @Query(() => [AddressSuggestion])
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)

@@ -61,6 +61,7 @@ import {
   type DispatchShipmentJobPayload,
 } from '../queue/queue.constants';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UserService } from '../user/user.service';
 
 @Injectable()
 export class ShipmentsService {
@@ -146,6 +147,7 @@ export class ShipmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly userService: UserService,
     @InjectQueue(DISPATCH_QUEUE_NAME)
     private readonly dispatchQueue: Queue<DispatchShipmentJobPayload>,
   ) {
@@ -500,7 +502,14 @@ export class ShipmentsService {
   ): Promise<ProviderDashboardQuary> {
     const now = new Date();
     const monthStart = this.getMonthStartUtc(now);
-    const providerId = await this.resolveProviderIdForProfile(profileId);
+    const viewerRole = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.BUSINESS,
+    ]);
+    const providerId =
+      viewerRole === UserType.ADMIN
+        ? await this.resolveProviderIdForProfile(profileId)
+        : await this.requireOperationalProviderId(profileId);
     const wallet = await this.getOrCreateWalletAccount(profileId);
 
     if (!providerId) {
@@ -1359,6 +1368,17 @@ export class ShipmentsService {
     return providerMember?.providerId ?? null;
   }
 
+  private async requireOperationalProviderId(profileId: string): Promise<string> {
+    await this.userService.assertDriverOnboardingComplete(profileId);
+
+    const providerId = await this.resolveProviderIdForProfile(profileId);
+    if (!providerId) {
+      throw new ForbiddenException('No provider account found for this user');
+    }
+
+    return providerId;
+  }
+
   private async requireUserRole(
     profileId: string,
     preferredRoles: UserType[] = [
@@ -1415,10 +1435,7 @@ export class ShipmentsService {
     }
 
     if (role === UserType.BUSINESS) {
-      const providerId = await this.resolveProviderIdForProfile(profileId);
-      if (!providerId) {
-        return null;
-      }
+      const providerId = await this.requireOperationalProviderId(profileId);
 
       return {
         OR: [
@@ -1468,10 +1485,7 @@ export class ShipmentsService {
       return false;
     }
 
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-    if (!providerId) {
-      return false;
-    }
+    const providerId = await this.requireOperationalProviderId(profileId);
 
     const providerShipment = await this.prisma.shipment.findFirst({
       where: {
@@ -1788,6 +1802,7 @@ export class ShipmentsService {
       countryCode: address.countryCode,
       lat: address.lat ?? undefined,
       lng: address.lng ?? undefined,
+      isActive: false,
       createdAt: address.createdAt,
       updatedAt: address.updatedAt,
     };
@@ -1806,7 +1821,10 @@ export class ShipmentsService {
       UserType.BUSINESS,
       UserType.ADMIN,
     ]);
-    const providerId = await this.resolveProviderIdForProfile(viewerProfileId);
+    const providerId =
+      viewerRole === UserType.ADMIN
+        ? await this.resolveProviderIdForProfile(viewerProfileId)
+        : await this.requireOperationalProviderId(viewerProfileId);
 
     if (!providerId) {
       throw new ForbiddenException('No provider account found for this user');

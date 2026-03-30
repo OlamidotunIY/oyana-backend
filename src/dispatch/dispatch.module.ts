@@ -4,9 +4,10 @@ import { DispatchResolver } from './dispatch.resolver';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
 import { PubSub } from 'graphql-subscriptions';
+import { UserModule } from '../user/user.module';
 
 @Module({
-  imports: [NotificationsModule, AuthModule],
+  imports: [NotificationsModule, AuthModule, UserModule],
   providers: [
     DispatchService,
     DispatchResolver,
