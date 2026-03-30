@@ -19,6 +19,10 @@ export const isDriverUserRole = (
 export const mapUserRoleToUserTypes = (
   role: UserRole | null | undefined,
 ): UserType[] => {
+  if (!role) {
+    return [];
+  }
+
   if (role === UserRole.ADMIN) {
     return [UserType.ADMIN];
   }
