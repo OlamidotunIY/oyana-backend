@@ -1,6 +1,5 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { RegistrationIntent } from '../../enums';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 @InputType()
 export class SignInWithGoogleInput {
@@ -8,9 +7,4 @@ export class SignInWithGoogleInput {
   @IsString()
   @IsNotEmpty()
   idToken: string;
-
-  @Field(() => RegistrationIntent, { nullable: true })
-  @IsOptional()
-  @IsEnum(RegistrationIntent)
-  registrationIntent?: RegistrationIntent;
 }

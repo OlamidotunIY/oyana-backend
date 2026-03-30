@@ -28,14 +28,13 @@ import type { AuthUser } from './auth.types';
 import {
   ForgotPasswordInput,
   OtpMode,
-  RegistrationIntent,
   RequestOtpInput,
   RequestPhoneOtpInput,
   ResetPasswordInput,
   SignInInput,
-  SignUpInput,
-  State,
-  UserType,
+  SignUpDriverInput,
+  SignUpShipperInput,
+  UserRole,
   VerifyOtpInput,
   VerifyPhoneOtpInput,
 } from '../graphql/dto/auth';
@@ -79,65 +78,14 @@ export class AuthService {
   // Sign up (password-based)
   // ---------------------------------------------------------------------------
 
-  async signUp(input: SignUpInput): Promise<MessageResponse> {
+  async signUpShipper(input: SignUpShipperInput): Promise<MessageResponse> {
     const normalizedEmail = input.email.trim().toLowerCase();
-    const roles = this.normalizeSignUpRoles(
-      input.roles,
-      input.registrationIntent,
-    );
+    return this.signUpWithRole(normalizedEmail, input.password, UserRole.SHIPPER);
+  }
 
-    const existing = await this.prisma.profile.findUnique({
-      where: { email: normalizedEmail },
-      select: { id: true },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Email already registered');
-    }
-
-    const passwordHash = await bcrypt.hash(
-      input.password,
-      BCRYPT_PASSWORD_ROUNDS,
-    );
-    const profileId = randomUUID();
-
-    await this.prisma.profile.create({
-      data: {
-        id: profileId,
-        email: normalizedEmail,
-        emailVerified: false,
-        passwordHash,
-        roles,
-        firstName: input.firstName?.trim() || undefined,
-        lastName: input.lastName?.trim() || undefined,
-        state: input.state ?? this.getDefaultRegistrationState(),
-        referralCode: input.referralCode?.trim() || undefined,
-        phoneE164: input.phoneNumber?.trim() || undefined,
-      },
-    });
-
-    const signupEvent = new UserSignedUpEvent(
-      profileId,
-      normalizedEmail,
-      roles,
-      input.firstName?.trim() || undefined,
-      input.lastName?.trim() || undefined,
-      input.state,
-      input.referralCode,
-      input.phoneNumber,
-      input.businessName,
-      input.businessAddress,
-    );
-
-    this.eventEmitter.emit('user.signed-up', signupEvent);
-
-    await this.sendEmailOtp(normalizedEmail, OTP_MODE.EMAIL_VERIFICATION);
-
-    return {
-      message:
-        'Account created successfully. Check your email for a verification code before signing in.',
-      success: true,
-    };
+  async signUpDriver(input: SignUpDriverInput): Promise<MessageResponse> {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    return this.signUpWithRole(normalizedEmail, input.password, null);
   }
 
   // ---------------------------------------------------------------------------
@@ -276,7 +224,7 @@ export class AuthService {
           email: input.email,
           emailVerified: true,
           emailVerifiedAt: new Date(),
-          state: this.getDefaultRegistrationState(),
+          role: UserRole.SHIPPER,
         },
       });
       profile = await this.userService.getProfileByEmail(input.email);
@@ -335,10 +283,6 @@ export class AuthService {
 
     const { sub: providerId, email } = payload;
     const normalizedEmail = email.trim().toLowerCase();
-    const registrationIntent = this.normalizeRegistrationIntent(
-      input.registrationIntent,
-    );
-
     let profile = await this.userService.getProfileByEmail(normalizedEmail);
 
     if (!profile) {
@@ -349,8 +293,7 @@ export class AuthService {
           email: normalizedEmail,
           emailVerified: true,
           emailVerifiedAt: new Date(),
-          roles: this.normalizeSignUpRoles(undefined, registrationIntent),
-          state: this.getDefaultRegistrationState(),
+          role: null,
         },
       });
       profile = await this.userService.getProfileByEmail(normalizedEmail);
@@ -798,41 +741,44 @@ export class AuthService {
     });
   }
 
-  private normalizeSignUpRoles(
-    inputRoles?: UserType[] | null,
-    registrationIntent?: RegistrationIntent | null,
-  ): UserType[] {
-    const normalizedRegistrationIntent =
-      this.normalizeRegistrationIntent(registrationIntent);
-    const requestedRoles =
-      inputRoles && inputRoles.length > 0
-        ? inputRoles
-        : normalizedRegistrationIntent === RegistrationIntent.DRIVER
-          ? [UserType.BUSINESS, UserType.INDIVIDUAL]
-          : [UserType.INDIVIDUAL];
+  private async signUpWithRole(
+    normalizedEmail: string,
+    rawPassword: string,
+    role: UserRole | null,
+  ): Promise<MessageResponse> {
+    const existing = await this.prisma.profile.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
 
-    if (requestedRoles.includes(UserType.ADMIN)) {
-      throw new BadRequestException('Admin role cannot be self-assigned');
+    if (existing) {
+      throw new BadRequestException('Email already registered');
     }
 
-    const normalizedRoles = Array.from(new Set(requestedRoles));
+    const passwordHash = await bcrypt.hash(rawPassword, BCRYPT_PASSWORD_ROUNDS);
+    const profileId = randomUUID();
 
-    if (normalizedRoles.includes(UserType.BUSINESS)) {
-      normalizedRoles.push(UserType.INDIVIDUAL);
-    }
+    await this.prisma.profile.create({
+      data: {
+        id: profileId,
+        email: normalizedEmail,
+        emailVerified: false,
+        passwordHash,
+        role,
+      },
+    });
 
-    return Array.from(new Set(normalizedRoles));
-  }
+    this.eventEmitter.emit(
+      'user.signed-up',
+      new UserSignedUpEvent(profileId, normalizedEmail, role),
+    );
 
-  private normalizeRegistrationIntent(
-    registrationIntent?: RegistrationIntent | null,
-  ): RegistrationIntent | null {
-    return registrationIntent === RegistrationIntent.DRIVER
-      ? RegistrationIntent.DRIVER
-      : null;
-  }
+    await this.sendEmailOtp(normalizedEmail, OTP_MODE.EMAIL_VERIFICATION);
 
-  private getDefaultRegistrationState(): State {
-    return State.LAGOS;
+    return {
+      message:
+        'Account created successfully. Check your email for a verification code before signing in.',
+      success: true,
+    };
   }
 }

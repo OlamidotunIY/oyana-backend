@@ -294,7 +294,7 @@ export class InvoicesService {
         id: profileId,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 

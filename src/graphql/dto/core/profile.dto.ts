@@ -16,8 +16,8 @@ import {
 import {
   DriverType,
   PreferredLanguage,
+  UserRole,
   UserStatus,
-  UserType,
 } from '../../enums';
 
 @InputType()
@@ -129,20 +129,6 @@ export class SetProfileImageInput {
 }
 
 @InputType()
-export class ActivateRoleInput {
-  @Field(() => UserType)
-  @IsEnum(UserType, { message: 'Target role must be a valid role' })
-  targetRole: UserType;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsString()
-  @MinLength(2, { message: 'Business name must be at least 2 characters long' })
-  @MaxLength(120, { message: 'Business name must not exceed 120 characters' })
-  businessName?: string;
-}
-
-@InputType()
 export class SetProviderAvailabilityInput {
   @Field(() => Boolean)
   @IsBoolean({ message: 'isAvailable must be a boolean value' })
@@ -168,6 +154,11 @@ export class CompleteDriverRegistrationInput {
   @Field(() => DriverType)
   @IsEnum(DriverType, { message: 'Driver type must be a valid value' })
   driverType: DriverType;
+
+  @Field(() => UserRole, { nullable: true })
+  @IsOptional()
+  @IsEnum(UserRole, { message: 'role must be a valid driver role' })
+  role?: UserRole;
 
   @Field()
   @IsString()

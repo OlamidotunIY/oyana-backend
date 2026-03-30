@@ -1392,7 +1392,7 @@ export class ShipmentsService {
         id: profileId,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 
@@ -1409,7 +1409,7 @@ export class ShipmentsService {
         id: profileId,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 

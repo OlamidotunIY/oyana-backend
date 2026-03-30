@@ -8,7 +8,6 @@ import {
   PushDevice,
 } from '../graphql/types/core';
 import {
-  ActivateRoleInput,
   CompleteDriverRegistrationInput,
   CreateProfileImageUploadUrlInput,
   SetProviderAvailabilityInput,
@@ -17,27 +16,22 @@ import {
   UpdateProfileInput,
   UpsertPushDeviceInput,
 } from '../graphql/dto/core';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../auth/auth.types';
-import { UserType } from '../graphql/enums';
 
 @Resolver(() => Profile)
 export class UserResolver {
   constructor(private readonly userService: UserService) {}
 
   @Query(() => Profile, { nullable: true })
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async me(@CurrentUser() user: AuthUser): Promise<Profile | null> {
     return this.userService.findProfileById(user.id);
   }
 
   @Mutation(() => Profile)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async updateProfile(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateProfileInput,
@@ -46,8 +40,7 @@ export class UserResolver {
   }
 
   @Mutation(() => ProfileImageUploadUrl)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async createProfileImageUploadUrl(
     @CurrentUser() user: AuthUser,
     @Args('input') input: CreateProfileImageUploadUrlInput,
@@ -56,8 +49,7 @@ export class UserResolver {
   }
 
   @Mutation(() => Profile)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async setProfileImage(
     @CurrentUser() user: AuthUser,
     @Args('input') input: SetProfileImageInput,
@@ -66,18 +58,7 @@ export class UserResolver {
   }
 
   @Mutation(() => Profile)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
-  async activateRole(
-    @CurrentUser() user: AuthUser,
-    @Args('input') input: ActivateRoleInput,
-  ): Promise<Profile> {
-    return this.userService.activateRole(user.id, input);
-  }
-
-  @Mutation(() => Profile)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async completeDriverRegistration(
     @CurrentUser() user: AuthUser,
     @Args('input') input: CompleteDriverRegistrationInput,
@@ -86,8 +67,7 @@ export class UserResolver {
   }
 
   @Mutation(() => Profile)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async setProviderAvailability(
     @CurrentUser() user: AuthUser,
     @Args('input') input: SetProviderAvailabilityInput,
@@ -96,8 +76,7 @@ export class UserResolver {
   }
 
   @Query(() => NotificationSettings)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async myNotificationSettings(
     @CurrentUser() user: AuthUser,
   ): Promise<NotificationSettings> {
@@ -105,8 +84,7 @@ export class UserResolver {
   }
 
   @Mutation(() => NotificationSettings)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async updateNotificationSettings(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpdateNotificationSettingsInput,
@@ -115,8 +93,7 @@ export class UserResolver {
   }
 
   @Mutation(() => PushDevice)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async upsertPushDevice(
     @CurrentUser() user: AuthUser,
     @Args('input') input: UpsertPushDeviceInput,

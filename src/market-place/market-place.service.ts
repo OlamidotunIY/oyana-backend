@@ -797,7 +797,7 @@ export class MarketPlaceService {
         id: profileId,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 

@@ -1,11 +1,9 @@
 import { UseGuards } from '@nestjs/common';
 import { Args, Float, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { CreateUserAddressDto, UserAddress } from '../graphql';
-import { UserType } from '../graphql/enums';
+import { State } from '../graphql/enums';
 import { AddressService } from './address.service';
 import { SearchAddressInput } from './dto/search-address.input';
 import { AddressSuggestion } from './types/address-suggestion.type';
@@ -17,15 +15,13 @@ export class AddressResolver {
   constructor(private readonly addressService: AddressService) {}
 
   @Query(() => [UserAddress])
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
+  @UseGuards(GqlAuthGuard)
   async myUserAddresses(@CurrentUser() user: AuthUser): Promise<UserAddress[]> {
     return this.addressService.getMyUserAddresses(user.id);
   }
 
   @Mutation(() => UserAddress)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
+  @UseGuards(GqlAuthGuard)
   async createUserAddress(
     @CurrentUser() user: AuthUser,
     @Args('input') input: CreateUserAddressDto,
@@ -34,8 +30,7 @@ export class AddressResolver {
   }
 
   @Mutation(() => UserAddress)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
+  @UseGuards(GqlAuthGuard)
   async setActiveUserAddress(
     @CurrentUser() user: AuthUser,
     @Args('addressId') addressId: string,
@@ -43,9 +38,14 @@ export class AddressResolver {
     return this.addressService.setActiveUserAddress(user.id, addressId);
   }
 
+  @Query(() => [State])
+  @UseGuards(GqlAuthGuard)
+  async availableStates(): Promise<State[]> {
+    return this.addressService.getAvailableStates();
+  }
+
   @Query(() => [AddressSuggestion])
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
+  @UseGuards(GqlAuthGuard)
   async searchAddresses(
     @Args('input') input: SearchAddressInput,
   ): Promise<AddressSuggestion[]> {
@@ -53,8 +53,7 @@ export class AddressResolver {
   }
 
   @Query(() => ResolvedAddress, { nullable: true })
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.INDIVIDUAL, UserType.BUSINESS, UserType.ADMIN)
+  @UseGuards(GqlAuthGuard)
   async currentAddress(
     @Args('lat', { type: () => Float }) lat: number,
     @Args('lng', { type: () => Float }) lng: number,

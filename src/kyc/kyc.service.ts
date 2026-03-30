@@ -409,7 +409,35 @@ export class KycService {
       input.providerId,
     );
 
-    const created = await this.prisma.vehicle.create({
+    const existingVehicle = await this.prisma.vehicle.findUnique({
+      where: {
+        providerId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const created = existingVehicle
+      ? await this.prisma.vehicle.update({
+          where: {
+            id: existingVehicle.id,
+          },
+          data: {
+            category: input.category,
+            plateNumber: input.plateNumber?.trim().toUpperCase(),
+            vin: input.vin?.trim().toUpperCase(),
+            make: input.make?.trim(),
+            model: input.model?.trim(),
+            color: input.color?.trim(),
+            capacityKg: input.capacityKg,
+            capacityVolumeCm3: this.parseOptionalBigInt(
+              input.capacityVolumeCm3,
+            ),
+            status: VehicleStatus.ACTIVE,
+          },
+        })
+      : await this.prisma.vehicle.create({
       data: {
         providerId,
         category: input.category,
@@ -422,7 +450,7 @@ export class KycService {
         capacityVolumeCm3: this.parseOptionalBigInt(input.capacityVolumeCm3),
         status: VehicleStatus.ACTIVE,
       },
-    });
+        });
 
     return this.toGraphqlVehicle(created);
   }
@@ -1265,7 +1293,7 @@ export class KycService {
   private async getUserRole(profileId: string): Promise<UserType> {
     const profile = await this.prisma.profile.findUnique({
       where: { id: profileId },
-      select: { roles: true },
+      select: { role: true },
     });
 
     if (!profile) {

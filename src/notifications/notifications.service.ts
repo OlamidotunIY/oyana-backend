@@ -10,7 +10,7 @@ import { PrismaService } from '../database/prisma.service';
 import {
   NotificationAudience,
   NotificationCategory,
-  UserType,
+  UserRole,
 } from '../graphql';
 
 type NotificationContent = {
@@ -92,9 +92,7 @@ export class NotificationsService {
   async notifyAdmins(content: NotificationContent): Promise<void> {
     const adminProfiles = await this.prisma.profile.findMany({
       where: {
-        roles: {
-          has: UserType.ADMIN,
-        },
+        role: UserRole.ADMIN,
       },
       select: {
         id: true,

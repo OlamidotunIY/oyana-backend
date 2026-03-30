@@ -1174,8 +1174,8 @@ export class DispatchService {
     const providers = await tx.provider.findMany({
       where: {
         isAvailable: true,
-        vehicles: {
-          some: {
+        vehicle: {
+          is: {
             category: vehicleCategory,
             status: 'active',
           },
@@ -1198,14 +1198,8 @@ export class DispatchService {
             },
           },
         },
-        vehicles: {
-          where: {
-            category: vehicleCategory,
-            status: 'active',
-          },
-          orderBy: { createdAt: 'asc' },
-          take: 1,
-          select: { id: true },
+        vehicle: {
+          select: { id: true, category: true, status: true },
         },
         shipmentAssignments: {
           where: {
@@ -1235,8 +1229,12 @@ export class DispatchService {
     const eligibleProviders: EligibleDispatchProvider[] = [];
 
     for (const provider of providers) {
-      const vehicle = provider.vehicles[0];
-      if (!vehicle?.id) {
+      const vehicle = provider.vehicle;
+      if (
+        !vehicle?.id ||
+        vehicle.category !== vehicleCategory ||
+        vehicle.status !== 'active'
+      ) {
         continue;
       }
 

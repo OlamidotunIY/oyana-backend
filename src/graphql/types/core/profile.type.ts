@@ -5,8 +5,8 @@ import {
   ProfileStatus,
   PreferredLanguage,
   PublicRole,
+  UserRole,
   State,
-  UserType,
 } from '../../enums';
 
 @ObjectType()
@@ -23,8 +23,8 @@ export class Profile {
   @Field(() => Date, { nullable: true })
   emailVerifiedAt: Date | null;
 
-  @Field(() => [UserType])
-  roles: UserType[];
+  @Field(() => UserRole, { nullable: true })
+  role: UserRole | null;
 
   @Field(() => String, { nullable: true })
   firstName: string | null;
@@ -44,8 +44,8 @@ export class Profile {
   @Field(() => Date, { nullable: true })
   phoneVerifiedAt: Date | null;
 
-  @Field(() => State)
-  state: State;
+  @Field(() => State, { nullable: true })
+  state: State | null;
 
   @Field(() => String, { nullable: true })
   referralCode: string | null;

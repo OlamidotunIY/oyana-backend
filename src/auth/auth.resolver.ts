@@ -3,7 +3,8 @@ import { UseGuards, UnauthorizedException } from '@nestjs/common';
 import { Response as ExpressResponse } from 'express';
 import { AuthService } from './auth.service';
 import {
-  SignUpInput,
+  SignUpDriverInput,
+  SignUpShipperInput,
   SignInInput,
   SignInWithGoogleInput,
   RequestOtpInput,
@@ -14,20 +15,27 @@ import {
   ResetPasswordInput,
 } from '../graphql/dto/auth';
 import { AuthResponse, MessageResponse } from '../graphql/types/auth';
-import { Roles } from './decorators/roles.decorator';
 import { GqlAuthGuard } from './guards/gql-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
+import { MobileClientGuard } from './guards/mobile-client.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { AuthUser } from './auth.types';
-import { UserType } from '../graphql/enums';
 
 @Resolver()
 export class AuthResolver {
   constructor(private readonly authService: AuthService) {}
 
   @Mutation(() => MessageResponse)
-  async signUp(@Args('input') input: SignUpInput): Promise<MessageResponse> {
-    return this.authService.signUp(input);
+  async signUpShipper(
+    @Args('input') input: SignUpShipperInput,
+  ): Promise<MessageResponse> {
+    return this.authService.signUpShipper(input);
+  }
+
+  @Mutation(() => MessageResponse)
+  async signUpDriver(
+    @Args('input') input: SignUpDriverInput,
+  ): Promise<MessageResponse> {
+    return this.authService.signUpDriver(input);
   }
 
   @Mutation(() => AuthResponse)
@@ -39,6 +47,7 @@ export class AuthResolver {
   }
 
   @Mutation(() => AuthResponse)
+  @UseGuards(MobileClientGuard)
   async signInWithGoogle(
     @Args('input') input: SignInWithGoogleInput,
     @Context() context: { req: any; res: ExpressResponse },
@@ -62,8 +71,7 @@ export class AuthResolver {
   }
 
   @Mutation(() => MessageResponse)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async requestPhoneOtp(
     @CurrentUser() user: AuthUser,
     @Args('input') input: RequestPhoneOtpInput,
@@ -72,8 +80,7 @@ export class AuthResolver {
   }
 
   @Mutation(() => MessageResponse)
-  @UseGuards(GqlAuthGuard, RolesGuard)
-  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  @UseGuards(GqlAuthGuard)
   async verifyPhoneOtp(
     @CurrentUser() user: AuthUser,
     @Args('input') input: VerifyPhoneOtpInput,

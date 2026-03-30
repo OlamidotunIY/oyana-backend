@@ -9,6 +9,12 @@ import { randomUUID } from 'crypto';
 import axios, { AxiosInstance } from 'axios';
 import { PrismaService } from '../database/prisma.service';
 import { CreateUserAddressDto, UserAddress } from '../graphql';
+import {
+  ALL_NIGERIAN_STATES,
+  AVAILABLE_STATES_CONFIG_KEY,
+  normalizeAvailableStatesValue,
+  normalizeNigerianState,
+} from '../config/nigeria-states';
 import { SearchAddressInput } from './dto/search-address.input';
 import { AddressSuggestion } from './types/address-suggestion.type';
 import { ResolvedAddress } from './types/resolved-address.type';
@@ -82,9 +88,11 @@ export class AddressService {
     const state = this.mapToSupportedState(resolvedAddress.stateOrProvince);
     if (!state) {
       throw new BadRequestException(
-        `Address state "${resolvedAddress.stateOrProvince ?? 'unknown'}" is not currently supported`,
+        `Address state "${resolvedAddress.stateOrProvince ?? 'unknown'}" is not recognized`,
       );
     }
+
+    await this.assertStateIsAvailable(state);
 
     const addressLine =
       resolvedAddress.addressLine?.trim() ||
@@ -141,6 +149,7 @@ export class AddressService {
           where: { id: profileId },
           data: {
             activeAddressId: address.id,
+            state,
           },
         });
       }
@@ -173,10 +182,27 @@ export class AddressService {
       where: { id: profileId },
       data: {
         activeAddressId: address.id,
+        state: address.state,
       },
     });
 
     return this.toGraphqlUserAddress(address, true);
+  }
+
+  async getAvailableStates(): Promise<PrismaState[]> {
+    const config = await this.prisma.platformConfig.findUnique({
+      where: {
+        key: AVAILABLE_STATES_CONFIG_KEY,
+      },
+      select: {
+        value: true,
+      },
+    });
+
+    const normalized = normalizeAvailableStatesValue(config?.value);
+    return normalized.length > 0
+      ? (normalized as PrismaState[])
+      : [...ALL_NIGERIAN_STATES] as PrismaState[];
   }
 
   async searchAddresses(
@@ -394,29 +420,7 @@ export class AddressService {
   private mapToSupportedState(
     rawState: string | null | undefined,
   ): PrismaState | null {
-    if (!rawState) {
-      return null;
-    }
-
-    const normalized = rawState.toLowerCase().replace(/[^a-z]/g, '');
-
-    if (normalized === 'lagos') {
-      return 'Lagos';
-    }
-
-    if (normalized === 'oyo') {
-      return 'Oyo';
-    }
-
-    if (
-      normalized === 'abuja' ||
-      normalized === 'federalcapitalterritory' ||
-      normalized === 'fct'
-    ) {
-      return 'Abuja';
-    }
-
-    return null;
+    return normalizeNigerianState(rawState) as PrismaState | null;
   }
 
   private resolvePostalCode(resolvedAddress: ResolvedAddress): string {
@@ -555,6 +559,15 @@ export class AddressService {
     }
 
     return apiKey;
+  }
+
+  private async assertStateIsAvailable(state: PrismaState): Promise<void> {
+    const availableStates = await this.getAvailableStates();
+    if (!availableStates.includes(state)) {
+      throw new BadRequestException(
+        `State ${state} is not currently enabled for user addresses`,
+      );
+    }
   }
 
   private toGraphqlUserAddress(

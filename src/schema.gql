@@ -135,12 +135,23 @@ type AdminOverview {
 }
 
 type AdminProviderOverview {
+  activeAddress: String
   activeAssignments: Int!
+  activeCity: String
   businessName: String!
   createdAt: DateTime!
+  driverType: DriverType
+  firstName: String
+  fullName: String
   id: ID!
+  isAvailable: Boolean!
   kycStatus: String!
+  lastName: String
   openOffers: Int!
+  phoneVerified: Boolean!
+  primaryVehicleCapacityKg: Int
+  primaryVehicleCategory: VehicleCategory
+  primaryVehiclePlateNumber: String
   status: String!
   updatedAt: DateTime!
 }
@@ -180,14 +191,21 @@ enum BidStatus {
   WITHDRAWN
 }
 
-"""
-BigInt custom scalar type for money amounts in minor units
-"""
+"""BigInt custom scalar type for money amounts in minor units"""
 scalar BigInt
 
 input CancelShipmentDto {
   cancellationReason: String!
   shipmentId: String!
+}
+
+input CompleteDriverRegistrationInput {
+  capacityKg: Int!
+  driverType: DriverType!
+  firstName: String!
+  isAvailable: Boolean!
+  lastName: String!
+  plateNumber: String!
 }
 
 input ConfirmWalletFundingInput {
@@ -239,6 +257,12 @@ input CreateKycUploadUrlDto {
   sizeBytes: BigInt
 }
 
+input CreateProfileImageUploadUrlInput {
+  fileName: String!
+  mimeType: String
+  sizeBytes: BigInt
+}
+
 input CreateShipmentBidDto {
   amountMinor: BigInt!
   currency: String
@@ -286,6 +310,7 @@ input CreateUserAddressDto {
   countryCode: String
   label: String
   placeId: String!
+  setAsActive: Boolean
 }
 
 input CreateVehicleDto {
@@ -412,6 +437,12 @@ enum DisputeStatus {
   RESOLVED
 }
 
+enum DriverType {
+  BIKE
+  TRUCK
+  VAN
+}
+
 input FlagFraudCaseDto {
   invoiceId: String
   metadata: JSON
@@ -511,10 +542,7 @@ enum InvoiceStatus {
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
 """
-scalar JSON
-  @specifiedBy(
-    url: "http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf"
-  )
+scalar JSON @specifiedBy(url: "http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf")
 
 type KycUploadUrl {
   expiresAt: DateTime!
@@ -538,6 +566,7 @@ input MarketplaceShipmentsFilterDto {
 type MarketplaceShipmentsResult {
   items: [Shipment!]!
   nextCursor: String
+  reason: String
 }
 
 type MessageResponse {
@@ -553,13 +582,17 @@ type Mutation {
   awardShipmentBid(input: AwardShipmentBidDto!): ShipmentBidAward!
   cancelShipment(input: CancelShipmentDto!): Shipment!
   cancelShipmentAssignment(id: String!): ShipmentAssignment!
+  completeDriverRegistration(input: CompleteDriverRegistrationInput!): Profile!
   confirmDropoff(shipmentId: String!): Shipment!
+  confirmMarketplaceDropoff(shipmentId: String!): Shipment!
+  confirmMarketplacePickup(shipmentId: String!): Shipment!
   confirmPickup(shipmentId: String!): Shipment!
   confirmWalletFunding(input: ConfirmWalletFundingInput!): WalletFundingResult!
   createDispatchBatch(input: CreateDispatchBatchDto!): DispatchBatch!
   createDispute(input: CreateDisputeDto!): DisputeCase!
   createInvoice(input: CreateInvoiceDto!): Invoice!
   createKycUploadUrl(input: CreateKycUploadUrlDto!): KycUploadUrl!
+  createProfileImageUploadUrl(input: CreateProfileImageUploadUrlInput!): ProfileImageUploadUrl!
   createShipment(input: CreateShipmentDto!): Shipment!
   createShipmentAssignment(input: AssignShipmentDto!): ShipmentAssignment!
   createShipmentBid(input: CreateShipmentBidDto!): ShipmentBid!
@@ -569,8 +602,6 @@ type Mutation {
   createVehicle(input: CreateVehicleDto!): Vehicle!
   createWalletFunding(input: CreateWalletFundingInput!): WalletFundingResult!
   createWalletWithdrawal(input: CreateWalletWithdrawalInput!): WalletWithdrawal!
-  confirmMarketplaceDropoff(shipmentId: String!): Shipment!
-  confirmMarketplacePickup(shipmentId: String!): Shipment!
   flagFraudCase(input: FlagFraudCaseDto!): FraudFlag!
   forgotPassword(input: ForgotPasswordInput!): MessageResponse!
   logout: MessageResponse!
@@ -584,34 +615,28 @@ type Mutation {
   resolveDispute(input: ResolveDisputeDto!): DisputeCase!
   respondToDispatchOffer(input: UpdateDispatchOfferDto!): DispatchOffer!
   sendDispatchOffer(input: CreateDispatchOfferDto!): DispatchOffer!
+  setActiveUserAddress(addressId: String!): UserAddress!
+  setProfileImage(input: SetProfileImageInput!): Profile!
   setProviderAvailability(input: SetProviderAvailabilityInput!): Profile!
   signIn(input: SignInInput!): AuthResponse!
+  signInWithGoogle(input: SignInWithGoogleInput!): AuthResponse!
   signUp(input: SignUpInput!): MessageResponse!
-  startNinFaceVerification(
-    input: StartNinFaceVerificationDto!
-  ): ProviderKycCheck!
+  startNinFaceVerification(input: StartNinFaceVerificationDto!): ProviderKycCheck!
   startPhoneVerification(input: StartPhoneVerificationDto!): ProviderKycCheck!
-  startVehiclePlateVerification(
-    input: StartVehiclePlateVerificationDto!
-  ): ProviderKycCheck!
-  startVehicleVinVerification(
-    input: StartVehicleVinVerificationDto!
-  ): ProviderKycCheck!
+  startVehiclePlateVerification(input: StartVehiclePlateVerificationDto!): ProviderKycCheck!
+  startVehicleVinVerification(input: StartVehicleVinVerificationDto!): ProviderKycCheck!
   syncKycStatus(input: SyncKycStatusDto!): [ProviderKycCheck!]!
   updateFraudFlagStatus(input: UpdateFraudFlagStatusDto!): FraudFlag!
   updateInvoiceStatus(input: UpdateInvoiceStatusDto!): Invoice!
+  updateNotificationSettings(input: UpdateNotificationSettingsInput!): NotificationSettings!
   updatePlatformConfig(input: UpdatePlatformConfigDto!): PlatformConfig!
   updateProfile(input: UpdateProfileInput!): Profile!
   updateShipment(id: String!, input: UpdateShipmentDto!): Shipment!
-  updateShipmentAssignment(
-    id: String!
-    input: AssignShipmentDto!
-  ): ShipmentAssignment!
+  updateShipmentAssignment(id: String!, input: AssignShipmentDto!): ShipmentAssignment!
   updateShipmentBid(id: String!, input: UpdateShipmentBidDto!): ShipmentBid!
   updateSlaRule(input: UpdateSlaRuleDto!): SLARule!
-  updateSupportTicketStatus(
-    input: UpdateSupportTicketStatusDto!
-  ): SupportTicket!
+  updateSupportTicketStatus(input: UpdateSupportTicketStatusDto!): SupportTicket!
+  upsertPushDevice(input: UpsertPushDeviceInput!): PushDevice!
   verifyOtp(input: VerifyOtpInput!): AuthResponse!
   verifyPhoneOtp(input: VerifyPhoneOtpInput!): MessageResponse!
   withdrawBid(id: String!): ShipmentBid!
@@ -627,6 +652,25 @@ enum NotificationAudience {
   ADMIN
   CUSTOMER
   PROVIDER
+}
+
+type NotificationSettings {
+  hasActivePushDevice: Boolean!
+  lastPushDeviceSeenAt: DateTime
+  notificationPromptedAt: DateTime
+  notificationsEnabled: Boolean!
+  pushPermissionGranted: Boolean!
+  pushPermissionStatus: String
+}
+
+enum OnboardingStep {
+  ADDRESS
+  COMPLETED
+  DRIVER_REGISTRATION
+  EMAIL_VERIFICATION
+  NOTIFICATION_PERMISSION
+  PHONE_INPUT
+  PHONE_VERIFICATION
 }
 
 type PaymentIntent {
@@ -677,27 +721,46 @@ enum PreferredLanguage {
 }
 
 type Profile {
+  activeAddressId: String
   businessName: String
   city: String
   createdAt: DateTime!
+  driverType: DriverType
   email: String!
+  emailVerified: Boolean!
+  emailVerifiedAt: DateTime
   firstName: String
   id: ID!
   lastLoginAt: DateTime
   lastName: String
+  notificationPromptedAt: DateTime
+  notificationsEnabled: Boolean!
+  onboardingCompleted: Boolean!
+  onboardingStep: OnboardingStep!
   phoneE164: String
   phoneVerified: Boolean!
   phoneVerifiedAt: DateTime
   preferredLanguage: PreferredLanguage!
   primaryAddress: String
+  profileImageUrl: String
   providerAvailabilityUpdatedAt: DateTime
   providerId: String
   providerIsAvailable: Boolean
+  publicRole: PublicRole!
+  pushPermissionGranted: Boolean!
+  pushPermissionStatus: String
   referralCode: String
   roles: [UserType!]!
   state: State!
   status: ProfileStatus!
   updatedAt: DateTime!
+}
+
+type ProfileImageUploadUrl {
+  expiresAt: DateTime!
+  storageBucket: String!
+  storagePath: String!
+  uploadUrl: String!
 }
 
 enum ProfileStatus {
@@ -708,11 +771,30 @@ enum ProfileStatus {
 
 type ProviderDashboardQuary {
   activeAssignments: [Shipment!]!
+  cancelledShipmentsCount: Int!
   completedShipments: [Shipment!]!
+  completionRate: Float!
+  dispatchStats: ProviderDispatchStats!
+  earningsSummary: ProviderEarningsSummary!
   kycStatus: ProviderKycStatus
   myShipmentDashboard: ShipmentDashboard!
   myWallet: WalletAccount
+  performance: ProviderPerformance!
   vehicles: [Vehicle!]!
+}
+
+type ProviderDispatchStats {
+  acceptanceRate: Float!
+  offersAccepted: Int!
+  offersDeclined: Int!
+  offersExpired: Int!
+  offersReceived: Int!
+}
+
+type ProviderEarningsSummary {
+  currency: String!
+  earningsThisMonthMinor: BigInt!
+  totalEarningsMinor: BigInt!
 }
 
 type ProviderKycCheck {
@@ -762,6 +844,38 @@ type ProviderKycStatus {
   vehicleVinVerifiedAt: DateTime
 }
 
+type ProviderPerformance {
+  isAvailable: Boolean!
+  penaltiesCount: Int!
+  penaltyPoints: Int!
+  priorityScore: Int!
+  ratingAvg: Float!
+  ratingCount: Int!
+  teamMembersCount: Int!
+}
+
+enum PublicRole {
+  ADMIN
+  RIDER
+  SHIPPER
+  TRUCK_DRIVER
+  VAN_DRIVER
+}
+
+type PushDevice {
+  appVersion: String
+  createdAt: DateTime!
+  deviceId: String
+  expoPushToken: String!
+  id: ID!
+  isActive: Boolean!
+  lastSeenAt: DateTime!
+  platform: String
+  profileId: String!
+  pushPermissionStatus: String
+  updatedAt: DateTime!
+}
+
 type Query {
   adminConfig: [PlatformConfig!]!
   adminDashboard(input: AdminDashboardFilterDto): AdminDashboard!
@@ -783,9 +897,7 @@ type Query {
   freightRequestBids(shipmentId: String!): [ShipmentBid!]!
   getProviderDashboardQuary: ProviderDashboardQuary!
   invoice(id: String!): Invoice
-  marketplaceShipments(
-    filter: MarketplaceShipmentsFilterDto
-  ): MarketplaceShipmentsResult!
+  marketplaceShipments(filter: MarketplaceShipmentsFilterDto): MarketplaceShipmentsResult!
   me: Profile
   myBids: [ShipmentBid!]!
   myDispatchOffers: [DispatchOffer!]!
@@ -794,6 +906,7 @@ type Query {
   myInvoices: [Invoice!]!
   myKycChecks(filter: MyKycChecksFilterDto): [ProviderKycCheck!]!
   myKycStatus: ProviderKycStatus
+  myNotificationSettings: NotificationSettings!
   mySavedFundingCards: [WalletCardMethod!]!
   mySavedWithdrawalAccounts: [WalletSavedBankAccount!]!
   myShipmentDashboard: ShipmentDashboard!
@@ -802,9 +915,7 @@ type Query {
   myVehicles: [Vehicle!]!
   myWallet: WalletAccount
   myWalletCompliance: WalletCompliance!
-  myWalletTransactions(
-    input: WalletTransactionsInput
-  ): WalletTransactionsConnection!
+  myWalletTransactions(input: WalletTransactionsInput): WalletTransactionsConnection!
   paystackSupportedBanks(countryCode: String): [WalletBank!]!
   providerDashboard: ProviderDashboardQuary!
   searchAddresses(input: SearchAddressInput!): [AddressSuggestion!]!
@@ -839,6 +950,10 @@ enum RefundStatus {
   SUCCEEDED
 }
 
+enum RegistrationIntent {
+  DRIVER
+}
+
 input ReplySupportTicketDto {
   message: String!
   ticketId: String!
@@ -854,7 +969,9 @@ input RequestPhoneOtpInput {
 }
 
 input ResetPasswordInput {
+  email: String!
   newPassword: String!
+  token: String!
 }
 
 input ResolveDisputeDto {
@@ -909,6 +1026,11 @@ input SearchAddressInput {
   sessionToken: String
 }
 
+input SetProfileImageInput {
+  storageBucket: String!
+  storagePath: String!
+}
+
 input SetProviderAvailabilityInput {
   isAvailable: Boolean!
 }
@@ -921,6 +1043,7 @@ type Shipment {
   commissionRateBps: Float!
   createdAt: DateTime!
   customerProfileId: String!
+  dropoffAddress: UserAddress
   dropoffAddressId: String!
   dropoffAddressSummary: String
   finalPriceMinor: BigInt
@@ -929,6 +1052,7 @@ type Shipment {
   mode: ShipmentMode!
   packageDescription: String
   packageValueMinor: BigInt
+  pickupAddress: UserAddress
   pickupAddressId: String!
   pickupAddressSummary: String
   pricingCurrency: String!
@@ -1121,17 +1245,23 @@ input SignInInput {
   password: String!
 }
 
+input SignInWithGoogleInput {
+  idToken: String!
+  registrationIntent: RegistrationIntent
+}
+
 input SignUpInput {
   businessAddress: String
   businessName: String
   email: String!
-  firstName: String!
-  lastName: String!
+  firstName: String
+  lastName: String
   password: String!
   phoneNumber: String
   referralCode: String
+  registrationIntent: RegistrationIntent
   roles: [UserType!]
-  state: State!
+  state: State
 }
 
 enum SlaRuleScope {
@@ -1170,6 +1300,10 @@ enum State {
   ABUJA
   LAGOS
   OYO
+}
+
+type Subscription {
+  dispatchOfferSent: DispatchOffer!
 }
 
 type SupportTicket {
@@ -1275,6 +1409,13 @@ input UpdateInvoiceStatusDto {
   status: InvoiceStatus!
 }
 
+input UpdateNotificationSettingsInput {
+  markPrompted: Boolean
+  notificationsEnabled: Boolean
+  pushPermissionGranted: Boolean
+  pushPermissionStatus: String
+}
+
 input UpdatePlatformConfigDto {
   description: String
   key: String!
@@ -1331,12 +1472,22 @@ input UpdateSupportTicketStatusDto {
   ticketId: String!
 }
 
+input UpsertPushDeviceInput {
+  appVersion: String
+  deviceId: String
+  expoPushToken: String!
+  isActive: Boolean
+  platform: String
+  pushPermissionStatus: String
+}
+
 type UserAddress {
   address: String!
   city: String!
   countryCode: String!
   createdAt: DateTime!
   id: ID!
+  isActive: Boolean!
   label: String
   lat: Float
   lng: Float

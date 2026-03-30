@@ -6,6 +6,10 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
+  AVAILABLE_STATES_CONFIG_KEY,
+  normalizeAvailableStatesValue,
+} from '../config/nigeria-states';
+import {
   AdminDashboard,
   AdminDashboardFilterDto,
   AdminDashboardInterval,
@@ -555,16 +559,12 @@ export class AdminOpsService {
             overallStatus: true,
           },
         },
-        vehicles: {
+        vehicle: {
           select: {
             category: true,
             plateNumber: true,
             capacityKg: true,
           },
-          orderBy: {
-            createdAt: 'asc',
-          },
-          take: 1,
         },
       },
       orderBy: {
@@ -589,9 +589,9 @@ export class AdminOpsService {
       isAvailable: provider.isAvailable,
       activeAddress: provider.contactProfile?.activeAddress?.address ?? null,
       activeCity: provider.contactProfile?.activeAddress?.city ?? null,
-      primaryVehicleCategory: provider.vehicles[0]?.category ?? null,
-      primaryVehiclePlateNumber: provider.vehicles[0]?.plateNumber ?? null,
-      primaryVehicleCapacityKg: provider.vehicles[0]?.capacityKg ?? null,
+      primaryVehicleCategory: provider.vehicle?.category ?? null,
+      primaryVehiclePlateNumber: provider.vehicle?.plateNumber ?? null,
+      primaryVehicleCapacityKg: provider.vehicle?.capacityKg ?? null,
       activeAssignments: provider._count.shipmentAssignments,
       openOffers: provider._count.dispatchOffers,
       kycStatus: provider.kycProfile?.overallStatus ?? 'unverified',
@@ -973,6 +973,11 @@ export class AdminOpsService {
     input: UpdatePlatformConfigDto,
   ): Promise<PlatformConfig> {
     await this.assertAdmin(profileId);
+    const normalizedKey = input.key.trim();
+    const normalizedValue =
+      normalizedKey === AVAILABLE_STATES_CONFIG_KEY
+        ? normalizeAvailableStatesValue(input.value)
+        : input.value;
     const now = new Date();
     const [row] = await this.prisma.$queryRaw<PlatformConfigRow[]>(Prisma.sql`
       INSERT INTO "platform_configs" (
@@ -986,8 +991,8 @@ export class AdminOpsService {
       )
       VALUES (
         gen_random_uuid(),
-        ${input.key.trim()},
-        ${input.value as Prisma.InputJsonValue},
+        ${normalizedKey},
+        ${normalizedValue as Prisma.InputJsonValue},
         ${input.description?.trim() || null},
         ${profileId}::uuid,
         ${now},
@@ -1380,7 +1385,7 @@ export class AdminOpsService {
         id: profileId,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 

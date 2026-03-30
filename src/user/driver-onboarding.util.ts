@@ -1,9 +1,8 @@
-import { normalizeProfileRoles } from '../auth/utils/roles.util';
 import {
   DriverType,
   OnboardingStep,
   PublicRole,
-  UserType,
+  UserRole,
   VehicleCategory,
 } from '../graphql/enums';
 
@@ -19,7 +18,7 @@ export type DriverProviderShape = {
   driverType?: string | null;
   isAvailable?: boolean | null;
   availabilityUpdatedAt?: Date | null;
-  vehicles?: DriverVehicleShape[] | null;
+  vehicle?: DriverVehicleShape | null;
 };
 
 type DriverMembershipShape = {
@@ -27,7 +26,7 @@ type DriverMembershipShape = {
 };
 
 export type DriverOnboardingProfileShape = {
-  roles?: UserType[] | null;
+  role?: UserRole | null;
   emailVerified: boolean;
   phoneE164?: string | null;
   phoneVerified: boolean;
@@ -91,22 +90,18 @@ export const hasCompletedDriverRegistration = (
   }
 
   return Boolean(
-    provider?.vehicles?.some(
-      (vehicle) =>
-        vehicle.category === expectedCategory &&
-        Boolean(vehicle.plateNumber?.trim()) &&
-        typeof vehicle.capacityKg === 'number' &&
-        vehicle.capacityKg > 0,
-    ),
+    provider?.vehicle &&
+      provider.vehicle.category === expectedCategory &&
+      Boolean(provider.vehicle.plateNumber?.trim()) &&
+      typeof provider.vehicle.capacityKg === 'number' &&
+      provider.vehicle.capacityKg > 0,
   );
 };
 
 export const resolvePublicRole = (
   profile: DriverOnboardingProfileShape,
 ): PublicRole => {
-  const roles = normalizeProfileRoles(profile);
-
-  if (roles.includes(UserType.ADMIN)) {
+  if (profile.role === UserRole.ADMIN) {
     return PublicRole.ADMIN;
   }
 
@@ -127,12 +122,17 @@ export const resolvePublicRole = (
   return PublicRole.SHIPPER;
 };
 
+export const isDriverRole = (
+  role?: UserRole | null,
+): role is UserRole =>
+  role === UserRole.RIDER ||
+  role === UserRole.VAN_DRIVER ||
+  role === UserRole.TRUCK_DRIVER;
+
 export const resolveOnboardingStep = (
   profile: DriverOnboardingProfileShape,
 ): OnboardingStep => {
-  const roles = normalizeProfileRoles(profile);
-
-  if (!roles.includes(UserType.BUSINESS)) {
+  if (profile.role === UserRole.ADMIN || profile.role === UserRole.SHIPPER) {
     return OnboardingStep.COMPLETED;
   }
 
@@ -148,7 +148,10 @@ export const resolveOnboardingStep = (
     return OnboardingStep.PHONE_VERIFICATION;
   }
 
-  if (!hasCompletedDriverRegistration(resolveActiveProvider(profile))) {
+  if (
+    !isDriverRole(profile.role) ||
+    !hasCompletedDriverRegistration(resolveActiveProvider(profile))
+  ) {
     return OnboardingStep.DRIVER_REGISTRATION;
   }
 

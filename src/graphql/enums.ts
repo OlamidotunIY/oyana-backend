@@ -16,11 +16,14 @@ export const UserType = {
 } as const;
 export type UserType = (typeof UserType)[keyof typeof UserType];
 
-export const RegistrationIntent = {
-  DRIVER: 'driver',
+export const UserRole = {
+  SHIPPER: 'shipper',
+  RIDER: 'rider',
+  VAN_DRIVER: 'van_driver',
+  TRUCK_DRIVER: 'truck_driver',
+  ADMIN: 'admin',
 } as const;
-export type RegistrationIntent =
-  (typeof RegistrationIntent)[keyof typeof RegistrationIntent];
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 // ============================================================================
 // CORE ENUMS
@@ -34,9 +37,43 @@ export const ProfileStatus = {
 export type ProfileStatus = (typeof ProfileStatus)[keyof typeof ProfileStatus];
 
 export const State = {
+  ABIA: 'Abia',
+  ADAMAWA: 'Adamawa',
+  AKWA_IBOM: 'AkwaIbom',
+  ANAMBRA: 'Anambra',
+  BAUCHI: 'Bauchi',
+  BAYELSA: 'Bayelsa',
+  BENUE: 'Benue',
+  BORNO: 'Borno',
+  CROSS_RIVER: 'CrossRiver',
+  DELTA: 'Delta',
+  EBONYI: 'Ebonyi',
+  EDO: 'Edo',
+  EKITI: 'Ekiti',
+  ENUGU: 'Enugu',
+  GOMBE: 'Gombe',
+  IMO: 'Imo',
+  JIGAWA: 'Jigawa',
+  KADUNA: 'Kaduna',
+  KANO: 'Kano',
+  KATSINA: 'Katsina',
+  KEBBI: 'Kebbi',
+  KOGI: 'Kogi',
+  KWARA: 'Kwara',
   LAGOS: 'Lagos',
+  NASARAWA: 'Nasarawa',
+  NIGER: 'Niger',
+  OGUN: 'Ogun',
+  ONDO: 'Ondo',
+  OSUN: 'Osun',
   OYO: 'Oyo',
-  ABUJA: 'Abuja',
+  PLATEAU: 'Plateau',
+  RIVERS: 'Rivers',
+  SOKOTO: 'Sokoto',
+  TARABA: 'Taraba',
+  YOBE: 'Yobe',
+  ZAMFARA: 'Zamfara',
+  FEDERAL_CAPITAL_TERRITORY: 'FederalCapitalTerritory',
 } as const;
 export type State = (typeof State)[keyof typeof State];
 
@@ -455,7 +492,7 @@ export type WaybillStatus = (typeof WaybillStatus)[keyof typeof WaybillStatus];
 
 registerEnumType(OtpMode, { name: 'OtpMode' });
 registerEnumType(UserType, { name: 'UserType' });
-registerEnumType(RegistrationIntent, { name: 'RegistrationIntent' });
+registerEnumType(UserRole, { name: 'UserRole' });
 registerEnumType(ProfileStatus, { name: 'ProfileStatus' });
 registerEnumType(State, { name: 'State' });
 registerEnumType(PreferredLanguage, { name: 'PreferredLanguage' });

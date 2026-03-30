@@ -43,6 +43,7 @@ import {
   PaystackService,
   PaystackVerifyTransactionData,
 } from './paystack.service';
+import { hasAnyProfileRole } from '../auth/utils/roles.util';
 import { UserService } from '../user/user.service';
 
 const IDEMPOTENCY_OPERATION_CREATE_FUNDING = 'wallet_funding_create';
@@ -1484,7 +1485,7 @@ export class WalletService {
       select: {
         id: true,
         email: true,
-        roles: true,
+        role: true,
         phoneVerified: true,
       },
     });
@@ -1493,7 +1494,7 @@ export class WalletService {
       throw new NotFoundException('Profile not found');
     }
 
-    if (profile.roles.includes(UserType.BUSINESS)) {
+    if (hasAnyProfileRole(profile, [UserType.BUSINESS])) {
       await this.userService.assertDriverOnboardingComplete(ownerProfileId);
     }
 

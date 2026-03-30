@@ -446,7 +446,7 @@ export class DisputesService {
         id: profileId,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 

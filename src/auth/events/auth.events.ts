@@ -28,7 +28,7 @@ export class AuthEventsListener {
   @OnEvent('user.signed-up')
   async handleUserSignedUp(event: UserSignedUpEvent) {
     this.logger.log(
-      `Handled user signup event for ${event.email} (${Array.from(new Set(event.roles)).join(',')})`,
+      `Handled user signup event for ${event.email} (${event.role ?? 'pending_driver'})`,
     );
   }
 }

@@ -3,24 +3,24 @@
 // ============================================================================
 
 model Provider {
-  id                      String   @id @default(uuid()) @db.Uuid
-  businessName            String   @map("business_name")
+  id                      String           @id @default(uuid()) @db.Uuid
+  businessName            String           @map("business_name")
   driverType              VehicleCategory? @map("driver_type")
-  profileId               String?  @unique @map("contact_profile_id") @db.Uuid
-  status                  String   @default("pending")
-  isAvailable             Boolean  @default(false) @map("is_available")
-  availabilityUpdatedAt   DateTime? @map("availability_updated_at") @db.Timestamptz(6)
-  minWalletThresholdMinor BigInt   @default(0) @map("min_wallet_threshold_minor")
-  ratingAvg               Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
-  ratingCount             Int      @default(0) @map("rating_count")
-  priorityScore           Int      @default(0) @map("priority_score")
-  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  profileId               String?          @unique @map("contact_profile_id") @db.Uuid
+  status                  String           @default("pending")
+  isAvailable             Boolean          @default(false) @map("is_available")
+  availabilityUpdatedAt   DateTime?        @map("availability_updated_at") @db.Timestamptz(6)
+  minWalletThresholdMinor BigInt           @default(0) @map("min_wallet_threshold_minor")
+  ratingAvg               Decimal          @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount             Int              @default(0) @map("rating_count")
+  priorityScore           Int              @default(0) @map("priority_score")
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
   contactProfile      Profile?             @relation("ProviderContact", fields: [profileId], references: [id])
   members             ProviderMember[]
-  vehicles            Vehicle[]
+  vehicle             Vehicle?
   kycProfile          ProviderKycProfile?
   kycChecks           ProviderKycCheck[]
   kycMedia            ProviderKycMedia[]
@@ -53,7 +53,7 @@ model ProviderMember {
 
 model Vehicle {
   id                        String          @id @default(uuid()) @db.Uuid
-  providerId                String          @map("provider_id") @db.Uuid
+  providerId                String          @unique @map("provider_id") @db.Uuid
   category                  VehicleCategory
   plateNumber               String?         @map("plate_number")
   vin                       String?         @map("vin")
@@ -78,7 +78,7 @@ model Vehicle {
 
   @@unique([plateNumber], name: "unique_plate_number")
   @@unique([vin], name: "unique_vehicle_vin")
-  @@index([providerId, category, status])
+  @@index([category, status])
   @@map("vehicles")
 }
 

@@ -373,7 +373,7 @@ export class SupportService {
         id: profileId,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 

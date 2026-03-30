@@ -5,10 +5,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Prisma, VehicleCategory as PrismaVehicleCategory } from '@prisma/client';
+import type {
+  Prisma,
+  VehicleCategory as PrismaVehicleCategory,
+} from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
-  ActivateRoleInput,
   CompleteDriverRegistrationInput,
   CreateProfileImageUploadUrlInput,
   SetProviderAvailabilityInput,
@@ -17,17 +19,17 @@ import {
   UpdateProfileInput,
   UpsertPushDeviceInput,
 } from '../graphql/dto/core';
-import { PreferredLanguage, UserType } from '../graphql/enums';
+import { PreferredLanguage, UserRole } from '../graphql/enums';
 import {
   NotificationSettings,
   Profile,
   ProfileImageUploadUrl,
   PushDevice,
 } from '../graphql/types/core';
-import { normalizeProfileRoles } from '../auth/utils/roles.util';
 import { GoogleStorageService } from '../storage/google-storage.service';
 import {
   isDriverOnboardingCompleted,
+  isDriverRole,
   mapDriverTypeToVehicleCategory,
   normalizeDriverType,
   resolveActiveProvider,
@@ -40,7 +42,7 @@ const profileSelection = {
   email: true,
   emailVerified: true,
   emailVerifiedAt: true,
-  roles: true,
+  role: true,
   firstName: true,
   lastName: true,
   phoneE164: true,
@@ -74,14 +76,11 @@ const profileSelection = {
       driverType: true,
       isAvailable: true,
       availabilityUpdatedAt: true,
-      vehicles: {
+      vehicle: {
         select: {
           category: true,
           plateNumber: true,
           capacityKg: true,
-        },
-        orderBy: {
-          createdAt: 'asc',
         },
       },
     },
@@ -104,14 +103,11 @@ const profileSelection = {
           driverType: true,
           isAvailable: true,
           availabilityUpdatedAt: true,
-          vehicles: {
+          vehicle: {
             select: {
               category: true,
               plateNumber: true,
               capacityKg: true,
-            },
-            orderBy: {
-              createdAt: 'asc',
             },
           },
         },
@@ -125,7 +121,7 @@ type ProfileRecord = Prisma.ProfileGetPayload<{
 }>;
 
 const driverOnboardingSelection = {
-  roles: true,
+  role: true,
   emailVerified: true,
   phoneE164: true,
   phoneVerified: true,
@@ -135,7 +131,7 @@ const driverOnboardingSelection = {
     select: {
       id: true,
       driverType: true,
-      vehicles: {
+      vehicle: {
         select: {
           category: true,
           plateNumber: true,
@@ -158,7 +154,7 @@ const driverOnboardingSelection = {
         select: {
           id: true,
           driverType: true,
-          vehicles: {
+          vehicle: {
             select: {
               category: true,
               plateNumber: true,
@@ -197,7 +193,7 @@ export class UserService {
       email: profile.email,
       emailVerified: profile.emailVerified,
       emailVerifiedAt: profile.emailVerifiedAt,
-      roles: normalizeProfileRoles(profile),
+      role: profile.role ?? null,
       firstName: profile.firstName,
       lastName: profile.lastName,
       phoneE164: profile.phoneE164,
@@ -266,6 +262,12 @@ export class UserService {
 
     if (!profile) {
       throw new NotFoundException('Profile not found');
+    }
+
+    if (!isDriverRole(profile.role ?? null)) {
+      throw new ForbiddenException(
+        'Only completed driver accounts can access provider operations.',
+      );
     }
 
     const onboardingStep = resolveOnboardingStep(profile);
@@ -373,72 +375,6 @@ export class UserService {
     return this.toGraphqlProfile(profile);
   }
 
-  async activateRole(
-    profileId: string,
-    input: ActivateRoleInput,
-  ): Promise<Profile> {
-    if (input.targetRole === UserType.ADMIN) {
-      throw new BadRequestException('Admin role cannot be self-activated');
-    }
-
-    const profile = await this.prisma.profile.findUnique({
-      where: {
-        id: profileId,
-      },
-      select: {
-        id: true,
-        email: true,
-        roles: true,
-        firstName: true,
-        lastName: true,
-        state: true,
-      },
-    });
-
-    if (!profile) {
-      throw new NotFoundException('Profile not found');
-    }
-
-    const currentRoles = normalizeProfileRoles(profile);
-    if (currentRoles.includes(input.targetRole)) {
-      const currentProfile = await this.findProfileById(profileId);
-      if (!currentProfile) {
-        throw new NotFoundException('Profile not found');
-      }
-      return currentProfile;
-    }
-
-    const nextRoles = Array.from(
-      new Set([
-        ...currentRoles,
-        input.targetRole,
-        ...(input.targetRole === UserType.BUSINESS
-          ? [UserType.INDIVIDUAL]
-          : []),
-      ]),
-    );
-
-    const updatedProfile = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.profile.update({
-        where: { id: profileId },
-        data: {
-          roles: {
-            set: nextRoles,
-          },
-        },
-        select: profileSelection,
-      });
-
-      if (input.targetRole === UserType.BUSINESS) {
-        await this.ensureProviderForProfile(tx, profile, input.businessName);
-      }
-
-      return updated;
-    });
-
-    return this.toGraphqlProfile(updatedProfile);
-  }
-
   async completeDriverRegistration(
     profileId: string,
     input: CompleteDriverRegistrationInput,
@@ -448,7 +384,7 @@ export class UserService {
       select: {
         id: true,
         email: true,
-        roles: true,
+        role: true,
       },
     });
 
@@ -464,13 +400,29 @@ export class UserService {
     const normalizedFirstName = input.firstName.trim();
     const normalizedLastName = input.lastName.trim();
     const businessName = `${normalizedFirstName} ${normalizedLastName}`.trim();
-    const nextRoles = Array.from(
-      new Set([
-        ...normalizeProfileRoles(profile),
-        UserType.BUSINESS,
-        UserType.INDIVIDUAL,
-      ]),
-    );
+    const nextRole =
+      input.role ??
+      (input.driverType === 'bike'
+        ? UserRole.RIDER
+        : input.driverType === 'van'
+          ? UserRole.VAN_DRIVER
+          : UserRole.TRUCK_DRIVER);
+    const expectedRole =
+      input.driverType === 'bike'
+        ? UserRole.RIDER
+        : input.driverType === 'van'
+          ? UserRole.VAN_DRIVER
+          : UserRole.TRUCK_DRIVER;
+
+    if (!isDriverRole(nextRole) || nextRole !== expectedRole) {
+      throw new BadRequestException('Driver role must match the vehicle type');
+    }
+
+    if (profile.role === UserRole.SHIPPER || profile.role === UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'This account cannot be converted into a driver account.',
+      );
+    }
 
     const updatedProfile = await this.prisma.$transaction(async (tx) => {
       await tx.profile.update({
@@ -478,9 +430,7 @@ export class UserService {
         data: {
           firstName: normalizedFirstName,
           lastName: normalizedLastName,
-          roles: {
-            set: nextRoles,
-          },
+          role: nextRole,
         },
       });
 
@@ -499,13 +449,9 @@ export class UserService {
         },
       );
 
-      const existingVehicle = await tx.vehicle.findFirst({
+      const existingVehicle = await tx.vehicle.findUnique({
         where: {
           providerId,
-          category: vehicleCategory,
-        },
-        orderBy: {
-          createdAt: 'asc',
         },
         select: {
           id: true,
@@ -520,6 +466,7 @@ export class UserService {
             id: existingVehicle.id,
           },
           data: {
+            category: vehicleCategory,
             plateNumber: normalizedPlateNumber,
             capacityKg: input.capacityKg,
             status: 'active',
@@ -550,6 +497,8 @@ export class UserService {
     profileId: string,
     input: SetProviderAvailabilityInput,
   ): Promise<Profile> {
+    await this.assertDriverOnboardingComplete(profileId);
+
     const ownerProvider = await this.prisma.provider.findFirst({
       where: {
         profileId,
@@ -908,16 +857,16 @@ export class UserService {
       .trim();
 
     if (fullName.length > 0) {
-      return `${fullName} Logistics`;
+      return fullName;
     }
 
     const emailPrefix = profile.email.split('@')[0]?.trim();
     if (emailPrefix) {
       const normalized =
         emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1);
-      return `${normalized} Logistics`;
+      return normalized;
     }
 
-    return 'New Provider';
+    return 'New Driver';
   }
 }

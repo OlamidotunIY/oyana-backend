@@ -1,16 +1,8 @@
 import { Field, InputType } from '@nestjs/graphql';
-import {
-  IsEmail,
-  IsString,
-  MinLength,
-  IsEnum,
-  IsOptional,
-  IsArray,
-} from 'class-validator';
-import { RegistrationIntent, State, UserType } from '../../enums';
+import { IsEmail, IsString, MinLength } from 'class-validator';
 
 @InputType()
-export class SignUpInput {
+export class SignUpShipperInput {
   @Field()
   @IsEmail()
   email: string;
@@ -19,50 +11,16 @@ export class SignUpInput {
   @IsString()
   @MinLength(6)
   password: string;
+}
 
-  @Field(() => [UserType], { nullable: true })
-  @IsOptional()
-  @IsArray()
-  @IsEnum(UserType, { each: true })
-  roles?: UserType[];
+@InputType()
+export class SignUpDriverInput {
+  @Field()
+  @IsEmail()
+  email: string;
 
-  @Field(() => RegistrationIntent, { nullable: true })
-  @IsOptional()
-  @IsEnum(RegistrationIntent)
-  registrationIntent?: RegistrationIntent;
-
-  @Field({ nullable: true })
-  @IsOptional()
+  @Field()
   @IsString()
-  firstName?: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsString()
-  lastName?: string;
-
-  @Field(() => State, { nullable: true })
-  @IsOptional()
-  @IsEnum(State)
-  state?: State;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsString()
-  referralCode?: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsString()
-  phoneNumber?: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsString()
-  businessName?: string;
-
-  @Field({ nullable: true })
-  @IsOptional()
-  @IsString()
-  businessAddress?: string;
+  @MinLength(6)
+  password: string;
 }

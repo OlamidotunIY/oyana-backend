@@ -48,7 +48,7 @@ export class RolesGuard implements CanActivate {
         id: request.user!.id,
       },
       select: {
-        roles: true,
+        role: true,
       },
     });
 
@@ -58,6 +58,13 @@ export class RolesGuard implements CanActivate {
 
     const userRoles = normalizeProfileRoles(profile);
     request.userRoles = userRoles;
+
+    if (userRoles.length === 0) {
+      throw new ForbiddenException(
+        'Complete account onboarding before accessing this operation',
+      );
+    }
+
     request.userRole = resolveProfileRole(profile, requiredRoles);
 
     if (!requiredRoles.includes(request.userRole)) {
