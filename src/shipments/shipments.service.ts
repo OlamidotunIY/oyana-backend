@@ -1339,6 +1339,19 @@ export class ShipmentsService {
   private async resolveProviderIdForProfile(
     profileId: string,
   ): Promise<string | null> {
+    const driverProfile = await this.prisma.driverProfile.findUnique({
+      where: {
+        profileId,
+      },
+      select: {
+        providerId: true,
+      },
+    });
+
+    if (driverProfile?.providerId) {
+      return driverProfile.providerId;
+    }
+
     const provider = await this.prisma.provider.findFirst({
       where: {
         profileId,
@@ -1393,6 +1406,13 @@ export class ShipmentsService {
       },
       select: {
         role: true,
+        accountRole: true,
+        activeAppMode: true,
+        driverProfile: {
+          select: {
+            onboardingStatus: true,
+          },
+        },
       },
     });
 
@@ -1410,6 +1430,13 @@ export class ShipmentsService {
       },
       select: {
         role: true,
+        accountRole: true,
+        activeAppMode: true,
+        driverProfile: {
+          select: {
+            onboardingStatus: true,
+          },
+        },
       },
     });
 

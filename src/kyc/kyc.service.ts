@@ -1199,6 +1199,19 @@ export class KycService {
   private async resolveProviderIdForProfile(
     profileId: string,
   ): Promise<string | null> {
+    const driverProfile = await this.prisma.driverProfile.findUnique({
+      where: {
+        profileId,
+      },
+      select: {
+        providerId: true,
+      },
+    });
+
+    if (driverProfile?.providerId) {
+      return driverProfile.providerId;
+    }
+
     const provider = await this.prisma.provider.findFirst({
       where: {
         OR: [
@@ -1293,7 +1306,16 @@ export class KycService {
   private async getUserRole(profileId: string): Promise<UserType> {
     const profile = await this.prisma.profile.findUnique({
       where: { id: profileId },
-      select: { role: true },
+      select: {
+        role: true,
+        accountRole: true,
+        activeAppMode: true,
+        driverProfile: {
+          select: {
+            onboardingStatus: true,
+          },
+        },
+      },
     });
 
     if (!profile) {

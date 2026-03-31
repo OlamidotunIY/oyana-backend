@@ -1393,6 +1393,19 @@ export class DispatchService {
   }
 
   async resolveProviderIdForProfile(profileId: string): Promise<string | null> {
+    const driverProfile = await this.prisma.driverProfile.findUnique({
+      where: {
+        profileId,
+      },
+      select: {
+        providerId: true,
+      },
+    });
+
+    if (driverProfile?.providerId) {
+      return driverProfile.providerId;
+    }
+
     const provider = await this.prisma.provider.findFirst({
       where: {
         profileId,

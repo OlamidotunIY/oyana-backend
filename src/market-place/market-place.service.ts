@@ -739,6 +739,19 @@ export class MarketPlaceService {
   private async resolveProviderIdForProfile(
     profileId: string,
   ): Promise<string | null> {
+    const driverProfile = await this.prisma.driverProfile.findUnique({
+      where: {
+        profileId,
+      },
+      select: {
+        providerId: true,
+      },
+    });
+
+    if (driverProfile?.providerId) {
+      return driverProfile.providerId;
+    }
+
     const provider = await this.prisma.provider.findFirst({
       where: {
         profileId,
@@ -779,6 +792,34 @@ export class MarketPlaceService {
     return providerId;
   }
 
+  private async requireFreightAccess(profileId: string): Promise<void> {
+    const driverProfile = await this.prisma.driverProfile.findUnique({
+      where: {
+        profileId,
+      },
+      select: {
+        onboardingStatus: true,
+        canFreight: true,
+        profile: {
+          select: {
+            activeAppMode: true,
+          },
+        },
+      },
+    });
+
+    if (
+      !driverProfile ||
+      driverProfile.onboardingStatus !== 'approved' ||
+      driverProfile.profile.activeAppMode !== 'driver' ||
+      !driverProfile.canFreight
+    ) {
+      throw new ForbiddenException(
+        'Only approved van and truck drivers can access freight.',
+      );
+    }
+  }
+
   private async requireUserRole(
     profileId: string,
     preferredRoles: UserType[] = [
@@ -793,6 +834,13 @@ export class MarketPlaceService {
       },
       select: {
         role: true,
+        accountRole: true,
+        activeAppMode: true,
+        driverProfile: {
+          select: {
+            onboardingStatus: true,
+          },
+        },
       },
     });
 

@@ -97,8 +97,9 @@ export class AuthService {
     req: ExpressRequest,
     response: ExpressResponse,
   ): Promise<AuthResponse> {
+    const normalizedEmail = input.email.trim().toLowerCase();
     const profile = await this.prisma.profile.findUnique({
-      where: { email: input.email },
+      where: { email: normalizedEmail },
       select: {
         id: true,
         email: true,
@@ -130,7 +131,7 @@ export class AuthService {
       throw new ForbiddenException('Admin email is not verified.');
     }
 
-    const fullProfile = await this.userService.getProfileByEmail(input.email);
+    const fullProfile = await this.userService.getProfileByEmail(normalizedEmail);
     if (!fullProfile) {
       throw new UnauthorizedException('Profile not found');
     }
@@ -318,6 +319,12 @@ export class AuthService {
 
     if (!profile) {
       throw new UnauthorizedException('Profile not found');
+    }
+
+    if (profile.accountRole === 'admin') {
+      throw new ForbiddenException(
+        'Admin accounts must sign in on the admin web with email and password.',
+      );
     }
 
     await this.prisma.socialAccount.upsert({
