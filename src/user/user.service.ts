@@ -11,17 +11,39 @@ import type {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
+  AddDriverComplianceDocumentInput,
   CompleteDriverRegistrationInput,
+  CreateDriverDocumentUploadUrlInput,
   CreateProfileImageUploadUrlInput,
+  ReviewDriverOnboardingInput,
+  SaveDriverIdentityInfoInput,
+  SaveDriverPersonalInfoInput,
+  SaveDriverVehicleInput,
   SetProviderAvailabilityInput,
   SetProfileImageInput,
+  SubmitDriverOnboardingInput,
+  SwitchAppModeInput,
   UpdateNotificationSettingsInput,
+  UpdateDriverPresenceInput,
   UpdateProfileInput,
   UpsertPushDeviceInput,
 } from '../graphql/dto/core';
-import { PreferredLanguage, UserRole } from '../graphql/enums';
 import {
+  AppMode,
+  DriverCapability,
+  DriverOnboardingStatus,
+  DriverType,
+  OnboardingStep,
+  PreferredLanguage,
+  PublicRole,
+  UserRole,
+} from '../graphql/enums';
+import {
+  DriverDocumentUploadUrl,
+  DriverPresenceRecord,
+  DriverProfileRecord,
   NotificationSettings,
+  NotificationInboxItem,
   Profile,
   ProfileImageUploadUrl,
   PushDevice,
@@ -37,12 +59,103 @@ import {
   resolvePublicRole,
 } from './driver-onboarding.util';
 
+const driverVehicleSelection = {
+  id: true,
+  category: true,
+  plateNumber: true,
+  vin: true,
+  make: true,
+  model: true,
+  color: true,
+  capacityKg: true,
+  capacityVolumeCm3: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.DriverVehicleSelect;
+
+const driverDocumentSelection = {
+  id: true,
+  type: true,
+  status: true,
+  storageBucket: true,
+  storagePath: true,
+  mimeType: true,
+  notes: true,
+  uploadedAt: true,
+  reviewedAt: true,
+} satisfies Prisma.DriverComplianceDocumentSelect;
+
+const driverSubmissionSelection = {
+  id: true,
+  status: true,
+  rejectionReason: true,
+  reviewerId: true,
+  snapshot: true,
+  submittedAt: true,
+  reviewedAt: true,
+} satisfies Prisma.DriverOnboardingSubmissionSelect;
+
+const driverPresenceSelection = {
+  id: true,
+  isOnline: true,
+  lat: true,
+  lng: true,
+  accuracyMeters: true,
+  heading: true,
+  speedKph: true,
+  recordedAt: true,
+  lastHeartbeatAt: true,
+  updatedAt: true,
+} satisfies Prisma.DriverPresenceSelect;
+
+const driverProfileSelection = {
+  id: true,
+  providerId: true,
+  onboardingStatus: true,
+  driverType: true,
+  legalFirstName: true,
+  legalLastName: true,
+  dateOfBirth: true,
+  selfieStorageBucket: true,
+  selfieStoragePath: true,
+  licenseNumber: true,
+  licenseExpiryAt: true,
+  identityType: true,
+  identityNumber: true,
+  insurancePolicyNumber: true,
+  rejectionReason: true,
+  canDispatch: true,
+  canFreight: true,
+  submittedAt: true,
+  reviewedAt: true,
+  approvedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  vehicle: {
+    select: driverVehicleSelection,
+  },
+  complianceDocuments: {
+    orderBy: [{ uploadedAt: 'desc' }, { createdAt: 'desc' }],
+    select: driverDocumentSelection,
+  },
+  submissions: {
+    orderBy: { submittedAt: 'desc' },
+    take: 10,
+    select: driverSubmissionSelection,
+  },
+  presence: {
+    select: driverPresenceSelection,
+  },
+} satisfies Prisma.DriverProfileSelect;
+
 const profileSelection = {
   id: true,
   email: true,
   emailVerified: true,
   emailVerifiedAt: true,
   role: true,
+  accountRole: true,
+  activeAppMode: true,
   firstName: true,
   lastName: true,
   phoneE164: true,
@@ -62,6 +175,17 @@ const profileSelection = {
   lastLoginAt: true,
   createdAt: true,
   updatedAt: true,
+  driverProfile: {
+    select: driverProfileSelection,
+  },
+  walletAccounts: {
+    take: 1,
+    select: {
+      balanceMinor: true,
+      escrowMinor: true,
+      currency: true,
+    },
+  },
   activeAddress: {
     select: {
       id: true,
@@ -120,13 +244,26 @@ type ProfileRecord = Prisma.ProfileGetPayload<{
   select: typeof profileSelection;
 }>;
 
+type DriverProfileDbRecord = NonNullable<ProfileRecord['driverProfile']>;
+
 const driverOnboardingSelection = {
+  accountRole: true,
+  activeAppMode: true,
   role: true,
   emailVerified: true,
   phoneE164: true,
   phoneVerified: true,
   notificationPromptedAt: true,
   activeAddressId: true,
+  driverProfile: {
+    select: {
+      id: true,
+      onboardingStatus: true,
+      canDispatch: true,
+      canFreight: true,
+      providerId: true,
+    },
+  },
   contactForProviders: {
     select: {
       id: true,

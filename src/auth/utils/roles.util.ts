@@ -1,7 +1,20 @@
-import { UserRole, UserType } from '../../graphql/enums';
+import {
+  AccountRole,
+  AppMode,
+  DriverOnboardingStatus,
+  UserRole,
+  UserType,
+} from '../../graphql/enums';
 
 type ProfileRoleShape = {
   role?: UserRole | null;
+  accountRole?: AccountRole | null;
+  activeAppMode?: AppMode | null;
+  driverProfile?:
+    | {
+        onboardingStatus?: DriverOnboardingStatus | null;
+      }
+    | null;
 };
 
 const ALL_USER_TYPES = Object.values(UserType) as UserType[];
@@ -16,22 +29,31 @@ export const isDriverUserRole = (
 ): value is UserRole =>
   Boolean(value && DRIVER_USER_ROLES.has(value));
 
-export const mapUserRoleToUserTypes = (
-  role: UserRole | null | undefined,
-): UserType[] => {
-  if (!role) {
-    return [];
-  }
+const hasApprovedDriverMode = (profile: ProfileRoleShape): boolean =>
+  profile.activeAppMode === AppMode.DRIVER &&
+  profile.driverProfile?.onboardingStatus === DriverOnboardingStatus.APPROVED;
 
-  if (role === UserRole.ADMIN) {
+export const mapUserRoleToUserTypes = (
+  profile: ProfileRoleShape,
+): UserType[] => {
+  if (
+    profile.accountRole === AccountRole.ADMIN ||
+    profile.role === UserRole.ADMIN
+  ) {
     return [UserType.ADMIN];
   }
 
-  if (isDriverUserRole(role)) {
+  if (hasApprovedDriverMode(profile)) {
     return [UserType.BUSINESS];
   }
 
-  if (role === UserRole.SHIPPER) {
+  // Compatibility path for older seeded data that still stores driver role
+  // directly on the profile and has not been upgraded to DriverProfile yet.
+  if (isDriverUserRole(profile.role) && !profile.driverProfile) {
+    return [UserType.BUSINESS];
+  }
+
+  if (profile.accountRole === AccountRole.USER || profile.role === UserRole.SHIPPER) {
     return [UserType.INDIVIDUAL];
   }
 
@@ -41,7 +63,7 @@ export const mapUserRoleToUserTypes = (
 export const normalizeProfileRoles = (
   profile: ProfileRoleShape,
 ): UserType[] => {
-  return mapUserRoleToUserTypes(profile.role).filter((role) =>
+  return mapUserRoleToUserTypes(profile).filter((role) =>
     ALL_USER_TYPES.includes(role),
   );
 };

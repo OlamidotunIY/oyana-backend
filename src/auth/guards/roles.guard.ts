@@ -49,6 +49,13 @@ export class RolesGuard implements CanActivate {
       },
       select: {
         role: true,
+        accountRole: true,
+        activeAppMode: true,
+        driverProfile: {
+          select: {
+            onboardingStatus: true,
+          },
+        },
       },
     });
 

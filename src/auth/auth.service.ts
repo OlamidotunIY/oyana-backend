@@ -36,7 +36,7 @@ import {
   SignUpShipperInput,
   UserRole,
   VerifyOtpInput,
-  VerifyPhoneOtpInput,
+  VerifyPhoneOtpAndAuthenticateInput,
 } from '../graphql/dto/auth';
 import type { SignInWithGoogleInput } from '../graphql/dto/auth/sign-in-with-google.dto';
 import { AuthResponse, MessageResponse } from '../graphql/types/auth';
@@ -103,6 +103,7 @@ export class AuthService {
         id: true,
         email: true,
         emailVerified: true,
+        accountRole: true,
         passwordHash: true,
       },
     });
@@ -119,11 +120,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!profile.emailVerified) {
-      await this.sendEmailOtp(profile.email, OTP_MODE.EMAIL_VERIFICATION);
+    if (profile.accountRole !== 'admin') {
       throw new ForbiddenException(
-        'Email not verified. We sent a verification code to your email.',
+        'Password sign-in is available only for admin accounts.',
       );
+    }
+
+    if (!profile.emailVerified) {
+      throw new ForbiddenException('Admin email is not verified.');
     }
 
     const fullProfile = await this.userService.getProfileByEmail(input.email);
@@ -293,7 +297,9 @@ export class AuthService {
           email: normalizedEmail,
           emailVerified: true,
           emailVerifiedAt: new Date(),
-          role: null,
+          role: UserRole.SHIPPER,
+          accountRole: 'user',
+          activeAppMode: 'shipper',
         },
       });
       profile = await this.userService.getProfileByEmail(normalizedEmail);
@@ -420,9 +426,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    const fullProfile = await this.userService.getProfileByEmail(
-      authUser.email,
-    );
+    const fullProfile = await this.userService.findProfileById(authUser.id);
     if (!fullProfile) {
       throw new UnauthorizedException('Profile not found');
     }
@@ -468,31 +472,7 @@ export class AuthService {
     return { id: session.profile.id, email: session.profile.email };
   }
 
-  async requestPhoneOtp(
-    profileId: string,
-    input: RequestPhoneOtpInput,
-  ): Promise<MessageResponse> {
-    const profile = await this.prisma.profile.findUnique({
-      where: { id: profileId },
-      select: { id: true },
-    });
-
-    if (!profile) {
-      throw new UnauthorizedException('Profile not found');
-    }
-
-    const existingPhoneOwner = await this.prisma.profile.findFirst({
-      where: {
-        phoneE164: input.phoneE164,
-        id: { not: profileId },
-      },
-      select: { id: true },
-    });
-
-    if (existingPhoneOwner) {
-      throw new BadRequestException('Phone number is already in use');
-    }
-
+  async requestPhoneOtp(input: RequestPhoneOtpInput): Promise<MessageResponse> {
     const code = await this.createOtpRecord({
       phoneE164: input.phoneE164,
       mode: OTP_MODE.PHONE_VERIFICATION,
@@ -506,10 +486,11 @@ export class AuthService {
     };
   }
 
-  async verifyPhoneOtp(
-    profileId: string,
-    input: VerifyPhoneOtpInput,
-  ): Promise<MessageResponse> {
+  async verifyPhoneOtpAndAuthenticate(
+    input: VerifyPhoneOtpAndAuthenticateInput,
+    req: ExpressRequest,
+    response: ExpressResponse,
+  ): Promise<AuthResponse> {
     const otpRecord = await this.prisma.otpCode.findFirst({
       where: {
         phoneE164: input.phoneE164,
@@ -529,25 +510,81 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.otpCode.update({
-        where: { id: otpRecord.id },
-        data: { usedAt: new Date() },
-      }),
-      this.prisma.profile.update({
-        where: { id: profileId },
-        data: {
-          phoneE164: input.phoneE164,
-          phoneVerified: true,
-          phoneVerifiedAt: new Date(),
-        },
-      }),
-    ]);
+    const normalizedPhone = input.phoneE164.trim();
 
-    return {
-      message: 'Phone number verified successfully.',
-      success: true,
-    };
+    let profile = await this.prisma.profile.findFirst({
+      where: {
+        phoneE164: normalizedPhone,
+      },
+      select: {
+        id: true,
+        accountRole: true,
+      },
+    });
+
+    if (profile?.accountRole === 'admin') {
+      throw new ForbiddenException(
+        'Admin accounts must sign in with email and password.',
+      );
+    }
+
+    const now = new Date();
+
+    if (!profile) {
+      const profileId = randomUUID();
+      await this.prisma.$transaction([
+        this.prisma.otpCode.update({
+          where: { id: otpRecord.id },
+          data: { usedAt: now },
+        }),
+        this.prisma.profile.create({
+          data: {
+            id: profileId,
+            phoneE164: normalizedPhone,
+            phoneVerified: true,
+            phoneVerifiedAt: now,
+            role: UserRole.SHIPPER,
+            accountRole: 'user',
+            activeAppMode: 'shipper',
+          },
+        }),
+      ]);
+      profile = {
+        id: profileId,
+        accountRole: 'user',
+      };
+    } else {
+      await this.prisma.$transaction([
+        this.prisma.otpCode.update({
+          where: { id: otpRecord.id },
+          data: { usedAt: now },
+        }),
+        this.prisma.profile.update({
+          where: { id: profile.id },
+          data: {
+            phoneE164: normalizedPhone,
+            phoneVerified: true,
+            phoneVerifiedAt: now,
+          },
+        }),
+      ]);
+    }
+
+    const fullProfile = await this.userService.findProfileById(profile.id);
+    if (!fullProfile) {
+      throw new UnauthorizedException('Profile not found');
+    }
+
+    const { accessToken, refreshToken } = await this.issueTokens(
+      profile.id,
+      fullProfile.email,
+      req,
+      response,
+    );
+
+    await this.updateLastLogin(profile.id);
+
+    return { accessToken, refreshToken, user: fullProfile };
   }
 
   // ---------------------------------------------------------------------------
@@ -582,7 +619,7 @@ export class AuthService {
 
   private async issueTokens(
     profileId: string,
-    email: string,
+    email: string | null,
     req: ExpressRequest,
     response: ExpressResponse,
   ): Promise<{ accessToken: string; refreshToken: string }> {
@@ -765,6 +802,8 @@ export class AuthService {
         emailVerified: false,
         passwordHash,
         role,
+        accountRole: role === UserRole.ADMIN ? 'admin' : 'user',
+        activeAppMode: 'shipper',
       },
     });
 

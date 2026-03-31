@@ -1,6 +1,7 @@
 import { Field, Float, ID, Int, ObjectType } from '@nestjs/graphql';
 import { GraphQLJSON } from 'graphql-scalars';
 import {
+  DriverType,
   DriverCapability,
   DriverComplianceDocumentType,
   DriverOnboardingStatus,
@@ -158,8 +159,8 @@ export class DriverProfileRecord {
   @Field(() => DriverOnboardingStatus)
   onboardingStatus: DriverOnboardingStatus;
 
-  @Field(() => VehicleCategory, { nullable: true })
-  driverType?: VehicleCategory | null;
+  @Field(() => DriverType, { nullable: true })
+  driverType?: DriverType | null;
 
   @Field({ nullable: true })
   legalFirstName?: string | null;

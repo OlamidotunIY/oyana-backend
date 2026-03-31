@@ -5,6 +5,7 @@ export * from './request-otp.dto';
 export * from './verify-otp.dto';
 export * from './request-phone-otp.dto';
 export * from './verify-phone-otp.dto';
+export * from './verify-phone-otp-and-authenticate.dto';
 export * from './forgot-password.dto';
 export * from './reset-password.dto';
 export * from './complete-signup.dto';

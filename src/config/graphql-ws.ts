@@ -350,13 +350,15 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
             if (!token) {
               throw new UnauthorizedException('Unauthorized');
             }
-            let user: { id: string; email: string };
+            let user: { id: string; email: string | null };
             try {
-              const payload = jwtService.verify<{ sub: string; email: string }>(
-                token,
-                { secret: configService.getOrThrow('JWT_SECRET') },
-              );
-              user = { id: payload.sub, email: payload.email };
+              const payload = jwtService.verify<{
+                sub: string;
+                email?: string | null;
+              }>(token, {
+                secret: configService.getOrThrow('JWT_SECRET'),
+              });
+              user = { id: payload.sub, email: payload.email ?? null };
             } catch {
               throw new UnauthorizedException('Unauthorized');
             }

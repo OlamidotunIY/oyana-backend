@@ -79,11 +79,13 @@ export class GqlAuthGuard implements CanActivate {
 
   private verifyJwt(token: string, secret: string): AuthUser | null {
     try {
-      const payload = this.jwtService.verify<{ sub: string; email: string }>(
-        token,
-        { secret },
-      );
-      return { id: payload.sub, email: payload.email };
+      const payload = this.jwtService.verify<{
+        sub: string;
+        email?: string | null;
+      }>(token, {
+        secret,
+      });
+      return { id: payload.sub, email: payload.email ?? null };
     } catch {
       return null;
     }
