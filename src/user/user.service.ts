@@ -320,10 +320,125 @@ export class UserService {
       : PreferredLanguage.EN;
   }
 
+  private resolveDriverOnboardingStatus(
+    profile: Pick<ProfileRecord, 'driverProfile'>,
+  ): DriverOnboardingStatus {
+    return (
+      profile.driverProfile?.onboardingStatus ??
+      DriverOnboardingStatus.NOT_STARTED
+    );
+  }
+
+  private resolveDriverType(
+    profile: Pick<ProfileRecord, 'driverProfile' | 'contactForProviders' | 'providerMembers'>,
+  ): DriverType | null {
+    return (
+      normalizeDriverType(profile.driverProfile?.driverType) ??
+      normalizeDriverType(resolveActiveProvider(profile)?.driverType)
+    );
+  }
+
+  private resolveDriverCapabilities(
+    driverProfile: ProfileRecord['driverProfile'],
+  ): DriverCapability[] {
+    if (!driverProfile) {
+      return [];
+    }
+
+    const capabilities: DriverCapability[] = [];
+
+    if (driverProfile.canDispatch) {
+      capabilities.push(DriverCapability.DISPATCH);
+    }
+
+    if (driverProfile.canFreight) {
+      capabilities.push(DriverCapability.FREIGHT);
+    }
+
+    return capabilities;
+  }
+
+  private resolveCurrentMode(profile: ProfileRecord): AppMode {
+    const driverApproved =
+      profile.driverProfile?.onboardingStatus === DriverOnboardingStatus.APPROVED;
+
+    if (driverApproved && profile.activeAppMode === AppMode.DRIVER) {
+      return AppMode.DRIVER;
+    }
+
+    return AppMode.SHIPPER;
+  }
+
+  private resolveAvailableModes(profile: ProfileRecord): AppMode[] {
+    const availableModes = [AppMode.SHIPPER];
+
+    if (
+      profile.driverProfile?.onboardingStatus === DriverOnboardingStatus.APPROVED
+    ) {
+      availableModes.push(AppMode.DRIVER);
+    }
+
+    return availableModes;
+  }
+
+  private resolvePublicRoleForMode(
+    profile: ProfileRecord,
+    currentMode: AppMode,
+    driverType: DriverType | null,
+  ): PublicRole {
+    if (profile.accountRole === 'admin' || profile.role === UserRole.ADMIN) {
+      return PublicRole.ADMIN;
+    }
+
+    if (currentMode !== AppMode.DRIVER || !driverType) {
+      return PublicRole.SHIPPER;
+    }
+
+    if (driverType === DriverType.BIKE) {
+      return PublicRole.RIDER;
+    }
+
+    if (driverType === DriverType.VAN) {
+      return PublicRole.VAN_DRIVER;
+    }
+
+    if (driverType === DriverType.TRUCK) {
+      return PublicRole.TRUCK_DRIVER;
+    }
+
+    return PublicRole.SHIPPER;
+  }
+
+  private resolveLegacyOnboardingStep(profile: ProfileRecord): OnboardingStep {
+    const driverStatus = this.resolveDriverOnboardingStatus(profile);
+
+    if (
+      profile.accountRole === 'admin' ||
+      driverStatus === DriverOnboardingStatus.APPROVED ||
+      !profile.driverProfile
+    ) {
+      return OnboardingStep.COMPLETED;
+    }
+
+    return OnboardingStep.DRIVER_REGISTRATION;
+  }
+
   private async toGraphqlProfile(profile: ProfileRecord): Promise<Profile> {
     const activeProvider = resolveActiveProvider(profile);
-    const profileImageUrl = await this.resolveProfileImageUrl(profile);
-    const onboardingStep = resolveOnboardingStep(profile);
+    const driverType = this.resolveDriverType(profile);
+    const currentMode = this.resolveCurrentMode(profile);
+    const [profileImageUrl, unreadNotificationCount] = await Promise.all([
+      this.resolveProfileImageUrl(profile),
+      this.prisma.notification.count({
+        where: {
+          recipientProfileId: profile.id,
+          isRead: false,
+        },
+      }),
+    ]);
+    const driverCapabilities = this.resolveDriverCapabilities(profile.driverProfile);
+    const onboardingStep = this.resolveLegacyOnboardingStep(profile);
+    const wallet = profile.walletAccounts[0] ?? null;
 
     return {
       id: profile.id,
@@ -331,6 +446,9 @@ export class UserService {
       emailVerified: profile.emailVerified,
       emailVerifiedAt: profile.emailVerifiedAt,
       role: profile.role ?? null,
+      accountRole: profile.accountRole,
+      availableModes: this.resolveAvailableModes(profile),
+      currentMode,
       firstName: profile.firstName,
       lastName: profile.lastName,
       phoneE164: profile.phoneE164,
@@ -351,17 +469,24 @@ export class UserService {
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
       businessName: activeProvider?.businessName ?? null,
-      publicRole: resolvePublicRole(profile),
-      driverType: normalizeDriverType(activeProvider?.driverType),
-      providerId: activeProvider?.id ?? null,
+      publicRole: this.resolvePublicRoleForMode(profile, currentMode, driverType),
+      driverType,
+      driverProfileId: profile.driverProfile?.id ?? null,
+      driverOnboardingStatus: this.resolveDriverOnboardingStatus(profile),
+      driverCapabilities,
+      providerId: profile.driverProfile?.providerId ?? activeProvider?.id ?? null,
       providerIsAvailable: activeProvider?.isAvailable ?? null,
       providerAvailabilityUpdatedAt:
         activeProvider?.availabilityUpdatedAt ?? null,
       primaryAddress: profile.activeAddress?.address ?? null,
       city: profile.activeAddress?.city ?? null,
       activeAddressId: profile.activeAddressId ?? null,
+      walletBalanceMinor: wallet?.balanceMinor ?? null,
+      walletEscrowMinor: wallet?.escrowMinor ?? null,
+      walletCurrency: wallet?.currency ?? null,
+      unreadNotificationCount,
       onboardingStep,
-      onboardingCompleted: isDriverOnboardingCompleted(profile),
+      onboardingCompleted: onboardingStep === OnboardingStep.COMPLETED,
     };
   }
 
