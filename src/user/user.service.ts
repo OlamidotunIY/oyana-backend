@@ -31,6 +31,7 @@ import {
 import {
   AppMode,
   DriverCapability,
+  DriverComplianceDocumentType,
   DriverOnboardingStatus,
   DriverType,
   NotificationCategory,
@@ -330,7 +331,7 @@ export class UserService {
   }
 
   private resolveDriverType(
-    profile: Pick<ProfileRecord, 'driverProfile' | 'contactForProviders' | 'providerMembers'>,
+    profile: ProfileRecord,
   ): DriverType | null {
     return (
       normalizeDriverType(profile.driverProfile?.driverType) ??
@@ -370,7 +371,7 @@ export class UserService {
   }
 
   private resolveAvailableModes(profile: ProfileRecord): AppMode[] {
-    const availableModes = [AppMode.SHIPPER];
+    const availableModes: AppMode[] = [AppMode.SHIPPER];
 
     if (
       profile.driverProfile?.onboardingStatus === DriverOnboardingStatus.APPROVED

@@ -240,7 +240,7 @@ export class WalletService {
           }
 
           const chargeResult = await this.paystackService.chargeAuthorization({
-            email: profile.email,
+            email: this.resolvePaystackCustomerEmail(profile),
             amountMinor,
             reference,
             authorizationCode: savedCard.authorizationCode,
@@ -298,7 +298,7 @@ export class WalletService {
 
         const initializeResult =
           await this.paystackService.initializeTransaction({
-            email: profile.email,
+            email: this.resolvePaystackCustomerEmail(profile),
             amountMinor,
             reference,
             currency,
@@ -1486,6 +1486,13 @@ export class WalletService {
         id: true,
         email: true,
         role: true,
+        accountRole: true,
+        activeAppMode: true,
+        driverProfile: {
+          select: {
+            onboardingStatus: true,
+          },
+        },
         phoneVerified: true,
       },
     });
@@ -1499,6 +1506,13 @@ export class WalletService {
     }
 
     return profile;
+  }
+
+  private resolvePaystackCustomerEmail(profile: {
+    id: string;
+    email: string | null;
+  }): string {
+    return profile.email ?? `wallet+${profile.id}@oyana.local`;
   }
 
   private async assertPhoneVerified(ownerProfileId: string): Promise<void> {
