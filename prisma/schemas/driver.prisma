@@ -1,0 +1,142 @@
+enum DriverOnboardingStatus {
+  not_started
+  draft
+  in_review
+  approved
+  rejected
+}
+
+enum DriverComplianceDocumentType {
+  selfie
+  driver_license
+  identity_document
+  nin
+  insurance
+  vehicle_registration
+  proof_of_address
+}
+
+enum DriverComplianceDocumentStatus {
+  uploaded
+  approved
+  rejected
+}
+
+enum DriverPresenceSource {
+  gps
+}
+
+model DriverProfile {
+  id                    String                  @id @default(uuid()) @db.Uuid
+  profileId             String                  @unique @map("profile_id") @db.Uuid
+  providerId            String?                 @unique @map("provider_id") @db.Uuid
+  onboardingStatus      DriverOnboardingStatus  @default(not_started) @map("onboarding_status")
+  driverType            VehicleCategory?        @map("driver_type")
+  legalFirstName        String?                 @map("legal_first_name")
+  legalLastName         String?                 @map("legal_last_name")
+  dateOfBirth           DateTime?               @map("date_of_birth") @db.Date
+  selfieStorageBucket   String?                 @map("selfie_storage_bucket")
+  selfieStoragePath     String?                 @map("selfie_storage_path")
+  licenseNumber         String?                 @map("license_number")
+  licenseExpiryAt       DateTime?               @map("license_expiry_at") @db.Date
+  identityType          String?                 @map("identity_type")
+  identityNumber        String?                 @map("identity_number")
+  insurancePolicyNumber String?                 @map("insurance_policy_number")
+  rejectionReason       String?                 @map("rejection_reason")
+  canDispatch           Boolean                 @default(false) @map("can_dispatch")
+  canFreight            Boolean                 @default(false) @map("can_freight")
+  submittedAt           DateTime?               @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt            DateTime?               @map("reviewed_at") @db.Timestamptz(6)
+  approvedAt            DateTime?               @map("approved_at") @db.Timestamptz(6)
+  createdAt             DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile              Profile                       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  provider             Provider?                     @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  vehicle              DriverVehicle?
+  complianceDocuments  DriverComplianceDocument[]
+  submissions          DriverOnboardingSubmission[]
+  presence             DriverPresence?
+
+  @@index([onboardingStatus, driverType])
+  @@map("driver_profiles")
+}
+
+model DriverVehicle {
+  id                String          @id @default(uuid()) @db.Uuid
+  driverProfileId   String          @unique @map("driver_profile_id") @db.Uuid
+  category          VehicleCategory
+  plateNumber       String?         @map("plate_number")
+  vin               String?         @map("vin")
+  make              String?
+  model             String?
+  color             String?
+  capacityKg        Int?            @map("capacity_kg")
+  capacityVolumeCm3 BigInt?         @map("capacity_volume_cm3")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  @@map("driver_vehicles")
+}
+
+model DriverComplianceDocument {
+  id              String                         @id @default(uuid()) @db.Uuid
+  driverProfileId String                         @map("driver_profile_id") @db.Uuid
+  type            DriverComplianceDocumentType
+  status          DriverComplianceDocumentStatus @default(uploaded)
+  storageBucket   String                         @map("storage_bucket")
+  storagePath     String                         @map("storage_path")
+  mimeType        String?                        @map("mime_type")
+  notes           String?
+  uploadedAt      DateTime                       @default(now()) @map("uploaded_at") @db.Timestamptz(6)
+  reviewedAt      DateTime?                      @map("reviewed_at") @db.Timestamptz(6)
+  createdAt       DateTime                       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  @@index([driverProfileId, type, createdAt(sort: Desc)])
+  @@unique([driverProfileId, type, storageBucket, storagePath])
+  @@map("driver_compliance_documents")
+}
+
+model DriverOnboardingSubmission {
+  id              String                 @id @default(uuid()) @db.Uuid
+  driverProfileId String                 @map("driver_profile_id") @db.Uuid
+  status          DriverOnboardingStatus @map("status")
+  rejectionReason String?                @map("rejection_reason")
+  reviewerId      String?                @map("reviewer_id") @db.Uuid
+  snapshot        Json?                  @map("snapshot")
+  submittedAt     DateTime               @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt      DateTime?              @map("reviewed_at") @db.Timestamptz(6)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+  reviewer      Profile?      @relation(fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([driverProfileId, submittedAt(sort: Desc)])
+  @@map("driver_onboarding_submissions")
+}
+
+model DriverPresence {
+  id               String               @id @default(uuid()) @db.Uuid
+  driverProfileId  String               @unique @map("driver_profile_id") @db.Uuid
+  source           DriverPresenceSource @default(gps)
+  isOnline         Boolean              @default(false) @map("is_online")
+  lat              Float?
+  lng              Float?
+  accuracyMeters   Float?               @map("accuracy_meters")
+  heading          Float?
+  speedKph         Float?               @map("speed_kph")
+  recordedAt       DateTime?            @map("recorded_at") @db.Timestamptz(6)
+  lastHeartbeatAt  DateTime?            @map("last_heartbeat_at") @db.Timestamptz(6)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
+
+  @@index([isOnline, lastHeartbeatAt(sort: Desc)])
+  @@map("driver_presence")
+}

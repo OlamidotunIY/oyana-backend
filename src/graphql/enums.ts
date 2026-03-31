@@ -25,6 +25,47 @@ export const UserRole = {
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
+export const AccountRole = {
+  USER: 'user',
+  ADMIN: 'admin',
+} as const;
+export type AccountRole = (typeof AccountRole)[keyof typeof AccountRole];
+
+export const AppMode = {
+  SHIPPER: 'shipper',
+  DRIVER: 'driver',
+} as const;
+export type AppMode = (typeof AppMode)[keyof typeof AppMode];
+
+export const DriverOnboardingStatus = {
+  NOT_STARTED: 'not_started',
+  DRAFT: 'draft',
+  IN_REVIEW: 'in_review',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+} as const;
+export type DriverOnboardingStatus =
+  (typeof DriverOnboardingStatus)[keyof typeof DriverOnboardingStatus];
+
+export const DriverCapability = {
+  DISPATCH: 'dispatch',
+  FREIGHT: 'freight',
+} as const;
+export type DriverCapability =
+  (typeof DriverCapability)[keyof typeof DriverCapability];
+
+export const DriverComplianceDocumentType = {
+  SELFIE: 'selfie',
+  DRIVER_LICENSE: 'driver_license',
+  IDENTITY_DOCUMENT: 'identity_document',
+  NIN: 'nin',
+  INSURANCE: 'insurance',
+  VEHICLE_REGISTRATION: 'vehicle_registration',
+  PROOF_OF_ADDRESS: 'proof_of_address',
+} as const;
+export type DriverComplianceDocumentType =
+  (typeof DriverComplianceDocumentType)[keyof typeof DriverComplianceDocumentType];
+
 // ============================================================================
 // CORE ENUMS
 // ============================================================================
@@ -493,6 +534,15 @@ export type WaybillStatus = (typeof WaybillStatus)[keyof typeof WaybillStatus];
 registerEnumType(OtpMode, { name: 'OtpMode' });
 registerEnumType(UserType, { name: 'UserType' });
 registerEnumType(UserRole, { name: 'UserRole' });
+registerEnumType(AccountRole, { name: 'AccountRole' });
+registerEnumType(AppMode, { name: 'AppMode' });
+registerEnumType(DriverOnboardingStatus, {
+  name: 'DriverOnboardingStatus',
+});
+registerEnumType(DriverCapability, { name: 'DriverCapability' });
+registerEnumType(DriverComplianceDocumentType, {
+  name: 'DriverComplianceDocumentType',
+});
 registerEnumType(ProfileStatus, { name: 'ProfileStatus' });
 registerEnumType(State, { name: 'State' });
 registerEnumType(PreferredLanguage, { name: 'PreferredLanguage' });

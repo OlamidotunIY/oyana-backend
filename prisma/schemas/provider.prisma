@@ -19,6 +19,7 @@ model Provider {
 
   // Relations
   contactProfile      Profile?             @relation("ProviderContact", fields: [profileId], references: [id])
+  driverProfile       DriverProfile?
   members             ProviderMember[]
   vehicle             Vehicle?
   kycProfile          ProviderKycProfile?

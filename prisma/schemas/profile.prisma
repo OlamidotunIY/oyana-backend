@@ -1,10 +1,22 @@
+enum AccountRole {
+  user
+  admin
+}
+
+enum AppMode {
+  shipper
+  driver
+}
+
 model Profile {
   id                     String        @id @db.Uuid
-  email                  String        @unique
+  email                  String?       @unique
   emailVerified          Boolean       @default(false) @map("email_verified")
   emailVerifiedAt        DateTime?     @map("email_verified_at") @db.Timestamptz(6)
   passwordHash           String?       @map("password_hash")
   role                   UserRole?     @map("user_role")
+  accountRole            AccountRole   @default(user) @map("account_role")
+  activeAppMode          AppMode       @default(shipper) @map("active_app_mode")
   firstName              String?       @map("first_name")
   lastName               String?       @map("last_name")
   phoneE164              String?       @unique @map("phone_e164")
@@ -63,9 +75,12 @@ model Profile {
   platformConfigUpdates     PlatformConfig[]           @relation("PlatformConfigUpdater")
   notifications             Notification[]             @relation("ProfileNotifications")
   pushDevices               PushDevice[]
-  activeAddress             UserAddress?                @relation("ActiveUserAddress", fields: [activeAddressId], references: [id], onDelete: SetNull)
+  driverProfile             DriverProfile?
+  driverOnboardingReviews   DriverOnboardingSubmission[]
+  activeAddress             UserAddress?               @relation("ActiveUserAddress", fields: [activeAddressId], references: [id], onDelete: SetNull)
 
   @@index([activeAddressId])
+  @@index([accountRole, activeAppMode])
   @@map("profiles")
 }
 

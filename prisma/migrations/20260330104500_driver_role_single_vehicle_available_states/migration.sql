@@ -77,6 +77,9 @@ ALTER TYPE "State" ADD VALUE IF NOT EXISTS 'FederalCapitalTerritory';
 ALTER TABLE "profiles"
   ADD COLUMN IF NOT EXISTS "user_role" "UserRole";
 
+ALTER TABLE "providers"
+  ADD COLUMN IF NOT EXISTS "driver_type" "VehicleCategory";
+
 ALTER TABLE "profiles"
   ALTER COLUMN "state" DROP NOT NULL;
 
