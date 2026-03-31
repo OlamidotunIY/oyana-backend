@@ -44,12 +44,22 @@ export class MarketPlaceService {
     profileId: string,
     filter?: MarketplaceShipmentsFilterDto,
   ): Promise<MarketplaceShipmentsResult> {
+    await this.requireFreightAccess(profileId);
     const providerId = await this.requireOperationalProviderId(profileId);
 
-    // Validate provider has an active address with coordinates
     const providerRecord = await this.prisma.provider.findUnique({
       where: { id: providerId },
       select: {
+        driverProfile: {
+          select: {
+            presence: {
+              select: {
+                lat: true,
+                lng: true,
+              },
+            },
+          },
+        },
         contactProfile: {
           select: {
             activeAddress: {
@@ -63,33 +73,10 @@ export class MarketPlaceService {
       },
     });
 
-    const activeAddress = providerRecord?.contactProfile?.activeAddress ?? null;
-
-    if (!activeAddress?.lat || !activeAddress?.lng) {
-      return {
-        items: [],
-        reason:
-          'Your provider account does not have an active address with location coordinates. Please add an address to access marketplace freight shipments.',
-      };
-    }
-
-    // Validate provider has at least one active truck or van
-    const hasTruckOrVan = await this.prisma.vehicle.findFirst({
-      where: {
-        providerId,
-        status: 'active',
-        category: { in: ['truck', 'van'] },
-      },
-      select: { id: true },
-    });
-
-    if (!hasTruckOrVan) {
-      return {
-        items: [],
-        reason:
-          'You do not have any active truck or van vehicles registered. Please add a truck or van vehicle to access marketplace freight shipments.',
-      };
-    }
+    const sortOrigin =
+      providerRecord?.driverProfile?.presence ??
+      providerRecord?.contactProfile?.activeAddress ??
+      null;
 
     const vehicleCategories = filter?.vehicleCategories?.length
       ? filter.vehicleCategories
@@ -223,24 +210,27 @@ export class MarketPlaceService {
         })
       : shipments;
 
-    const sortedByProximity = distanceFiltered
-      .map((shipment) => ({
-        shipment,
-        distanceToPickup: this.calculateDistanceKm(
-          activeAddress.lat,
-          activeAddress.lng,
-          shipment.pickupAddress?.lat ?? null,
-          shipment.pickupAddress?.lng ?? null,
-        ),
-      }))
-      .sort((a, b) => {
-        if (a.distanceToPickup === null && b.distanceToPickup === null)
-          return 0;
-        if (a.distanceToPickup === null) return 1;
-        if (b.distanceToPickup === null) return -1;
-        return a.distanceToPickup - b.distanceToPickup;
-      })
-      .map(({ shipment }) => shipment);
+    const sortedByProximity =
+      sortOrigin?.lat != null && sortOrigin?.lng != null
+        ? distanceFiltered
+            .map((shipment) => ({
+              shipment,
+              distanceToPickup: this.calculateDistanceKm(
+                sortOrigin.lat,
+                sortOrigin.lng,
+                shipment.pickupAddress?.lat ?? null,
+                shipment.pickupAddress?.lng ?? null,
+              ),
+            }))
+            .sort((a, b) => {
+              if (a.distanceToPickup === null && b.distanceToPickup === null)
+                return 0;
+              if (a.distanceToPickup === null) return 1;
+              if (b.distanceToPickup === null) return -1;
+              return a.distanceToPickup - b.distanceToPickup;
+            })
+            .map(({ shipment }) => shipment)
+        : distanceFiltered;
 
     const items = sortedByProximity.map((shipment) =>
       this.toGraphqlShipment(shipment, {
@@ -261,6 +251,7 @@ export class MarketPlaceService {
     profileId: string,
     shipmentId: string,
   ): Promise<ShipmentBid[]> {
+    await this.requireFreightAccess(profileId);
     const providerId = await this.requireOperationalProviderId(profileId);
 
     const bids = await this.prisma.shipmentBid.findMany({
@@ -286,6 +277,7 @@ export class MarketPlaceService {
   }
 
   async myBids(profileId: string): Promise<ShipmentBid[]> {
+    await this.requireFreightAccess(profileId);
     const providerId = await this.requireOperationalProviderId(profileId);
 
     const bids = await this.prisma.shipmentBid.findMany({
@@ -463,6 +455,7 @@ export class MarketPlaceService {
     profileId: string,
     input: CreateShipmentBidDto,
   ): Promise<ShipmentBid> {
+    await this.requireFreightAccess(profileId);
     const providerId = await this.requireOperationalProviderId(profileId);
 
     const shipment = await this.prisma.shipment.findUnique({
@@ -552,6 +545,7 @@ export class MarketPlaceService {
     id: string,
     input: UpdateShipmentBidDto,
   ): Promise<ShipmentBid> {
+    await this.requireFreightAccess(profileId);
     const providerId = await this.requireOperationalProviderId(profileId);
 
     const bid = await this.prisma.shipmentBid.findFirst({
@@ -591,6 +585,7 @@ export class MarketPlaceService {
   }
 
   async withdrawBid(profileId: string, id: string): Promise<ShipmentBid> {
+    await this.requireFreightAccess(profileId);
     const providerId = await this.requireOperationalProviderId(profileId);
 
     const bid = await this.prisma.shipmentBid.findFirst({

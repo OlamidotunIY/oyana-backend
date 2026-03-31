@@ -47,6 +47,7 @@ const DEFAULT_DISPATCH_RECONCILE_DB_MAX_RETRIES = 4;
 const DEFAULT_DISPATCH_RECONCILE_DB_BASE_DELAY_MS = 500;
 const DEFAULT_DISPATCH_MAX_RADIUS_KM = 50;
 const DEFAULT_DISPATCH_ROUTE_ALIGN_KM = 5;
+const DEFAULT_DRIVER_HEARTBEAT_STALE_MS = 5 * 60 * 1000;
 const DISPATCH_ACCEPT_CONFLICT_MESSAGE =
   'Dispatch offer can no longer be accepted because shipment is already assigned';
 
@@ -1170,10 +1171,30 @@ export class DispatchService {
     pickupLng: number | null,
   ): Promise<EligibleDispatchProvider[]> {
     const hasPickupCoords = pickupLat !== null && pickupLng !== null;
+    const staleHeartbeatCutoff = new Date(
+      Date.now() - DEFAULT_DRIVER_HEARTBEAT_STALE_MS,
+    );
 
     const providers = await tx.provider.findMany({
       where: {
         isAvailable: true,
+        driverProfile: {
+          is: {
+            onboardingStatus: 'approved',
+            canDispatch: true,
+            profile: {
+              activeAppMode: 'driver',
+            },
+            presence: {
+              is: {
+                isOnline: true,
+                lastHeartbeatAt: {
+                  gte: staleHeartbeatCutoff,
+                },
+              },
+            },
+          },
+        },
         vehicle: {
           is: {
             category: vehicleCategory,
@@ -1188,13 +1209,14 @@ export class DispatchService {
       ],
       select: {
         id: true,
-        contactProfile: {
+        driverProfile: {
           select: {
-            userAddresses: {
-              where: { lat: { not: null }, lng: { not: null } },
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { lat: true, lng: true },
+            presence: {
+              select: {
+                lat: true,
+                lng: true,
+                lastHeartbeatAt: true,
+              },
             },
           },
         },
@@ -1239,10 +1261,15 @@ export class DispatchService {
       }
 
       // Provider must have an active address with coordinates to be eligible
-      const providerAddress = provider.contactProfile?.userAddresses[0];
-      if (!providerAddress?.lat || !providerAddress?.lng) {
+      const providerPresence = provider.driverProfile?.presence;
+      if (
+        providerPresence?.lat == null ||
+        providerPresence?.lng == null ||
+        !providerPresence.lastHeartbeatAt ||
+        providerPresence.lastHeartbeatAt < staleHeartbeatCutoff
+      ) {
         this.logger.debug(
-          `Skipping provider ${provider.id}: no active address with coordinates`,
+          `Skipping provider ${provider.id}: no fresh live driver presence`,
         );
         continue;
       }
@@ -1250,8 +1277,8 @@ export class DispatchService {
       // Location proximity: provider must be within max radius of the pickup address
       if (hasPickupCoords) {
         const distanceToPickup = this.haversineDistanceKm(
-          providerAddress.lat,
-          providerAddress.lng,
+          providerPresence.lat,
+          providerPresence.lng,
           pickupLat!,
           pickupLng!,
         );
