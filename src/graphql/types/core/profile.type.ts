@@ -1,6 +1,10 @@
-import { ObjectType, Field, ID } from '@nestjs/graphql';
+import { Int, ObjectType, Field, ID } from '@nestjs/graphql';
 import {
+  AccountRole,
+  AppMode,
+  DriverCapability,
   DriverType,
+  DriverOnboardingStatus,
   OnboardingStep,
   ProfileStatus,
   PreferredLanguage,
@@ -8,14 +12,15 @@ import {
   UserRole,
   State,
 } from '../../enums';
+import { GraphQLBigInt } from '../../scalars';
 
 @ObjectType()
 export class Profile {
   @Field(() => ID)
   id: string;
 
-  @Field()
-  email: string;
+  @Field({ nullable: true })
+  email: string | null;
 
   @Field(() => Boolean)
   emailVerified: boolean;
@@ -25,6 +30,15 @@ export class Profile {
 
   @Field(() => UserRole, { nullable: true })
   role: UserRole | null;
+
+  @Field(() => AccountRole)
+  accountRole: AccountRole;
+
+  @Field(() => [AppMode])
+  availableModes: AppMode[];
+
+  @Field(() => AppMode)
+  currentMode: AppMode;
 
   @Field(() => String, { nullable: true })
   firstName: string | null;
@@ -72,6 +86,15 @@ export class Profile {
   driverType?: DriverType | null;
 
   @Field(() => String, { nullable: true })
+  driverProfileId?: string | null;
+
+  @Field(() => DriverOnboardingStatus)
+  driverOnboardingStatus: DriverOnboardingStatus;
+
+  @Field(() => [DriverCapability])
+  driverCapabilities: DriverCapability[];
+
+  @Field(() => String, { nullable: true })
   providerId?: string | null;
 
   @Field(() => Boolean, { nullable: true })
@@ -88,6 +111,18 @@ export class Profile {
 
   @Field(() => String, { nullable: true })
   activeAddressId?: string | null;
+
+  @Field(() => GraphQLBigInt, { nullable: true })
+  walletBalanceMinor?: bigint | null;
+
+  @Field(() => GraphQLBigInt, { nullable: true })
+  walletEscrowMinor?: bigint | null;
+
+  @Field(() => String, { nullable: true })
+  walletCurrency?: string | null;
+
+  @Field(() => Int)
+  unreadNotificationCount: number;
 
   @Field(() => OnboardingStep)
   onboardingStep: OnboardingStep;

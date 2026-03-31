@@ -1,6 +1,7 @@
 import { InputType, Field, Int } from '@nestjs/graphql';
 import { GraphQLBigInt } from '../../scalars';
 import {
+  IsDateString,
   IsBoolean,
   IsInt,
   IsNotEmpty,
@@ -14,10 +15,14 @@ import {
   MinLength,
 } from 'class-validator';
 import {
+  AppMode,
   DriverType,
+  DriverComplianceDocumentType,
+  DriverOnboardingStatus,
   PreferredLanguage,
   UserRole,
   UserStatus,
+  VehicleCategory,
 } from '../../enums';
 
 @InputType()
@@ -174,4 +179,238 @@ export class CompleteDriverRegistrationInput {
   @Field(() => Boolean)
   @IsBoolean({ message: 'isAvailable must be a boolean value' })
   isAvailable: boolean;
+}
+
+@InputType()
+export class CreateDriverDocumentUploadUrlInput {
+  @Field(() => DriverComplianceDocumentType)
+  @IsEnum(DriverComplianceDocumentType)
+  documentType: DriverComplianceDocumentType;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  fileName: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mimeType?: string;
+
+  @Field(() => GraphQLBigInt, { nullable: true })
+  @IsOptional()
+  @Min(1)
+  sizeBytes?: bigint;
+}
+
+@InputType()
+export class SaveDriverPersonalInfoInput {
+  @Field(() => DriverType)
+  @IsEnum(DriverType)
+  driverType: DriverType;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(50)
+  legalFirstName: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(2)
+  @MaxLength(50)
+  legalLastName: string;
+
+  @Field()
+  @IsDateString()
+  dateOfBirth: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  selfieStorageBucket?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  selfieStoragePath?: string;
+}
+
+@InputType()
+export class SaveDriverIdentityInfoInput {
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  licenseNumber: string;
+
+  @Field()
+  @IsDateString()
+  licenseExpiryAt: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  identityType: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  identityNumber: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  insurancePolicyNumber?: string;
+}
+
+@InputType()
+export class SaveDriverVehicleInput {
+  @Field(() => VehicleCategory)
+  @IsEnum(VehicleCategory)
+  category: VehicleCategory;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(24)
+  plateNumber: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  vin?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  make?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  model?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(24)
+  color?: string;
+
+  @Field(() => Int)
+  @IsInt()
+  @Min(1)
+  capacityKg: number;
+
+  @Field(() => GraphQLBigInt, { nullable: true })
+  @IsOptional()
+  @Min(1)
+  capacityVolumeCm3?: bigint;
+}
+
+@InputType()
+export class AddDriverComplianceDocumentInput {
+  @Field(() => DriverComplianceDocumentType)
+  @IsEnum(DriverComplianceDocumentType)
+  documentType: DriverComplianceDocumentType;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  storageBucket: string;
+
+  @Field()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  storagePath: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  mimeType?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  notes?: string;
+}
+
+@InputType()
+export class SubmitDriverOnboardingInput {
+  @Field(() => Boolean, { nullable: true })
+  @IsOptional()
+  @IsBoolean()
+  activateDriverMode?: boolean;
+}
+
+@InputType()
+export class ReviewDriverOnboardingInput {
+  @Field()
+  @IsUUID('4')
+  driverProfileId: string;
+
+  @Field(() => DriverOnboardingStatus)
+  @IsEnum(DriverOnboardingStatus)
+  status: DriverOnboardingStatus;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(400)
+  rejectionReason?: string;
+}
+
+@InputType()
+export class SwitchAppModeInput {
+  @Field(() => AppMode)
+  @IsEnum(AppMode)
+  mode: AppMode;
+}
+
+@InputType()
+export class UpdateDriverPresenceInput {
+  @Field(() => Boolean)
+  @IsBoolean()
+  isOnline: boolean;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  lat?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  lng?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  accuracyMeters?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  heading?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  speedKph?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsDateString()
+  recordedAt?: string;
 }
