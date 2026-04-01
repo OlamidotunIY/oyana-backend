@@ -1,4 +1,4 @@
-import { Field, InputType } from '@nestjs/graphql';
+import { Field, InputType, Int } from '@nestjs/graphql';
 import { DispatchOfferStatus } from '../../enums';
 
 @InputType()
@@ -12,6 +12,6 @@ export class UpdateDispatchOfferDto {
   @Field(() => Date, { nullable: true })
   respondedAt?: Date;
 
-  @Field(() => Float, { nullable: true })
+  @Field(() => Int, { nullable: true })
   providerEtaMinutes?: number;
 }

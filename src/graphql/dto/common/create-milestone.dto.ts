@@ -1,4 +1,4 @@
-import { InputType, Field } from '@nestjs/graphql';
+import { InputType, Field, Float } from '@nestjs/graphql';
 import { ShipmentMilestoneType } from '../../enums';
 import { GraphQLJSON } from 'graphql-scalars';
 

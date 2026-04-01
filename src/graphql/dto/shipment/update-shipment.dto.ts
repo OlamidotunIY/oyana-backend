@@ -1,4 +1,4 @@
-import { InputType, Field } from '@nestjs/graphql';
+import { InputType, Field, Int } from '@nestjs/graphql';
 import {
   IsBoolean,
   IsEnum,
@@ -96,7 +96,7 @@ export class UpdateShipmentDto {
   @IsOptional()
   finalPriceMinor?: bigint;
 
-  @Field(() => Float, { nullable: true })
+  @Field(() => Int, { nullable: true })
   @IsOptional()
   @IsNumber()
   commissionRateBps?: number;

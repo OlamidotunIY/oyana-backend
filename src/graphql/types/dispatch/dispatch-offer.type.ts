@@ -1,4 +1,4 @@
-import { ObjectType, Field, ID } from '@nestjs/graphql';
+import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 import { DispatchOfferStatus } from '../../enums';
 import { GraphQLJSON } from 'graphql-scalars';
 
@@ -31,7 +31,7 @@ export class DispatchOffer {
   @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 
-  @Field(() => Float, { nullable: true })
+  @Field(() => Int, { nullable: true })
   providerEtaMinutes?: number;
 
   @Field(() => GraphQLJSON, { nullable: true })

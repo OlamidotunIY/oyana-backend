@@ -1,4 +1,4 @@
-import { InputType, Field } from '@nestjs/graphql';
+import { InputType, Field, Int } from '@nestjs/graphql';
 import { GraphQLJSON } from 'graphql-scalars';
 
 @InputType()
@@ -18,7 +18,7 @@ export class CreateDispatchOfferDto {
   @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 
-  @Field(() => Float, { nullable: true })
+  @Field(() => Int, { nullable: true })
   providerEtaMinutes?: number;
 
   @Field(() => GraphQLJSON, { nullable: true })
