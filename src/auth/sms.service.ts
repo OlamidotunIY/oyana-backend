@@ -20,6 +20,54 @@ export class SmsService {
       return;
     }
 
+    if (provider === 'smarthive') {
+      const apiKey = this.configService.get<string>(
+        'SMARTHIVE_SMS_API_KEY',
+        '',
+      );
+      const sender = this.configService.get<string>(
+        'SMARTHIVE_SMS_SENDER_ID',
+        'Oyana',
+      );
+
+      if (!apiKey) {
+        throw new BadRequestException(
+          'Smarthive SMS is not configured. Add SMARTHIVE_SMS_API_KEY or switch SMS_PROVIDER to console.',
+        );
+      }
+
+      const res = await fetch('https://api.smarthivesms.com/api/sms/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          sender,
+          recipients: phoneE164,
+          msg: message,
+          type: 1,
+          route: 'TRX',
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        throw new BadRequestException(
+          `Smarthive SMS failed (${res.status}): ${text}`,
+        );
+      }
+
+      const body = (await res.json()) as { status?: string };
+      if (body?.status !== 'ok') {
+        throw new BadRequestException(
+          `Smarthive SMS rejected: ${JSON.stringify(body)}`,
+        );
+      }
+
+      return;
+    }
+
     if (provider === 'twilio') {
       const accountSid = this.configService.get<string>(
         'SMS_TWILIO_ACCOUNT_SID',
