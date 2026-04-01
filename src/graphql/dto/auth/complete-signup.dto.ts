@@ -13,7 +13,7 @@ export class CompleteSignupInput {
   @MinLength(2)
   fullName: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @Matches(/^\+?[1-9]\d{1,14}$/, {
     message: 'Phone number must be in E.164 format',

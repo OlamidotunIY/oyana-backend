@@ -45,7 +45,7 @@ export class CreateProfileInput {
   @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
   lastName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @Matches(/^\+[1-9]\d{1,14}$/, {
@@ -77,7 +77,7 @@ export class UpdateProfileInput {
   @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
   lastName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @Matches(/^\+[1-9]\d{1,14}$/, {

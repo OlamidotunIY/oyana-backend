@@ -21,7 +21,7 @@ export class CreateUserAddressDto {
   @MaxLength(80)
   label?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @Matches(/^[A-Za-z]{2}$/, {

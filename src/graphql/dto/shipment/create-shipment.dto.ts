@@ -73,7 +73,7 @@ export class CreateShipmentDto {
   @IsBoolean()
   requiresEscrow?: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @Matches(/^[A-Za-z]{3}$/, {
