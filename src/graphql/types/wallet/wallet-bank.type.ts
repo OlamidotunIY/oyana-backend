@@ -17,10 +17,10 @@ export class WalletBank {
   @Field(() => String, { nullable: true })
   gateway?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Boolean, { nullable: true })
   payWithBank?: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => Boolean, { nullable: true })
   active?: boolean;
 
   @Field(() => String, { nullable: true })

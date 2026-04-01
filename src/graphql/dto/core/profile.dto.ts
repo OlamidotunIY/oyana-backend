@@ -1,4 +1,4 @@
-import { InputType, Field, Int } from '@nestjs/graphql';
+import { InputType, Field, Int, Float } from '@nestjs/graphql';
 import { GraphQLBigInt } from '../../scalars';
 import {
   IsDateString,
@@ -389,23 +389,23 @@ export class UpdateDriverPresenceInput {
   @IsBoolean()
   isOnline: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   @IsOptional()
   lat?: number;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   @IsOptional()
   lng?: number;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   @IsOptional()
   accuracyMeters?: number;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   @IsOptional()
   heading?: number;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   @IsOptional()
   speedKph?: number;
 

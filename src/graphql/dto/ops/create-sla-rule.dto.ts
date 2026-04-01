@@ -19,6 +19,6 @@ export class CreateSlaRuleDto {
   @Field(() => String, { nullable: true })
   providerId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Boolean, { nullable: true })
   isActive?: boolean;
 }

@@ -9,6 +9,6 @@ export class UpdateSlaRuleDto {
   @Field(() => GraphQLJSON, { nullable: true })
   value?: unknown;
 
-  @Field({ nullable: true })
+  @Field(() => Boolean, { nullable: true })
   isActive?: boolean;
 }

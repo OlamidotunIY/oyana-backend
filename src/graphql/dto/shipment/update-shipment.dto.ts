@@ -75,7 +75,7 @@ export class UpdateShipmentDto {
   @IsString()
   specialInstructions?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Boolean, { nullable: true })
   @IsOptional()
   @IsBoolean()
   requiresEscrow?: boolean;
@@ -96,7 +96,7 @@ export class UpdateShipmentDto {
   @IsOptional()
   finalPriceMinor?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   @IsOptional()
   @IsNumber()
   commissionRateBps?: number;

@@ -68,7 +68,7 @@ export class CreateShipmentDto {
   @IsString()
   specialInstructions?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Boolean, { nullable: true })
   @IsOptional()
   @IsBoolean()
   requiresEscrow?: boolean;

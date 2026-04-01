@@ -13,10 +13,10 @@ export class CreateMilestoneDto {
   @Field(() => Date, { nullable: true })
   occurredAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   lat?: number;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   lng?: number;
 
   @Field(() => GraphQLJSON, { nullable: true })

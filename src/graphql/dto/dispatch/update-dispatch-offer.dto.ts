@@ -12,6 +12,6 @@ export class UpdateDispatchOfferDto {
   @Field(() => Date, { nullable: true })
   respondedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   providerEtaMinutes?: number;
 }

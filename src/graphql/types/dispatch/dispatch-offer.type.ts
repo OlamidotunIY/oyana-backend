@@ -31,7 +31,7 @@ export class DispatchOffer {
   @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   providerEtaMinutes?: number;
 
   @Field(() => GraphQLJSON, { nullable: true })

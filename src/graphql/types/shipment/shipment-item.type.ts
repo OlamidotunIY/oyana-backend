@@ -14,7 +14,7 @@ export class ShipmentItem {
   @Field()
   quantity: number;
 
-  @Field({ nullable: true })
+  @Field(() => Float, { nullable: true })
   weightKg?: number;
 
   @Field()
