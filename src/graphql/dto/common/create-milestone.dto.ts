@@ -10,7 +10,7 @@ export class CreateMilestoneDto {
   @Field(() => ShipmentMilestoneType)
   milestoneType: ShipmentMilestoneType;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   occurredAt?: Date;
 
   @Field({ nullable: true })

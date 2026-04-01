@@ -4,11 +4,11 @@ import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 @InputType()
 export class AdminDashboardFilterDto {
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   @IsOptional()
   from?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   @IsOptional()
   to?: Date;
 

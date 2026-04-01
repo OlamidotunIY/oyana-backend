@@ -29,19 +29,19 @@ export class ProviderKycStatus {
   @Field()
   vehicleVinStatus: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   ninVerifiedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   phoneVerifiedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   faceVerifiedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   vehiclePlateVerifiedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   vehicleVinVerifiedAt?: Date;
 
   @Field(() => Float, { nullable: true })
@@ -56,10 +56,10 @@ export class ProviderKycStatus {
   @Field(() => String, { nullable: true })
   failureSummary?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   lastVendorSyncAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   lastCheckAt?: Date;
 
   @Field()

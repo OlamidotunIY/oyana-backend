@@ -16,7 +16,7 @@ export class ShipmentMilestone {
   @Field(() => ShipmentMilestoneStatus)
   status: ShipmentMilestoneStatus;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   occurredAt?: Date;
 
   @Field({ nullable: true })

@@ -12,13 +12,13 @@ export class DispatchBatch {
   @Field(() => DispatchBatchStatus)
   status: DispatchBatchStatus;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   openedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   closedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 
   @Field()

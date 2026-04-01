@@ -31,13 +31,13 @@ export class ShipmentAssignment {
   @Field(() => ShipmentAssignmentStatus)
   status: ShipmentAssignmentStatus;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   assignedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   completedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   cancelledAt?: Date;
 
   @Field(() => String, { nullable: true })

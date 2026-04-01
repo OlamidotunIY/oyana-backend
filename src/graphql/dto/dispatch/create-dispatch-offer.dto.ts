@@ -15,7 +15,7 @@ export class CreateDispatchOfferDto {
   @Field(() => String, { nullable: true })
   vehicleId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 
   @Field({ nullable: true })

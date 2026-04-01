@@ -35,7 +35,7 @@ export class PaymentIntent {
   @Field(() => GraphQLJSON, { nullable: true })
   rawWebhook?: any;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   confirmedAt?: Date;
 
   @Field()

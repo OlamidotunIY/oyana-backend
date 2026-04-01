@@ -50,7 +50,7 @@ export class CreateShipmentDto {
   @IsNotEmpty()
   dropoffAddressId: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   @IsOptional()
   scheduledAt?: Date;
 

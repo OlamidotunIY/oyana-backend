@@ -42,13 +42,13 @@ export class ProviderKycCheck {
   @Field(() => GraphQLJSON, { nullable: true })
   normalizedData?: unknown;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   verifiedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   failedAt?: Date;
 
   @Field(() => String, { nullable: true })

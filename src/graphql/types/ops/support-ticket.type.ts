@@ -34,10 +34,10 @@ export class SupportTicket {
   @Field(() => String, { nullable: true })
   assignedAdminProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   resolvedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   closedAt?: Date;
 
   @Field()

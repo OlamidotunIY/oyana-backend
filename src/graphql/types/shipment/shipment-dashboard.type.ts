@@ -37,7 +37,7 @@ export class ShipmentDashboardRecentShipment {
   @Field(() => ShipmentMode)
   mode: ShipmentMode;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   scheduledAt?: Date;
 
   @Field()

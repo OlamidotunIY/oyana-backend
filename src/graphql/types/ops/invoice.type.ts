@@ -38,10 +38,10 @@ export class Invoice {
   @Field()
   issuedAt: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   dueAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   paidAt?: Date;
 
   @Field(() => String, { nullable: true })

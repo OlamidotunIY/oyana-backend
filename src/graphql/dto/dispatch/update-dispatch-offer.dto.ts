@@ -9,7 +9,7 @@ export class UpdateDispatchOfferDto {
   @Field(() => DispatchOfferStatus)
   status: DispatchOfferStatus;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   respondedAt?: Date;
 
   @Field({ nullable: true })

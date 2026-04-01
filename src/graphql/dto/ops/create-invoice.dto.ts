@@ -12,7 +12,7 @@ export class CreateInvoiceDto {
   @Field(() => String, { nullable: true })
   currency?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   dueAt?: Date;
 
   @Field(() => String, { nullable: true })

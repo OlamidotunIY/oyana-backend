@@ -72,7 +72,7 @@ export class DriverComplianceDocumentRecord {
   @Field()
   uploadedAt: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   reviewedAt?: Date | null;
 }
 
@@ -99,10 +99,10 @@ export class DriverPresenceRecord {
   @Field(() => Float, { nullable: true })
   speedKph?: number | null;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   recordedAt?: Date | null;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   lastHeartbeatAt?: Date | null;
 
   @Field()
@@ -129,7 +129,7 @@ export class DriverOnboardingSubmissionRecord {
   @Field()
   submittedAt: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   reviewedAt?: Date | null;
 }
 
@@ -168,7 +168,7 @@ export class DriverProfileRecord {
   @Field(() => String, { nullable: true })
   legalLastName?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   dateOfBirth?: Date | null;
 
   @Field(() => String, { nullable: true })
@@ -180,7 +180,7 @@ export class DriverProfileRecord {
   @Field(() => String, { nullable: true })
   licenseNumber?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   licenseExpiryAt?: Date | null;
 
   @Field(() => String, { nullable: true })
@@ -204,13 +204,13 @@ export class DriverProfileRecord {
   @Field(() => Boolean)
   canFreight: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   submittedAt?: Date | null;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   reviewedAt?: Date | null;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   approvedAt?: Date | null;
 
   @Field(() => DriverVehicleRecord, { nullable: true })
@@ -258,7 +258,7 @@ export class NotificationInboxItem {
   @Field(() => Boolean)
   isRead: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   readAt?: Date | null;
 
   @Field()

@@ -43,7 +43,7 @@ export class FraudFlag {
   @Field(() => String, { nullable: true })
   resolvedByProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   resolvedAt?: Date;
 
   @Field()

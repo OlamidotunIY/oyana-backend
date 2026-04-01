@@ -54,7 +54,7 @@ export class WalletCardMethod {
   @Field(() => GraphQLJSON, { nullable: true })
   metadata?: Record<string, unknown>;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   lastUsedAt?: Date;
 
   @Field()

@@ -14,11 +14,11 @@ export class MarketplaceShipmentsFilterDto {
   @IsString()
   cargoQuery?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   @IsOptional()
   scheduledFrom?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   @IsOptional()
   scheduledTo?: Date;
 

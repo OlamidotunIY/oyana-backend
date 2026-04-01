@@ -21,7 +21,7 @@ export class Waybill {
   @Field(() => String, { nullable: true })
   reviewedByProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   reviewedAt?: Date;
 
   @Field()

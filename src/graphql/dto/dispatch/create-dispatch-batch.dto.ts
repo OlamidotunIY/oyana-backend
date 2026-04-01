@@ -5,6 +5,6 @@ export class CreateDispatchBatchDto {
   @Field()
   shipmentId: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 }

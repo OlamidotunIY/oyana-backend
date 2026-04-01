@@ -22,13 +22,13 @@ export class DispatchOffer {
   @Field(() => DispatchOfferStatus)
   status: DispatchOfferStatus;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   sentAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   respondedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   expiresAt?: Date;
 
   @Field({ nullable: true })

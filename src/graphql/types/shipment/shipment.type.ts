@@ -53,7 +53,7 @@ export class Shipment {
   @Field(() => [ShipmentItem], { nullable: true })
   items?: ShipmentItem[];
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   scheduledAt?: Date;
 
   @Field(() => String, { nullable: true })
@@ -83,7 +83,7 @@ export class Shipment {
   @Field(() => GraphQLBigInt)
   commissionAmountMinor: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   cancelledAt?: Date;
 
   @Field(() => String, { nullable: true })

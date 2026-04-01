@@ -57,7 +57,7 @@ export class UpdateShipmentDto {
   @IsString()
   dropoffAddressId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   @IsOptional()
   scheduledAt?: Date;
 
@@ -105,7 +105,7 @@ export class UpdateShipmentDto {
   @IsOptional()
   commissionAmountMinor?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   @IsOptional()
   cancelledAt?: Date;
 

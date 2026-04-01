@@ -55,10 +55,10 @@ export class WalletWithdrawal {
   @Field(() => GraphQLJSON, { nullable: true })
   rawWebhook?: Record<string, unknown>;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   completedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   failedAt?: Date;
 
   @Field(() => String, { nullable: true })

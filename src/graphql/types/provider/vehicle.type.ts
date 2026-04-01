@@ -40,7 +40,7 @@ export class Vehicle {
   @Field(() => String, { nullable: true })
   vinVerificationStatus?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   lastVerificationAt?: Date;
 
   @Field(() => String, { nullable: true })

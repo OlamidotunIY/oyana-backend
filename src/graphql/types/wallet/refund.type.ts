@@ -31,10 +31,10 @@ export class Refund {
   @Field(() => String, { nullable: true })
   approvedByProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   approvedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => Date, { nullable: true })
   processedAt?: Date;
 
   @Field()
