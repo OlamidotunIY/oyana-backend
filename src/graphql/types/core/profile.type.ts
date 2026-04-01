@@ -19,7 +19,7 @@ export class Profile {
   @Field(() => ID)
   id: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   email: string | null;
 
   @Field(() => Boolean)
