@@ -3,17 +3,17 @@ import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 @InputType()
 export class SyncKycStatusDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsUUID()
   providerId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsUUID()
   checkId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   vendorReference?: string;
@@ -21,12 +21,12 @@ export class SyncKycStatusDto {
 
 @InputType()
 export class MyKycChecksFilterDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   checkType?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   status?: string;

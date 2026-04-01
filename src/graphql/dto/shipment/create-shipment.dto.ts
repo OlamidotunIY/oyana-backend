@@ -17,7 +17,7 @@ import { GraphQLBigInt } from '../../scalars';
 
 @InputType()
 export class CreateShipmentDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   trackingCode?: string;
@@ -54,7 +54,7 @@ export class CreateShipmentDto {
   @IsOptional()
   scheduledAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   packageDescription?: string;
@@ -63,7 +63,7 @@ export class CreateShipmentDto {
   @IsOptional()
   packageValueMinor?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   specialInstructions?: string;

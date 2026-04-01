@@ -19,12 +19,12 @@ export class CreateWalletFundingInput {
   @IsNotEmpty()
   idempotencyKey: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   savedCardMethodId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   callbackUrl?: string;

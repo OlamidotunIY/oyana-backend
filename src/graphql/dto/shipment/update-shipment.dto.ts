@@ -17,12 +17,12 @@ import { GraphQLBigInt } from '../../scalars';
 
 @InputType()
 export class UpdateShipmentDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   trackingCode?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   customerProfileId?: string;
@@ -47,12 +47,12 @@ export class UpdateShipmentDto {
   @IsEnum(ShipmentStatus)
   status?: ShipmentStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   pickupAddressId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   dropoffAddressId?: string;
@@ -65,12 +65,12 @@ export class UpdateShipmentDto {
   @IsOptional()
   packageValueMinor?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   packageDescription?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   specialInstructions?: string;
@@ -109,12 +109,12 @@ export class UpdateShipmentDto {
   @IsOptional()
   cancelledAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   cancelledByProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   cancellationReason?: string;

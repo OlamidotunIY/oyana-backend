@@ -8,7 +8,7 @@ import {
 
 @InputType()
 export class WalletTransactionsInput {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   cursor?: string;

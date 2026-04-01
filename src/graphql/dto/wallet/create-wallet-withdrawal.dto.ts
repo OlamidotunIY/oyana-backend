@@ -25,23 +25,23 @@ export class CreateWalletWithdrawalInput {
   @IsNotEmpty()
   idempotencyKey: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   reason?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   savedBankAccountId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @ValidateIf((input: CreateWalletWithdrawalInput) => !input.savedBankAccountId)
   @IsString()
   @IsNotEmpty()
   bankCode?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @ValidateIf((input: CreateWalletWithdrawalInput) => !input.savedBankAccountId)
   @IsString()
   @Matches(/^\d{10}$/)

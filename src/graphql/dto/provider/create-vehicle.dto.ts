@@ -14,7 +14,7 @@ import {
 
 @InputType()
 export class CreateVehicleDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsUUID()
   providerId?: string;
@@ -23,35 +23,35 @@ export class CreateVehicleDto {
   @IsEnum(VehicleCategory)
   category: VehicleCategory;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(24)
   plateNumber?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(64)
   vin?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(64)
   make?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(64)
   model?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @IsNotEmpty()

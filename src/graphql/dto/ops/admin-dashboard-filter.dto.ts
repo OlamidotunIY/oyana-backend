@@ -22,7 +22,7 @@ export class AdminDashboardFilterDto {
   @IsEnum(ShipmentMode)
   shipmentMode?: ShipmentMode;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   fleetSearch?: string;

@@ -11,7 +11,7 @@ import {
 
 @InputType()
 export class StartNinFaceVerificationDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsUUID()
   providerId?: string;
@@ -30,13 +30,13 @@ export class StartNinFaceVerificationDto {
   @IsDateString()
   dateOfBirth: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(120)
   firstName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(120)

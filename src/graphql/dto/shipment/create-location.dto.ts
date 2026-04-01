@@ -15,7 +15,7 @@ export class CreateUserAddressDto {
   @IsNotEmpty()
   placeId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(80)

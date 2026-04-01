@@ -11,7 +11,7 @@ import {
 
 @InputType()
 export class CreateKycUploadUrlDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsUUID()
   providerId?: string;
@@ -22,7 +22,7 @@ export class CreateKycUploadUrlDto {
   @MaxLength(200)
   fileName: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(120)

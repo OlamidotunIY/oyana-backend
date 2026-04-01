@@ -4,12 +4,12 @@ import { VehicleCategory } from '../../enums';
 
 @InputType()
 export class MarketplaceShipmentsFilterDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   routeQuery?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   cargoQuery?: string;
@@ -33,7 +33,7 @@ export class MarketplaceShipmentsFilterDto {
   @IsEnum(VehicleCategory, { each: true })
   vehicleCategories?: VehicleCategory[];
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   cursor?: string;

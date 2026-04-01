@@ -31,14 +31,14 @@ export class CreateProfileInput {
   @IsUUID('4', { message: 'authUserId must be a valid UUID' })
   authUserId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(2, { message: 'First name must be at least 2 characters long' })
   @MaxLength(50, { message: 'First name must not exceed 50 characters' })
   firstName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(2, { message: 'Last name must be at least 2 characters long' })
@@ -63,14 +63,14 @@ export class CreateProfileInput {
 
 @InputType()
 export class UpdateProfileInput {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(2, { message: 'First name must be at least 2 characters long' })
   @MaxLength(50, { message: 'First name must not exceed 50 characters' })
   firstName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MinLength(2, { message: 'Last name must be at least 2 characters long' })
@@ -106,7 +106,7 @@ export class CreateProfileImageUploadUrlInput {
   @MaxLength(200)
   fileName: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -193,7 +193,7 @@ export class CreateDriverDocumentUploadUrlInput {
   @MaxLength(200)
   fileName: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -229,13 +229,13 @@ export class SaveDriverPersonalInfoInput {
   @IsDateString()
   dateOfBirth: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(120)
   selfieStorageBucket?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(500)
@@ -266,7 +266,7 @@ export class SaveDriverIdentityInfoInput {
   @MaxLength(64)
   identityNumber: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(64)
@@ -285,25 +285,25 @@ export class SaveDriverVehicleInput {
   @MaxLength(24)
   plateNumber: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(32)
   vin?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(40)
   make?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(40)
   model?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(24)
@@ -338,13 +338,13 @@ export class AddDriverComplianceDocumentInput {
   @MaxLength(500)
   storagePath: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(120)
   mimeType?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -369,7 +369,7 @@ export class ReviewDriverOnboardingInput {
   @IsEnum(DriverOnboardingStatus)
   status: DriverOnboardingStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsString()
   @MaxLength(400)
@@ -409,7 +409,7 @@ export class UpdateDriverPresenceInput {
   @IsOptional()
   speedKph?: number;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsDateString()
   recordedAt?: string;

@@ -9,7 +9,7 @@ import {
 
 @InputType()
 export class StartPhoneVerificationDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   @IsOptional()
   @IsUUID()
   providerId?: string;
