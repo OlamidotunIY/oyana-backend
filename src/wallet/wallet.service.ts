@@ -1465,16 +1465,34 @@ export class WalletService {
     const prismaClient = tx ?? this.prisma;
     await this.requireProfile(ownerId);
 
-    return prismaClient.walletAccount.upsert({
-      where: {
-        ownerProfileId: ownerId,
-      },
-      update: {},
-      create: {
-        ownerProfileId: ownerId,
-        currency: WALLET_CURRENCY,
-      },
+    // Optimistic read-first to avoid a lock on every call.
+    const existing = await prismaClient.walletAccount.findUnique({
+      where: { ownerProfileId: ownerId },
     });
+    if (existing) return existing;
+
+    // No wallet yet — try to create one. If a concurrent request wins the
+    // race and inserts first (P2002), fall back to a plain findUnique.
+    try {
+      return await prismaClient.walletAccount.create({
+        data: {
+          ownerProfileId: ownerId,
+          currency: WALLET_CURRENCY,
+        },
+      });
+    } catch (err: unknown) {
+      if (
+        err instanceof Error &&
+        'code' in err &&
+        (err as { code: string }).code === 'P2002'
+      ) {
+        const wallet = await prismaClient.walletAccount.findUnique({
+          where: { ownerProfileId: ownerId },
+        });
+        if (wallet) return wallet;
+      }
+      throw err;
+    }
   }
 
   private async requireProfile(ownerProfileId: string) {
