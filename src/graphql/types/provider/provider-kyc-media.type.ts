@@ -9,7 +9,7 @@ export class ProviderKycMedia {
   @Field()
   providerId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   checkId?: string;
 
   @Field()
@@ -18,7 +18,7 @@ export class ProviderKycMedia {
   @Field()
   storagePath: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   mimeType?: string;
 
   @Field(() => GraphQLBigInt, { nullable: true })
@@ -27,7 +27,7 @@ export class ProviderKycMedia {
   @Field()
   uploadState: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   uploadedByProfileId?: string;
 
   @Field()

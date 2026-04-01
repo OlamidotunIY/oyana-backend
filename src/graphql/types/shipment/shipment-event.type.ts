@@ -13,7 +13,7 @@ export class ShipmentEvent {
   @Field(() => ShipmentEventType)
   eventType: ShipmentEventType;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   actorProfileId?: string;
 
   @Field(() => ShipmentActorRole, { nullable: true })

@@ -38,10 +38,10 @@ export class Shipment {
   @Field()
   dropoffAddressId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   pickupAddressSummary?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   dropoffAddressSummary?: string;
 
   @Field(() => UserAddress, { nullable: true })
@@ -56,13 +56,13 @@ export class Shipment {
   @Field({ nullable: true })
   scheduledAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   packageDescription?: string;
 
   @Field(() => GraphQLBigInt, { nullable: true })
   packageValueMinor?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   specialInstructions?: string;
 
   @Field()
@@ -86,10 +86,10 @@ export class Shipment {
   @Field({ nullable: true })
   cancelledAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   cancelledByProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   cancellationReason?: string;
 
   @Field()

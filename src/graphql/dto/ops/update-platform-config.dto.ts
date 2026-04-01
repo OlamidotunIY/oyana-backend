@@ -9,6 +9,6 @@ export class UpdatePlatformConfigDto {
   @Field(() => GraphQLJSON)
   value: unknown;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   description?: string;
 }

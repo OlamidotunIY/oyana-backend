@@ -33,10 +33,10 @@ export class Transaction {
   @Field()
   reference: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   paymentIntentId?: string;
 
   @Field(() => GraphQLJSON, { nullable: true })

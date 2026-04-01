@@ -13,10 +13,10 @@ export class CreateSlaRuleDto {
   @Field(() => GraphQLJSON)
   value: unknown;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vehicleCategory?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   providerId?: string;
 
   @Field({ nullable: true })

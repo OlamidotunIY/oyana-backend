@@ -25,13 +25,13 @@ export class SupportTicket {
   @Field(() => SupportTicketStatus)
   status: SupportTicketStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   referenceId?: string;
 
   @Field()
   description: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   assignedAdminProfileId?: string;
 
   @Field({ nullable: true })

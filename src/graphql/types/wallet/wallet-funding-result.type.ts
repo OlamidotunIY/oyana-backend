@@ -14,10 +14,10 @@ export class WalletFundingResult {
   @Field()
   reference: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   authorizationUrl?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   message?: string;
 
   @Field(() => PaymentIntent, { nullable: true })

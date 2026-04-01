@@ -8,12 +8,12 @@ export class CreateDisputeDto {
   @Field()
   reason: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   referenceId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   invoiceId?: string;
 }

@@ -9,10 +9,10 @@ export class ProviderKycCheck {
   @Field()
   providerId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   profileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vehicleId?: string;
 
   @Field()
@@ -24,19 +24,19 @@ export class ProviderKycCheck {
   @Field()
   vendor: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vendorReference?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   responseCode?: string;
 
   @Field(() => Float, { nullable: true })
   confidence?: number;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   message?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   maskedIdentifier?: string;
 
   @Field(() => GraphQLJSON, { nullable: true })
@@ -51,7 +51,7 @@ export class ProviderKycCheck {
   @Field({ nullable: true })
   failedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   initiatedByProfileId?: string;
 
   @Field()

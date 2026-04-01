@@ -8,13 +8,13 @@ export class WalletBank {
   @Field()
   code: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   slug?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   longcode?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   gateway?: string;
 
   @Field({ nullable: true })
@@ -23,9 +23,9 @@ export class WalletBank {
   @Field({ nullable: true })
   active?: boolean;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   country?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   currency?: string;
 }

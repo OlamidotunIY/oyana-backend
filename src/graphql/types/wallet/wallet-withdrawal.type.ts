@@ -25,28 +25,28 @@ export class WalletWithdrawal {
   @Field()
   status: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   bankCode?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   bankName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   accountNumberMasked?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   accountName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   recipientCode?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   transferCode?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   paystackTransferId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   failureReason?: string;
 
   @Field(() => GraphQLJSON, { nullable: true })
@@ -61,10 +61,10 @@ export class WalletWithdrawal {
   @Field({ nullable: true })
   failedAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   relatedTransactionId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   savedBankAccountId?: string;
 
   @Field()

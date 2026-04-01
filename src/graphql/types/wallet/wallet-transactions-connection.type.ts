@@ -6,7 +6,7 @@ export class WalletTransactionsConnection {
   @Field(() => [Transaction])
   items: Transaction[];
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   nextCursor?: string;
 
   @Field(() => Boolean)

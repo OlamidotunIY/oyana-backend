@@ -13,10 +13,10 @@ export class SLARule {
   @Field(() => SlaRuleScope)
   scope: SlaRuleScope;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vehicleCategory?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   providerId?: string;
 
   @Field(() => GraphQLJSON)

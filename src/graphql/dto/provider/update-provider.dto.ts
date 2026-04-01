@@ -4,10 +4,10 @@ import { GraphQLBigInt } from '../../scalars';
 
 @InputType()
 export class UpdateProviderDto {
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   businessName?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   profileId?: string;
 
   @Field(() => ProviderStatus, { nullable: true })

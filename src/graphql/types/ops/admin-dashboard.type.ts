@@ -68,10 +68,10 @@ export class AdminDashboardFleetRow {
   @Field(() => AdminFleetStatus)
   status: AdminFleetStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   from?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   to?: string;
 
   @Field(() => Int, { nullable: true })

@@ -15,6 +15,6 @@ export class CreateSupportTicketDto {
   @Field()
   description: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   referenceId?: string;
 }

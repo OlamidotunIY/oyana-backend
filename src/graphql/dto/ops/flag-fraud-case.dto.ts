@@ -19,9 +19,9 @@ export class FlagFraudCaseDto {
   @Field(() => GraphQLJSON, { nullable: true })
   metadata?: unknown;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   invoiceId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 }

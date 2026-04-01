@@ -21,7 +21,7 @@ export class UserAddress {
   @Field()
   postalCode: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   label?: string;
 
   @Field()

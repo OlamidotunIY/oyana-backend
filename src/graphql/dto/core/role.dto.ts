@@ -5,7 +5,7 @@ export class CreateRoleInput {
   @Field()
   key: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   name?: string;
 }
 
@@ -23,7 +23,7 @@ export class CreatePermissionInput {
   @Field()
   key: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   description?: string;
 }
 

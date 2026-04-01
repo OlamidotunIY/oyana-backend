@@ -14,7 +14,7 @@ export class Invoice {
   @Field()
   profileId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 
   @Field(() => InvoiceStatus)
@@ -44,7 +44,7 @@ export class Invoice {
   @Field({ nullable: true })
   paidAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   notes?: string;
 
   @Field()

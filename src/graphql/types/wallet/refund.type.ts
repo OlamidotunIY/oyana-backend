@@ -25,10 +25,10 @@ export class Refund {
   @Field(() => RefundStatus)
   status: RefundStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   reason?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   approvedByProfileId?: string;
 
   @Field({ nullable: true })

@@ -28,19 +28,19 @@ export class FraudFlag {
   @Field(() => GraphQLJSON, { nullable: true })
   metadata?: unknown;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   invoiceId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   raisedByProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   assignedToProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   resolvedByProfileId?: string;
 
   @Field({ nullable: true })

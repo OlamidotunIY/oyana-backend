@@ -14,6 +14,6 @@ export class CreateRatingDto {
   @Field(() => Int)
   score: number;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   comment?: string;
 }

@@ -9,18 +9,18 @@ export class AssignShipmentDto {
   @Field()
   providerId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vehicleId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   driverProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   dispatchOfferId?: string;
 
   @Field(() => GraphQLBigInt, { nullable: true })
   agreedPriceMinor?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   currency?: string;
 }

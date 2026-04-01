@@ -12,10 +12,10 @@ export class PlatformConfig {
   @Field(() => GraphQLJSON)
   value: unknown;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   description?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   updatedByProfileId?: string;
 
   @Field()

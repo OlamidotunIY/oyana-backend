@@ -6,9 +6,9 @@ export class MarketplaceShipmentsResult {
   @Field(() => [Shipment])
   items: Shipment[];
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   nextCursor?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   reason?: string;
 }

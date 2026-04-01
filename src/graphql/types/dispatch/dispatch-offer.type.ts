@@ -16,7 +16,7 @@ export class DispatchOffer {
   @Field()
   shipmentId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vehicleId?: string;
 
   @Field(() => DispatchOfferStatus)

@@ -7,7 +7,7 @@ export class WalletAccount {
   @Field(() => ID)
   id: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   ownerProfileId?: string;
 
   @Field()

@@ -6,7 +6,7 @@ export class CreatePaymentIntentDto {
   @Field()
   walletAccountId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   provider?: string;
 
   @Field(() => GraphQLBigInt)

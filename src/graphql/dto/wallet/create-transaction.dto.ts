@@ -23,13 +23,13 @@ export class CreateTransactionDto {
   @Field()
   reference: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   status?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   paymentIntentId?: string;
 
   @Field(() => GraphQLJSON, { nullable: true })

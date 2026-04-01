@@ -10,7 +10,7 @@ export class Provider {
   @Field()
   businessName: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   profileId?: string;
 
   @Field(() => ProviderStatus)

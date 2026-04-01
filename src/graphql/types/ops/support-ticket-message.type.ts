@@ -9,7 +9,7 @@ export class SupportTicketMessage {
   @Field()
   ticketId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   authorProfileId?: string;
 
   @Field(() => ShipmentActorRole)

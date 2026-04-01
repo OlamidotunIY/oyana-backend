@@ -47,13 +47,13 @@ export class ProviderKycStatus {
   @Field(() => Float, { nullable: true })
   faceConfidence?: number;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   maskedNin?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   maskedPhone?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   failureSummary?: string;
 
   @Field({ nullable: true })

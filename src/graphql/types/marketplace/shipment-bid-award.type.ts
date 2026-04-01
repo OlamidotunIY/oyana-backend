@@ -17,6 +17,6 @@ export class ShipmentBidAward {
   @Field()
   awardedAt: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   notes?: string;
 }

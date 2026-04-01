@@ -13,13 +13,13 @@ export class DisputeCase {
   @Field()
   ownerProfileId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   invoiceId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   referenceId?: string;
 
   @Field()
@@ -31,10 +31,10 @@ export class DisputeCase {
   @Field(() => DisputeStatus)
   status: DisputeStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   resolutionSummary?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   resolvedByProfileId?: string;
 
   @Field({ nullable: true })

@@ -9,7 +9,7 @@ export class AuthUser {
   @Field()
   email: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   fullName?: string;
 
   @Field()

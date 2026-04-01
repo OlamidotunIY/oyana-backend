@@ -9,6 +9,6 @@ export class UpdateFraudFlagStatusDto {
   @Field(() => FraudStatus)
   status: FraudStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   note?: string;
 }

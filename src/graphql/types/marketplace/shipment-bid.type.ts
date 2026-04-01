@@ -21,7 +21,7 @@ export class ShipmentBid {
   @Field()
   currency: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   message?: string;
 
   @Field(() => BidStatus)

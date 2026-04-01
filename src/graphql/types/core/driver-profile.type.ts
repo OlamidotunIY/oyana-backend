@@ -18,19 +18,19 @@ export class DriverVehicleRecord {
   @Field(() => VehicleCategory)
   category: VehicleCategory;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   plateNumber?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vin?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   make?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   model?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   color?: string | null;
 
   @Field(() => Int, { nullable: true })
@@ -63,10 +63,10 @@ export class DriverComplianceDocumentRecord {
   @Field()
   storagePath: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   mimeType?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   notes?: string | null;
 
   @Field()
@@ -117,10 +117,10 @@ export class DriverOnboardingSubmissionRecord {
   @Field(() => DriverOnboardingStatus)
   status: DriverOnboardingStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   rejectionReason?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   reviewerId?: string | null;
 
   @Field(() => GraphQLJSON, { nullable: true })
@@ -162,37 +162,37 @@ export class DriverProfileRecord {
   @Field(() => DriverType, { nullable: true })
   driverType?: DriverType | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   legalFirstName?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   legalLastName?: string | null;
 
   @Field({ nullable: true })
   dateOfBirth?: Date | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   selfieStorageBucket?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   selfieStoragePath?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   licenseNumber?: string | null;
 
   @Field({ nullable: true })
   licenseExpiryAt?: Date | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   identityType?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   identityNumber?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   insurancePolicyNumber?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   rejectionReason?: string | null;
 
   @Field(() => [DriverCapability])
@@ -246,10 +246,10 @@ export class NotificationInboxItem {
   @Field()
   body: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   entityType?: string | null;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   entityId?: string | null;
 
   @Field(() => GraphQLJSON, { nullable: true })

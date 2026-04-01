@@ -18,7 +18,7 @@ export class Waybill {
   @Field(() => WaybillStatus)
   status: WaybillStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   reviewedByProfileId?: string;
 
   @Field({ nullable: true })

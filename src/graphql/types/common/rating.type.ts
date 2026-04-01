@@ -17,7 +17,7 @@ export class Rating {
   @Field(() => Int)
   score: number;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   comment?: string;
 
   @Field()

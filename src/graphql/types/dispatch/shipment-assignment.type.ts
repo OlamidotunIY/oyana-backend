@@ -13,19 +13,19 @@ export class ShipmentAssignment {
   @Field()
   providerId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vehicleId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   driverProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   dispatchOfferId?: string;
 
   @Field(() => GraphQLBigInt, { nullable: true })
   agreedPriceMinor?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   currency?: string;
 
   @Field(() => ShipmentAssignmentStatus)
@@ -40,7 +40,7 @@ export class ShipmentAssignment {
   @Field({ nullable: true })
   cancelledAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   cancellationReason?: string;
 
   @Field()

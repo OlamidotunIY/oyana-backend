@@ -10,7 +10,7 @@ export class DisputeEvent {
   @Field()
   disputeCaseId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   actorProfileId?: string;
 
   @Field(() => ShipmentActorRole)
@@ -19,7 +19,7 @@ export class DisputeEvent {
   @Field(() => DisputeEventType)
   eventType: DisputeEventType;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   message?: string;
 
   @Field(() => GraphQLJSON, { nullable: true })

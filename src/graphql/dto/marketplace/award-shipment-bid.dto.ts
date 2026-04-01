@@ -8,9 +8,9 @@ export class AwardShipmentBidDto {
   @Field()
   shipmentId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   awardedByProfileId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   notes?: string;
 }

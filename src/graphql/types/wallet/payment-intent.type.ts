@@ -23,10 +23,10 @@ export class PaymentIntent {
   @Field(() => PaymentIntentStatus)
   status: PaymentIntentStatus;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   paystackReference?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   authorizationUrl?: string;
 
   @Field(() => GraphQLJSON, { nullable: true })

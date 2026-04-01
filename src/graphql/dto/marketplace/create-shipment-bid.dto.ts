@@ -6,15 +6,15 @@ export class CreateShipmentBidDto {
   @Field()
   shipmentId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   providerId?: string;
 
   @Field(() => GraphQLBigInt)
   amountMinor: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   currency?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   message?: string;
 }

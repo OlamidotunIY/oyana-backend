@@ -6,16 +6,16 @@ export class CreateInvoiceDto {
   @Field()
   profileId: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   shipmentId?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   currency?: string;
 
   @Field({ nullable: true })
   dueAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   notes?: string;
 
   @Field(() => [CreateInvoiceLineItemDto])

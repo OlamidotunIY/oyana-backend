@@ -43,10 +43,10 @@ export class ShipmentDashboardRecentShipment {
   @Field()
   createdAt: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   pickupAddressSummary?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   dropoffAddressSummary?: string;
 }
 

@@ -13,19 +13,19 @@ export class Vehicle {
   @Field(() => VehicleCategory)
   category: VehicleCategory;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   plateNumber?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vin?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   make?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   model?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   color?: string;
 
   @Field(() => Int, { nullable: true })
@@ -34,16 +34,16 @@ export class Vehicle {
   @Field(() => GraphQLBigInt, { nullable: true })
   capacityVolumeCm3?: bigint;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   plateVerificationStatus?: string;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   vinVerificationStatus?: string;
 
   @Field({ nullable: true })
   lastVerificationAt?: Date;
 
-  @Field({ nullable: true })
+  @Field(() => String, { nullable: true })
   verificationFailureReason?: string;
 
   @Field(() => VehicleStatus)
