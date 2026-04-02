@@ -1,11 +1,18 @@
 import { Field, InputType } from '@nestjs/graphql';
-import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  IsDefined,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+} from 'class-validator';
 import { GraphQLBigInt } from '../../scalars';
 import { GraphQLJSON } from 'graphql-scalars';
 
 @InputType()
 export class CreateWalletFundingInput {
   @Field(() => GraphQLBigInt)
+  @IsDefined()
   amountMinor: bigint;
 
   @Field({ nullable: true, defaultValue: 'NGN' })
