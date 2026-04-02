@@ -1,5 +1,5 @@
 import { Field, ID, Int, ObjectType } from '@nestjs/graphql';
-import { DriverType, VehicleCategory } from '../../enums';
+import { DriverType } from '../../enums';
 
 @ObjectType()
 export class AdminProviderOverview {
@@ -35,15 +35,6 @@ export class AdminProviderOverview {
 
   @Field(() => String, { nullable: true })
   activeCity?: string | null;
-
-  @Field(() => VehicleCategory, { nullable: true })
-  primaryVehicleCategory?: VehicleCategory | null;
-
-  @Field(() => String, { nullable: true })
-  primaryVehiclePlateNumber?: string | null;
-
-  @Field(() => Int, { nullable: true })
-  primaryVehicleCapacityKg?: number | null;
 
   @Field(() => Int)
   activeAssignments: number;

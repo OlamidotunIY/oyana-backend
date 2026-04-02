@@ -16,9 +16,6 @@ export class DispatchOffer {
   @Field()
   shipmentId: string;
 
-  @Field(() => String, { nullable: true })
-  vehicleId?: string;
-
   @Field(() => DispatchOfferStatus)
   status: DispatchOfferStatus;
 

@@ -80,7 +80,7 @@ export class MarketPlaceService {
 
     const vehicleCategories = filter?.vehicleCategories?.length
       ? filter.vehicleCategories
-      : await this.getProviderVehicleCategories(providerId);
+      : await this.getProviderDriverCategories(providerId);
 
     if (!vehicleCategories.length) {
       return { items: [] };
@@ -488,7 +488,7 @@ export class MarketPlaceService {
       );
     }
 
-    await this.requireProviderVehicleCategory(
+    await this.requireProviderDriverCategory(
       providerId,
       shipment.vehicleCategory,
     );
@@ -851,45 +851,40 @@ export class MarketPlaceService {
     return resolveProfileRole(profile, preferredRoles);
   }
 
-  private async getProviderVehicleCategories(
+  private async getProviderDriverCategories(
     providerId: string,
   ): Promise<VehicleCategory[]> {
-    const vehicles = await this.prisma.vehicle.findMany({
+    const provider = await this.prisma.provider.findUnique({
       where: {
-        providerId,
-        status: 'active',
+        id: providerId,
       },
       select: {
-        category: true,
+        driverType: true,
       },
     });
 
-    const categories = new Set<VehicleCategory>();
-    vehicles.forEach((vehicle) => {
-      categories.add(vehicle.category as VehicleCategory);
-    });
-
-    return Array.from(categories);
+    return provider?.driverType
+      ? [provider.driverType as VehicleCategory]
+      : [];
   }
 
-  private async requireProviderVehicleCategory(
+  private async requireProviderDriverCategory(
     providerId: string,
     category: VehicleCategory,
   ): Promise<void> {
-    const vehicle = await this.prisma.vehicle.findFirst({
+    const provider = await this.prisma.provider.findFirst({
       where: {
-        providerId,
-        category,
-        status: 'active',
+        id: providerId,
+        driverType: category,
       },
       select: {
         id: true,
       },
     });
 
-    if (!vehicle) {
+    if (!provider) {
       throw new ForbiddenException(
-        'Provider does not have an active vehicle for this shipment category',
+        'Driver category does not match this shipment category',
       );
     }
   }

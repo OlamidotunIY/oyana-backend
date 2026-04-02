@@ -1,6 +1,5 @@
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 import { ProviderKycStatus } from '../provider/provider-kyc-status.type';
-import { Vehicle } from '../provider/vehicle.type';
 import { WalletAccount } from '../wallet/wallet-account.type';
 import {
   ProviderDispatchStats,
@@ -26,9 +25,6 @@ export class ProviderDashboardQuary {
 
   @Field(() => [Shipment])
   completedShipments: Shipment[];
-
-  @Field(() => [Vehicle])
-  vehicles: Vehicle[];
 
   @Field(() => Int)
   cancelledShipmentsCount: number;

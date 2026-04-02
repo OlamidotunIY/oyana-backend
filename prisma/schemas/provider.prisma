@@ -21,7 +21,6 @@ model Provider {
   contactProfile      Profile?             @relation("ProviderContact", fields: [profileId], references: [id])
   driverProfile       DriverProfile?
   members             ProviderMember[]
-  vehicle             Vehicle?
   kycProfile          ProviderKycProfile?
   kycChecks           ProviderKycCheck[]
   kycMedia            ProviderKycMedia[]
@@ -52,37 +51,6 @@ model ProviderMember {
   @@map("provider_members")
 }
 
-model Vehicle {
-  id                        String          @id @default(uuid()) @db.Uuid
-  providerId                String          @unique @map("provider_id") @db.Uuid
-  category                  VehicleCategory
-  plateNumber               String?         @map("plate_number")
-  vin                       String?         @map("vin")
-  make                      String?
-  model                     String?
-  color                     String?
-  capacityKg                Int?            @map("capacity_kg")
-  capacityVolumeCm3         BigInt?         @map("capacity_volume_cm3")
-  plateVerificationStatus   String?         @map("plate_verification_status")
-  vinVerificationStatus     String?         @map("vin_verification_status")
-  lastVerificationAt        DateTime?       @map("last_verification_at") @db.Timestamptz(6)
-  verificationFailureReason String?         @map("verification_failure_reason")
-  status                    String          @default("active")
-  createdAt                 DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                 DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  // Relations
-  provider            Provider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  dispatchOffers      DispatchOffer[]
-  shipmentAssignments ShipmentAssignment[]
-  kycChecks           ProviderKycCheck[]
-
-  @@unique([plateNumber], name: "unique_plate_number")
-  @@unique([vin], name: "unique_vehicle_vin")
-  @@index([category, status])
-  @@map("vehicles")
-}
-
 model ProviderKycProfile {
   id                    String    @id @default(uuid()) @db.Uuid
   providerId            String    @unique @map("provider_id") @db.Uuid
@@ -91,13 +59,9 @@ model ProviderKycProfile {
   ninStatus             String    @default("unverified") @map("nin_status")
   phoneStatus           String    @default("unverified") @map("phone_status")
   faceStatus            String    @default("unverified") @map("face_status")
-  vehiclePlateStatus    String    @default("unverified") @map("vehicle_plate_status")
-  vehicleVinStatus      String    @default("unverified") @map("vehicle_vin_status")
   ninVerifiedAt         DateTime? @map("nin_verified_at") @db.Timestamptz(6)
   phoneVerifiedAt       DateTime? @map("phone_verified_at") @db.Timestamptz(6)
   faceVerifiedAt        DateTime? @map("face_verified_at") @db.Timestamptz(6)
-  vehiclePlateVerifiedAt DateTime? @map("vehicle_plate_verified_at") @db.Timestamptz(6)
-  vehicleVinVerifiedAt  DateTime? @map("vehicle_vin_verified_at") @db.Timestamptz(6)
   faceConfidence        Decimal?  @map("face_confidence") @db.Decimal(7, 4)
   maskedNin             String?   @map("masked_nin")
   maskedPhone           String?   @map("masked_phone")
@@ -120,7 +84,6 @@ model ProviderKycCheck {
   id                  String    @id @default(uuid()) @db.Uuid
   providerId          String    @map("provider_id") @db.Uuid
   profileId           String?   @map("profile_id") @db.Uuid
-  vehicleId           String?   @map("vehicle_id") @db.Uuid
   checkType           String    @map("check_type")
   status              String    @default("pending")
   vendor              String    @default("prembly")
@@ -142,7 +105,6 @@ model ProviderKycCheck {
   // Relations
   provider   Provider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
   profile    ProviderKycProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
-  vehicle    Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   initiatedBy Profile?           @relation("ProviderKycCheckInitiator", fields: [initiatedByProfileId], references: [id], onDelete: SetNull)
   media      ProviderKycMedia[]  @relation("KycCheckMedia")
 
@@ -150,7 +112,6 @@ model ProviderKycCheck {
   @@index([providerId, checkType, createdAt(sort: Desc)])
   @@index([status])
   @@index([profileId])
-  @@index([vehicleId])
   @@map("provider_kyc_checks")
 }
 

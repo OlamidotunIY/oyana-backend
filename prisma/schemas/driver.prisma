@@ -12,7 +12,6 @@ enum DriverComplianceDocumentType {
   identity_document
   nin
   insurance
-  vehicle_registration
   proof_of_address
 }
 
@@ -53,32 +52,12 @@ model DriverProfile {
 
   profile              Profile                       @relation(fields: [profileId], references: [id], onDelete: Cascade)
   provider             Provider?                     @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  vehicle              DriverVehicle?
   complianceDocuments  DriverComplianceDocument[]
   submissions          DriverOnboardingSubmission[]
   presence             DriverPresence?
 
   @@index([onboardingStatus, driverType])
   @@map("driver_profiles")
-}
-
-model DriverVehicle {
-  id                String          @id @default(uuid()) @db.Uuid
-  driverProfileId   String          @unique @map("driver_profile_id") @db.Uuid
-  category          VehicleCategory
-  plateNumber       String?         @map("plate_number")
-  vin               String?         @map("vin")
-  make              String?
-  model             String?
-  color             String?
-  capacityKg        Int?            @map("capacity_kg")
-  capacityVolumeCm3 BigInt?         @map("capacity_volume_cm3")
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  driverProfile DriverProfile @relation(fields: [driverProfileId], references: [id], onDelete: Cascade)
-
-  @@map("driver_vehicles")
 }
 
 model DriverComplianceDocument {

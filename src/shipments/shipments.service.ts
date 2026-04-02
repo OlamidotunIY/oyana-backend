@@ -12,6 +12,7 @@ import {
   AddShipmentItemDto,
   CancelShipmentDto,
   CreateShipmentDto,
+  EstimateShipmentBasePriceDto,
   NotificationAudience,
   NotificationCategory,
   ProviderKycStatus,
@@ -31,13 +32,12 @@ import {
   ShipmentScheduleType,
   ShipmentStatus,
   ShipmentTracking,
+  ShipmentBasePriceEstimate,
   TransactionDirection,
   TransactionStatus,
   UpdateShipmentDto,
   UserType,
   UserAddress,
-  Vehicle,
-  VehicleStatus,
   WalletAccount,
   State,
 } from '../graphql';
@@ -49,7 +49,6 @@ import type {
   UserAddress as PrismaUserAddress,
   Prisma,
   Shipment as PrismaShipment,
-  Vehicle as PrismaVehicle,
 } from '@prisma/client';
 import {
   normalizeProfileRoles,
@@ -170,6 +169,22 @@ export class ShipmentsService {
 
   getDefaultCommissionRateBps(): number {
     return this.defaultCommissionRateBps;
+  }
+
+  async estimateShipmentBasePrice(
+    viewerProfileId: string,
+    input: EstimateShipmentBasePriceDto,
+  ): Promise<ShipmentBasePriceEstimate> {
+    const viewerRole = await this.requireUserRole(viewerProfileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+      UserType.BUSINESS,
+    ]);
+
+    return this.buildShipmentBasePriceEstimate(input, {
+      allowedProfileId: viewerProfileId,
+      allowAnyAddress: viewerRole === UserType.ADMIN,
+    });
   }
 
   async getShipmentsForViewer(
@@ -532,7 +547,6 @@ export class ShipmentsService {
         kycStatus: null,
         activeAssignments: [],
         completedShipments: [],
-        vehicles: [],
         cancelledShipmentsCount: 0,
         completionRate: 0,
         dispatchStats: {
@@ -568,7 +582,6 @@ export class ShipmentsService {
       activeAssignments,
       completedShipments,
       kycStatus,
-      vehicles,
       providerRecord,
       offersReceived,
       offersAccepted,
@@ -692,14 +705,6 @@ export class ShipmentsService {
           providerId,
         },
       }),
-      this.prisma.vehicle.findMany({
-        where: {
-          providerId,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      }),
       this.prisma.provider.findUnique({
         where: { id: providerId },
         select: {
@@ -808,7 +813,6 @@ export class ShipmentsService {
       completedShipments: completedShipments.map((shipment) =>
         this.toGraphqlShipment(shipment),
       ),
-      vehicles: vehicles.map((vehicle) => this.toGraphqlVehicle(vehicle)),
       cancelledShipmentsCount,
       completionRate,
       dispatchStats: {
@@ -838,6 +842,35 @@ export class ShipmentsService {
   }
 
   async createShipment(input: CreateShipmentDto): Promise<Shipment> {
+    const basePriceEstimate =
+      input.quotedPriceMinor == null || input.finalPriceMinor == null
+        ? await this.buildShipmentBasePriceEstimate(
+            {
+              pickupAddressId: input.pickupAddressId,
+              dropoffAddressId: input.dropoffAddressId,
+              currency: input.pricingCurrency ?? undefined,
+            },
+            {
+              allowedProfileId: input.customerProfileId,
+              allowAnyAddress: false,
+            },
+          )
+        : null;
+
+    const quotedPriceMinor =
+      input.quotedPriceMinor ?? basePriceEstimate?.basePriceMinor ?? null;
+    const finalPriceMinor =
+      input.finalPriceMinor ?? quotedPriceMinor ?? null;
+    const pricingCurrency =
+      input.pricingCurrency ??
+      basePriceEstimate?.currency ??
+      this.getAllowedShipmentCurrencies()[0] ??
+      'NGN';
+    const commissionAmountMinor =
+      finalPriceMinor != null
+        ? this.calculateCommission(finalPriceMinor, this.defaultCommissionRateBps)
+        : BigInt(0);
+
     const shipment = await this.prisma.$transaction(async (tx) => {
       const createdShipment = await tx.shipment.create({
         data: {
@@ -854,11 +887,11 @@ export class ShipmentsService {
           packageValueMinor: input.packageValueMinor,
           specialInstructions: input.specialInstructions,
           requiresEscrow: input.requiresEscrow,
-          pricingCurrency: input.pricingCurrency,
-          quotedPriceMinor: input.quotedPriceMinor,
-          finalPriceMinor: input.finalPriceMinor,
+          pricingCurrency,
+          quotedPriceMinor,
+          finalPriceMinor,
           commissionRateBps: this.defaultCommissionRateBps,
-          commissionAmountMinor: 0,
+          commissionAmountMinor,
         },
       });
 
@@ -1605,6 +1638,236 @@ export class ShipmentsService {
     }
   }
 
+  private async buildShipmentBasePriceEstimate(
+    input: EstimateShipmentBasePriceDto,
+    options: {
+      allowedProfileId: string;
+      allowAnyAddress: boolean;
+    },
+  ): Promise<ShipmentBasePriceEstimate> {
+    const [pickup, dropoff, config] = await Promise.all([
+      this.resolveEstimatePoint('pickup', {
+        addressId: input.pickupAddressId,
+        lat: input.pickupLat,
+        lng: input.pickupLng,
+        allowedProfileId: options.allowedProfileId,
+        allowAnyAddress: options.allowAnyAddress,
+      }),
+      this.resolveEstimatePoint('dropoff', {
+        addressId: input.dropoffAddressId,
+        lat: input.dropoffLat,
+        lng: input.dropoffLng,
+        allowedProfileId: options.allowedProfileId,
+        allowAnyAddress: options.allowAnyAddress,
+      }),
+      this.getShipmentBasePriceConfig(input.currency),
+    ]);
+
+    const distanceKm = this.calculateDistanceKm(
+      pickup.lat,
+      pickup.lng,
+      dropoff.lat,
+      dropoff.lng,
+    );
+
+    if (distanceKm === null) {
+      throw new BadRequestException(
+        'Pickup and dropoff coordinates are required to estimate base price.',
+      );
+    }
+
+    const distanceFeeMinor = this.calculateDistanceFeeMinor(
+      distanceKm,
+      config.distancePerKmMinor,
+    );
+    const calculatedPriceMinor = config.baseFareMinor + distanceFeeMinor;
+    const basePriceMinor =
+      calculatedPriceMinor > config.minimumPriceMinor
+        ? calculatedPriceMinor
+        : config.minimumPriceMinor;
+
+    return {
+      currency: config.currency,
+      distanceKm: Number(distanceKm.toFixed(2)),
+      baseFareMinor: config.baseFareMinor,
+      distanceFeeMinor,
+      minimumPriceMinor: config.minimumPriceMinor,
+      basePriceMinor,
+    };
+  }
+
+  private async resolveEstimatePoint(
+    label: 'pickup' | 'dropoff',
+    input: {
+      addressId?: string;
+      lat?: number;
+      lng?: number;
+      allowedProfileId: string;
+      allowAnyAddress: boolean;
+    },
+  ): Promise<{ lat: number; lng: number }> {
+    if (input.addressId?.trim()) {
+      const address = await this.prisma.userAddress.findUnique({
+        where: {
+          id: input.addressId.trim(),
+        },
+        select: {
+          profileId: true,
+          lat: true,
+          lng: true,
+        },
+      });
+
+      if (!address) {
+        throw new NotFoundException(
+          `${label} address ${input.addressId.trim()} was not found`,
+        );
+      }
+
+      if (
+        !input.allowAnyAddress &&
+        address.profileId !== input.allowedProfileId
+      ) {
+        throw new ForbiddenException(
+          `You cannot use that ${label} address for price estimation.`,
+        );
+      }
+
+      if (address.lat == null || address.lng == null) {
+        throw new BadRequestException(
+          `${label} address does not have saved coordinates yet.`,
+        );
+      }
+
+      return {
+        lat: address.lat,
+        lng: address.lng,
+      };
+    }
+
+    if (input.lat == null || input.lng == null) {
+      throw new BadRequestException(
+        `Provide ${label} coordinates or a saved ${label} address.`,
+      );
+    }
+
+    return {
+      lat: input.lat,
+      lng: input.lng,
+    };
+  }
+
+  private async getShipmentBasePriceConfig(requestedCurrency?: string): Promise<{
+    currency: string;
+    baseFareMinor: bigint;
+    distancePerKmMinor: bigint;
+    minimumPriceMinor: bigint;
+  }> {
+    const configRows = await this.prisma.platformConfig.findMany({
+      where: {
+        key: {
+          in: [
+            'shipment_base_price_currency',
+            'shipment_base_price_fixed_minor',
+            'shipment_base_price_per_km_minor',
+            'shipment_base_price_minimum_minor',
+          ],
+        },
+      },
+      select: {
+        key: true,
+        value: true,
+      },
+    });
+
+    const configMap = new Map(
+      configRows.map((row) => [row.key, row.value] as const),
+    );
+
+    const fallbackCurrency =
+      requestedCurrency?.trim().toUpperCase() ||
+      this.getAllowedShipmentCurrencies()[0] ||
+      'NGN';
+
+    return {
+      currency:
+        this.readConfigString(configMap.get('shipment_base_price_currency')) ??
+        fallbackCurrency,
+      baseFareMinor: this.readConfigBigInt(
+        configMap.get('shipment_base_price_fixed_minor'),
+        process.env.SHIPMENT_BASE_PRICE_FIXED_MINOR ?? '150000',
+      ),
+      distancePerKmMinor: this.readConfigBigInt(
+        configMap.get('shipment_base_price_per_km_minor'),
+        process.env.SHIPMENT_BASE_PRICE_PER_KM_MINOR ?? '35000',
+      ),
+      minimumPriceMinor: this.readConfigBigInt(
+        configMap.get('shipment_base_price_minimum_minor'),
+        process.env.SHIPMENT_BASE_PRICE_MINIMUM_MINOR ?? '250000',
+      ),
+    };
+  }
+
+  private readConfigString(value: unknown): string | null {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim().toUpperCase();
+    }
+
+    return null;
+  }
+
+  private readConfigBigInt(value: unknown, fallback: string): bigint {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return BigInt(Math.max(0, Math.floor(value)));
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      try {
+        return BigInt(value.trim());
+      } catch {
+        return BigInt(fallback);
+      }
+    }
+
+    return BigInt(fallback);
+  }
+
+  private calculateDistanceFeeMinor(
+    distanceKm: number,
+    distancePerKmMinor: bigint,
+  ): bigint {
+    const distanceMeters = BigInt(Math.max(0, Math.round(distanceKm * 1000)));
+    return (distancePerKmMinor * distanceMeters + BigInt(999)) / BigInt(1000);
+  }
+
+  private calculateDistanceKm(
+    originLat: number | null,
+    originLng: number | null,
+    destinationLat: number | null,
+    destinationLng: number | null,
+  ): number | null {
+    if (
+      originLat == null ||
+      originLng == null ||
+      destinationLat == null ||
+      destinationLng == null
+    ) {
+      return null;
+    }
+
+    const toRadians = (value: number) => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+    const deltaLat = toRadians(destinationLat - originLat);
+    const deltaLng = toRadians(destinationLng - originLng);
+    const a =
+      Math.sin(deltaLat / 2) ** 2 +
+      Math.cos(toRadians(originLat)) *
+        Math.cos(toRadians(destinationLat)) *
+        Math.sin(deltaLng / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
+  }
+
   private async createInitialMilestones(
     tx: Prisma.TransactionClient,
     shipmentId: string,
@@ -1729,13 +1992,9 @@ export class ShipmentsService {
     ninStatus: string;
     phoneStatus: string;
     faceStatus: string;
-    vehiclePlateStatus: string;
-    vehicleVinStatus: string;
     ninVerifiedAt: Date | null;
     phoneVerifiedAt: Date | null;
     faceVerifiedAt: Date | null;
-    vehiclePlateVerifiedAt: Date | null;
-    vehicleVinVerifiedAt: Date | null;
     faceConfidence: Prisma.Decimal | null;
     maskedNin: string | null;
     maskedPhone: string | null;
@@ -1753,13 +2012,9 @@ export class ShipmentsService {
       ninStatus: status.ninStatus,
       phoneStatus: status.phoneStatus,
       faceStatus: status.faceStatus,
-      vehiclePlateStatus: status.vehiclePlateStatus,
-      vehicleVinStatus: status.vehicleVinStatus,
       ninVerifiedAt: status.ninVerifiedAt ?? undefined,
       phoneVerifiedAt: status.phoneVerifiedAt ?? undefined,
       faceVerifiedAt: status.faceVerifiedAt ?? undefined,
-      vehiclePlateVerifiedAt: status.vehiclePlateVerifiedAt ?? undefined,
-      vehicleVinVerifiedAt: status.vehicleVinVerifiedAt ?? undefined,
       faceConfidence: status.faceConfidence
         ? Number(status.faceConfidence)
         : undefined,
@@ -2117,42 +2372,6 @@ export class ShipmentsService {
       lng: milestone.lng ?? undefined,
       metadata: milestone.metadata as Record<string, unknown> | undefined,
       createdAt: milestone.createdAt,
-    };
-  }
-
-  private toGraphqlVehicle(vehicle: PrismaVehicle): Vehicle {
-    const status =
-      vehicle.status &&
-      Object.values(VehicleStatus).includes(vehicle.status as VehicleStatus)
-        ? (vehicle.status as VehicleStatus)
-        : VehicleStatus.ACTIVE;
-
-    return {
-      id: vehicle.id,
-      providerId: vehicle.providerId,
-      category: vehicle.category as Vehicle['category'],
-      plateNumber: vehicle.plateNumber ?? undefined,
-      vin: (vehicle as unknown as { vin?: string | null }).vin ?? undefined,
-      make: vehicle.make ?? undefined,
-      model: vehicle.model ?? undefined,
-      color: vehicle.color ?? undefined,
-      capacityKg: vehicle.capacityKg ?? undefined,
-      capacityVolumeCm3: vehicle.capacityVolumeCm3 ?? undefined,
-      plateVerificationStatus:
-        (vehicle as unknown as { plateVerificationStatus?: string | null })
-          .plateVerificationStatus ?? undefined,
-      vinVerificationStatus:
-        (vehicle as unknown as { vinVerificationStatus?: string | null })
-          .vinVerificationStatus ?? undefined,
-      lastVerificationAt:
-        (vehicle as unknown as { lastVerificationAt?: Date | null })
-          .lastVerificationAt ?? undefined,
-      verificationFailureReason:
-        (vehicle as unknown as { verificationFailureReason?: string | null })
-          .verificationFailureReason ?? undefined,
-      status,
-      createdAt: vehicle.createdAt,
-      updatedAt: vehicle.updatedAt,
     };
   }
 

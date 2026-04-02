@@ -5,21 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type {
-  Prisma,
-  VehicleCategory as PrismaVehicleCategory,
-} from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import {
   AddDriverComplianceDocumentInput,
-  CompleteDriverRegistrationInput,
   CreateDriverDocumentUploadUrlInput,
   CreateProfileImageUploadUrlInput,
   ReviewDriverOnboardingInput,
   SaveDriverIdentityInfoInput,
   SaveDriverPersonalInfoInput,
-  SaveDriverVehicleInput,
-  SetProviderAvailabilityInput,
   SetProfileImageInput,
   SubmitDriverOnboardingInput,
   SwitchAppModeInput,
@@ -54,24 +48,9 @@ import { GoogleStorageService } from '../storage/google-storage.service';
 import {
   isDriverOnboardingCompleted,
   isDriverRole,
-  mapDriverTypeToVehicleCategory,
   normalizeDriverType,
   resolveActiveProvider,
 } from './driver-onboarding.util';
-
-const driverVehicleSelection = {
-  id: true,
-  category: true,
-  plateNumber: true,
-  vin: true,
-  make: true,
-  model: true,
-  color: true,
-  capacityKg: true,
-  capacityVolumeCm3: true,
-  createdAt: true,
-  updatedAt: true,
-} satisfies Prisma.DriverVehicleSelect;
 
 const driverDocumentSelection = {
   id: true,
@@ -132,9 +111,6 @@ const driverProfileSelection = {
   approvedAt: true,
   createdAt: true,
   updatedAt: true,
-  vehicle: {
-    select: driverVehicleSelection,
-  },
   complianceDocuments: {
     orderBy: [{ uploadedAt: 'desc' }, { createdAt: 'desc' }],
     select: driverDocumentSelection,
@@ -201,13 +177,6 @@ const profileSelection = {
       driverType: true,
       isAvailable: true,
       availabilityUpdatedAt: true,
-      vehicle: {
-        select: {
-          category: true,
-          plateNumber: true,
-          capacityKg: true,
-        },
-      },
     },
     take: 1,
   },
@@ -228,13 +197,6 @@ const profileSelection = {
           driverType: true,
           isAvailable: true,
           availabilityUpdatedAt: true,
-          vehicle: {
-            select: {
-              category: true,
-              plateNumber: true,
-              capacityKg: true,
-            },
-          },
         },
       },
     },
@@ -269,13 +231,6 @@ const driverOnboardingSelection = {
     select: {
       id: true,
       driverType: true,
-      vehicle: {
-        select: {
-          category: true,
-          plateNumber: true,
-          capacityKg: true,
-        },
-      },
     },
     take: 1,
   },
@@ -292,13 +247,6 @@ const driverOnboardingSelection = {
         select: {
           id: true,
           driverType: true,
-          vehicle: {
-            select: {
-              category: true,
-              plateNumber: true,
-              capacityKg: true,
-            },
-          },
         },
       },
     },
@@ -696,7 +644,7 @@ export class UserService {
     profileId: string,
     input: SaveDriverPersonalInfoInput,
   ): Promise<DriverProfileRecord> {
-    const driverType = mapDriverTypeToVehicleCategory(input.driverType);
+    const driverType = normalizeDriverType(input.driverType);
     if (!driverType) {
       throw new BadRequestException('Driver type is invalid');
     }
@@ -745,54 +693,6 @@ export class UserService {
 
     return this.toGraphqlDriverProfile(driverProfile);
   }
-
-  async saveDriverVehicle(
-    profileId: string,
-    input: SaveDriverVehicleInput,
-  ): Promise<DriverProfileRecord> {
-    const driverProfile = await this.prisma.$transaction(async (tx) => {
-      const currentDriverProfile = await this.ensureDraftDriverProfile(tx, profileId);
-
-      await tx.driverVehicle.upsert({
-        where: {
-          driverProfileId: currentDriverProfile.id,
-        },
-        update: {
-          category: input.category,
-          plateNumber: input.plateNumber.trim().toUpperCase(),
-          vin: input.vin?.trim() || null,
-          make: input.make?.trim() || null,
-          model: input.model?.trim() || null,
-          color: input.color?.trim() || null,
-          capacityKg: input.capacityKg,
-          capacityVolumeCm3: input.capacityVolumeCm3 ?? null,
-        },
-        create: {
-          driverProfileId: currentDriverProfile.id,
-          category: input.category,
-          plateNumber: input.plateNumber.trim().toUpperCase(),
-          vin: input.vin?.trim() || null,
-          make: input.make?.trim() || null,
-          model: input.model?.trim() || null,
-          color: input.color?.trim() || null,
-          capacityKg: input.capacityKg,
-          capacityVolumeCm3: input.capacityVolumeCm3 ?? null,
-        },
-      });
-
-      return tx.driverProfile.update({
-        where: { id: currentDriverProfile.id },
-        data: {
-          ...this.buildDriverDraftUpdate(currentDriverProfile.onboardingStatus),
-          driverType: input.category,
-        },
-        select: driverProfileSelection,
-      });
-    });
-
-    return this.toGraphqlDriverProfile(driverProfile);
-  }
-
   async addDriverComplianceDocument(
     profileId: string,
     input: AddDriverComplianceDocumentInput,
@@ -1148,209 +1048,6 @@ export class UserService {
     return result.count;
   }
 
-  async completeDriverRegistration(
-    profileId: string,
-    input: CompleteDriverRegistrationInput,
-  ): Promise<Profile> {
-    const profile = await this.prisma.profile.findUnique({
-      where: { id: profileId },
-      select: {
-        id: true,
-        email: true,
-        role: true,
-      },
-    });
-
-    if (!profile) {
-      throw new NotFoundException('Profile not found');
-    }
-
-    const vehicleCategory = mapDriverTypeToVehicleCategory(input.driverType);
-    if (!vehicleCategory) {
-      throw new BadRequestException('Driver type is invalid');
-    }
-
-    const normalizedFirstName = input.firstName.trim();
-    const normalizedLastName = input.lastName.trim();
-    const businessName = `${normalizedFirstName} ${normalizedLastName}`.trim();
-    const nextRole =
-      input.role ??
-      (input.driverType === 'bike'
-        ? UserRole.RIDER
-        : input.driverType === 'van'
-          ? UserRole.VAN_DRIVER
-          : UserRole.TRUCK_DRIVER);
-    const expectedRole =
-      input.driverType === 'bike'
-        ? UserRole.RIDER
-        : input.driverType === 'van'
-          ? UserRole.VAN_DRIVER
-          : UserRole.TRUCK_DRIVER;
-
-    if (!isDriverRole(nextRole) || nextRole !== expectedRole) {
-      throw new BadRequestException('Driver role must match the vehicle type');
-    }
-
-    if (profile.role === UserRole.SHIPPER || profile.role === UserRole.ADMIN) {
-      throw new ForbiddenException(
-        'This account cannot be converted into a driver account.',
-      );
-    }
-
-    const updatedProfile = await this.prisma.$transaction(async (tx) => {
-      await tx.profile.update({
-        where: { id: profileId },
-        data: {
-          firstName: normalizedFirstName,
-          lastName: normalizedLastName,
-          role: nextRole,
-          activeAppMode: AppMode.DRIVER,
-        },
-      });
-
-      const providerId = await this.ensureProviderForProfile(
-        tx,
-        {
-          id: profile.id,
-          email: profile.email,
-          firstName: normalizedFirstName,
-          lastName: normalizedLastName,
-        },
-        businessName,
-        {
-          driverType: vehicleCategory,
-          isAvailable: input.isAvailable,
-        },
-      );
-
-      const existingVehicle = await tx.vehicle.findUnique({
-        where: {
-          providerId,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      const normalizedPlateNumber = input.plateNumber.trim().toUpperCase();
-
-      if (existingVehicle) {
-        await tx.vehicle.update({
-          where: {
-            id: existingVehicle.id,
-          },
-          data: {
-            category: vehicleCategory,
-            plateNumber: normalizedPlateNumber,
-            capacityKg: input.capacityKg,
-            status: 'active',
-          },
-        });
-      } else {
-        await tx.vehicle.create({
-          data: {
-            providerId,
-            category: vehicleCategory,
-            plateNumber: normalizedPlateNumber,
-            capacityKg: input.capacityKg,
-            status: 'active',
-          },
-        });
-      }
-
-      await tx.driverProfile.upsert({
-        where: { profileId },
-        update: {
-          providerId,
-          onboardingStatus: DriverOnboardingStatus.APPROVED,
-          driverType: vehicleCategory,
-          legalFirstName: normalizedFirstName,
-          legalLastName: normalizedLastName,
-          canDispatch: true,
-          canFreight: input.driverType !== DriverType.BIKE,
-          submittedAt: new Date(),
-          reviewedAt: new Date(),
-          approvedAt: new Date(),
-          rejectionReason: null,
-        },
-        create: {
-          profileId,
-          providerId,
-          onboardingStatus: DriverOnboardingStatus.APPROVED,
-          driverType: vehicleCategory,
-          legalFirstName: normalizedFirstName,
-          legalLastName: normalizedLastName,
-          canDispatch: true,
-          canFreight: input.driverType !== DriverType.BIKE,
-          submittedAt: new Date(),
-          reviewedAt: new Date(),
-          approvedAt: new Date(),
-        },
-      });
-
-      return tx.profile.findUniqueOrThrow({
-        where: { id: profileId },
-        select: profileSelection,
-      });
-    });
-
-    return this.toGraphqlProfile(updatedProfile);
-  }
-
-  async setProviderAvailability(
-    profileId: string,
-    input: SetProviderAvailabilityInput,
-  ): Promise<Profile> {
-    await this.assertDriverOnboardingComplete(profileId);
-
-    const ownerProvider = await this.prisma.provider.findFirst({
-      where: {
-        profileId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    const ownerMembership = await this.prisma.providerMember.findFirst({
-      where: {
-        profileId,
-        status: 'active',
-        role: 'owner',
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-      select: {
-        providerId: true,
-      },
-    });
-
-    const providerId = ownerProvider?.id ?? ownerMembership?.providerId;
-    if (!providerId) {
-      throw new ForbiddenException(
-        'Only provider owners can update provider availability',
-      );
-    }
-
-    await this.prisma.provider.update({
-      where: {
-        id: providerId,
-      },
-      data: {
-        isAvailable: input.isAvailable,
-        availabilityUpdatedAt: new Date(),
-      },
-    });
-
-    const profile = await this.findProfileById(profileId);
-    if (!profile) {
-      throw new NotFoundException('Profile not found');
-    }
-
-    return profile;
-  }
-
   async getNotificationSettings(
     profileId: string,
   ): Promise<NotificationSettings> {
@@ -1529,17 +1226,6 @@ export class UserService {
       );
     }
 
-    if (
-      !driverProfile.vehicle ||
-      !driverProfile.vehicle.category ||
-      !driverProfile.vehicle.plateNumber?.trim() ||
-      !driverProfile.vehicle.capacityKg
-    ) {
-      throw new BadRequestException(
-        'Complete vehicle information before submitting driver onboarding.',
-      );
-    }
-
     const uploadedDocumentTypes = new Set(
       driverProfile.complianceDocuments.map((document) => document.type),
     );
@@ -1553,13 +1239,10 @@ export class UserService {
       uploadedDocumentTypes.has(
         DriverComplianceDocumentType.IDENTITY_DOCUMENT,
       ) || uploadedDocumentTypes.has(DriverComplianceDocumentType.NIN);
-    const hasVehicleRegistration = uploadedDocumentTypes.has(
-      DriverComplianceDocumentType.VEHICLE_REGISTRATION,
-    );
 
-    if (!hasSelfie || !hasLicense || !hasIdentity || !hasVehicleRegistration) {
+    if (!hasSelfie || !hasLicense || !hasIdentity) {
       throw new BadRequestException(
-        'Upload selfie, license, identity, and vehicle registration documents before submitting.',
+        'Upload selfie, license, and identity documents before submitting.',
       );
     }
   }
@@ -1581,19 +1264,6 @@ export class UserService {
       insurancePolicyNumber: driverProfile.insurancePolicyNumber,
       selfieStorageBucket: driverProfile.selfieStorageBucket,
       selfieStoragePath: driverProfile.selfieStoragePath,
-      vehicle: driverProfile.vehicle
-        ? {
-            category: driverProfile.vehicle.category,
-            plateNumber: driverProfile.vehicle.plateNumber,
-            vin: driverProfile.vehicle.vin,
-            make: driverProfile.vehicle.make,
-            model: driverProfile.vehicle.model,
-            color: driverProfile.vehicle.color,
-            capacityKg: driverProfile.vehicle.capacityKg,
-            capacityVolumeCm3:
-              driverProfile.vehicle.capacityVolumeCm3?.toString() ?? null,
-          }
-        : null,
       complianceDocuments: driverProfile.complianceDocuments.map((document) => ({
         id: document.id,
         type: document.type,
@@ -1611,9 +1281,9 @@ export class UserService {
     tx: Prisma.TransactionClient,
     driverProfile: DriverProfileDbRecord,
   ): Promise<string> {
-    if (!driverProfile.driverType || !driverProfile.vehicle) {
+    if (!driverProfile.driverType) {
       throw new BadRequestException(
-        'Driver onboarding is missing required vehicle details.',
+        'Driver onboarding is missing a driver type.',
       );
     }
 
@@ -1641,37 +1311,10 @@ export class UserService {
       },
       `${driverProfile.legalFirstName ?? profile.firstName ?? ''} ${driverProfile.legalLastName ?? profile.lastName ?? ''}`.trim(),
       {
-        driverType: driverProfile.driverType as PrismaVehicleCategory,
+        driverType: driverProfile.driverType,
         isAvailable: false,
       },
     );
-
-    await tx.vehicle.upsert({
-      where: { providerId },
-      update: {
-        category: driverProfile.vehicle.category,
-        plateNumber: driverProfile.vehicle.plateNumber?.trim().toUpperCase() || null,
-        vin: driverProfile.vehicle.vin?.trim() || null,
-        make: driverProfile.vehicle.make?.trim() || null,
-        model: driverProfile.vehicle.model?.trim() || null,
-        color: driverProfile.vehicle.color?.trim() || null,
-        capacityKg: driverProfile.vehicle.capacityKg ?? null,
-        capacityVolumeCm3: driverProfile.vehicle.capacityVolumeCm3 ?? null,
-        status: 'active',
-      },
-      create: {
-        providerId,
-        category: driverProfile.vehicle.category,
-        plateNumber: driverProfile.vehicle.plateNumber?.trim().toUpperCase() || null,
-        vin: driverProfile.vehicle.vin?.trim() || null,
-        make: driverProfile.vehicle.make?.trim() || null,
-        model: driverProfile.vehicle.model?.trim() || null,
-        color: driverProfile.vehicle.color?.trim() || null,
-        capacityKg: driverProfile.vehicle.capacityKg ?? null,
-        capacityVolumeCm3: driverProfile.vehicle.capacityVolumeCm3 ?? null,
-        status: 'active',
-      },
-    });
 
     return providerId;
   }
@@ -1701,21 +1344,6 @@ export class UserService {
       submittedAt: driverProfile.submittedAt ?? null,
       reviewedAt: driverProfile.reviewedAt ?? null,
       approvedAt: driverProfile.approvedAt ?? null,
-      vehicle: driverProfile.vehicle
-        ? {
-            id: driverProfile.vehicle.id,
-            category: driverProfile.vehicle.category,
-            plateNumber: driverProfile.vehicle.plateNumber ?? null,
-            vin: driverProfile.vehicle.vin ?? null,
-            make: driverProfile.vehicle.make ?? null,
-            model: driverProfile.vehicle.model ?? null,
-            color: driverProfile.vehicle.color ?? null,
-            capacityKg: driverProfile.vehicle.capacityKg ?? null,
-            capacityVolumeCm3: driverProfile.vehicle.capacityVolumeCm3 ?? null,
-            createdAt: driverProfile.vehicle.createdAt,
-            updatedAt: driverProfile.vehicle.updatedAt,
-          }
-        : null,
       complianceDocuments: driverProfile.complianceDocuments.map((document) => ({
         id: document.id,
         type: document.type,
@@ -1809,7 +1437,7 @@ export class UserService {
     },
     businessName?: string,
     options?: {
-      driverType?: PrismaVehicleCategory | null;
+      driverType?: DriverType | null;
       isAvailable?: boolean;
     },
   ): Promise<string> {

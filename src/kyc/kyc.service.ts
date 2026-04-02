@@ -11,31 +11,25 @@ import {
   ProviderKycCheck as PrismaProviderKycCheck,
   ProviderKycMedia as PrismaProviderKycMedia,
   ProviderKycProfile as PrismaProviderKycProfile,
-  Vehicle as PrismaVehicle,
 } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import {
   CreateKycUploadUrlDto,
-  CreateVehicleDto,
   KycUploadUrl,
   MyKycChecksFilterDto,
   ProviderKycCheck,
   ProviderKycStatus,
   StartNinFaceVerificationDto,
   StartPhoneVerificationDto,
-  StartVehiclePlateVerificationDto,
-  StartVehicleVinVerificationDto,
   SyncKycStatusDto,
   UserType,
-  Vehicle,
-  VehicleStatus,
 } from '../graphql';
 import { resolveProfileRole } from '../auth/utils/roles.util';
 import { GoogleStorageService } from '../storage/google-storage.service';
 import { PremblyClient } from './prembly.client';
 
-type KycCheckType = 'nin_face' | 'phone' | 'vehicle_plate' | 'vehicle_vin';
+type KycCheckType = 'nin_face' | 'phone';
 type KycCheckStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
 type NormalizedCheckResult = {
@@ -54,7 +48,6 @@ type NormalizedCheckResult = {
 
 type CreateCheckOptions = {
   mediaId?: string;
-  vehicleId?: string;
   rawRequest?: Record<string, unknown>;
 };
 
@@ -239,114 +232,6 @@ export class KycService {
     return this.toGraphqlKycCheck(check);
   }
 
-  async startVehiclePlateVerification(
-    profileId: string,
-    input: StartVehiclePlateVerificationDto,
-  ): Promise<ProviderKycCheck> {
-    const providerId = await this.requireAuthorizedProviderId(
-      profileId,
-      input.providerId,
-    );
-    const vehicle = await this.resolveProviderVehicle(
-      providerId,
-      input.vehicleId,
-    );
-
-    const plateNumber =
-      input.plateNumber?.trim().toUpperCase() ??
-      vehicle?.plateNumber?.trim().toUpperCase();
-    if (!plateNumber) {
-      throw new BadRequestException(
-        'plateNumber is required when selected vehicle has no plate number',
-      );
-    }
-
-    const response = await this.premblyClient.verifyPlate({
-      plateNumber,
-    });
-
-    const normalized = this.normalizePlateResult(plateNumber, response);
-    const check = await this.createCheckAndRefreshProfile(
-      providerId,
-      profileId,
-      normalized,
-      {
-        vehicleId: vehicle?.id,
-        rawRequest: {
-          vehicleId: vehicle?.id,
-          plateNumber,
-        },
-      },
-    );
-
-    if (vehicle) {
-      await this.updateVehicleVerificationSnapshot(vehicle.id, {
-        plateNumber,
-        plateVerificationStatus: normalized.status,
-        verifiedAt: normalized.verifiedAt,
-        failedAt: normalized.failedAt,
-        message: normalized.message,
-      });
-    }
-
-    return this.toGraphqlKycCheck(check);
-  }
-
-  async startVehicleVinVerification(
-    profileId: string,
-    input: StartVehicleVinVerificationDto,
-  ): Promise<ProviderKycCheck> {
-    if (!this.isVinVerificationEnabled()) {
-      throw new BadRequestException(
-        'VIN verification is not configured for this environment',
-      );
-    }
-
-    const providerId = await this.requireAuthorizedProviderId(
-      profileId,
-      input.providerId,
-    );
-    const vehicle = await this.resolveProviderVehicle(
-      providerId,
-      input.vehicleId,
-    );
-
-    const vin =
-      input.vin?.trim().toUpperCase() ?? vehicle?.vin?.trim().toUpperCase();
-
-    if (!vin) {
-      throw new BadRequestException('vin is required for VIN verification');
-    }
-
-    const response = await this.premblyClient.verifyVin({ vin });
-    const normalized = this.normalizeVinResult(vin, response);
-
-    const check = await this.createCheckAndRefreshProfile(
-      providerId,
-      profileId,
-      normalized,
-      {
-        vehicleId: vehicle?.id,
-        rawRequest: {
-          vehicleId: vehicle?.id,
-          vin,
-        },
-      },
-    );
-
-    if (vehicle) {
-      await this.updateVehicleVerificationSnapshot(vehicle.id, {
-        vin,
-        vinVerificationStatus: normalized.status,
-        verifiedAt: normalized.verifiedAt,
-        failedAt: normalized.failedAt,
-        message: normalized.message,
-      });
-    }
-
-    return this.toGraphqlKycCheck(check);
-  }
-
   async syncKycStatus(
     profileId: string,
     input: SyncKycStatusDto,
@@ -398,79 +283,6 @@ export class KycService {
     }
 
     return updatedChecks;
-  }
-
-  async createVehicle(
-    profileId: string,
-    input: CreateVehicleDto,
-  ): Promise<Vehicle> {
-    const providerId = await this.requireAuthorizedProviderId(
-      profileId,
-      input.providerId,
-    );
-
-    const existingVehicle = await this.prisma.vehicle.findUnique({
-      where: {
-        providerId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    const created = existingVehicle
-      ? await this.prisma.vehicle.update({
-          where: {
-            id: existingVehicle.id,
-          },
-          data: {
-            category: input.category,
-            plateNumber: input.plateNumber?.trim().toUpperCase(),
-            vin: input.vin?.trim().toUpperCase(),
-            make: input.make?.trim(),
-            model: input.model?.trim(),
-            color: input.color?.trim(),
-            capacityKg: input.capacityKg,
-            capacityVolumeCm3: this.parseOptionalBigInt(
-              input.capacityVolumeCm3,
-            ),
-            status: VehicleStatus.ACTIVE,
-          },
-        })
-      : await this.prisma.vehicle.create({
-      data: {
-        providerId,
-        category: input.category,
-        plateNumber: input.plateNumber?.trim().toUpperCase(),
-        vin: input.vin?.trim().toUpperCase(),
-        make: input.make?.trim(),
-        model: input.model?.trim(),
-        color: input.color?.trim(),
-        capacityKg: input.capacityKg,
-        capacityVolumeCm3: this.parseOptionalBigInt(input.capacityVolumeCm3),
-        status: VehicleStatus.ACTIVE,
-      },
-        });
-
-    return this.toGraphqlVehicle(created);
-  }
-
-  async getVehicles(profileId: string): Promise<Vehicle[]> {
-    const providerId = await this.resolveProviderIdForProfile(profileId);
-    if (!providerId) {
-      return [];
-    }
-
-    const vehicles = await this.prisma.vehicle.findMany({
-      where: {
-        providerId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    return vehicles.map((vehicle) => this.toGraphqlVehicle(vehicle));
   }
 
   async handlePremblyWebhook(
@@ -577,7 +389,6 @@ export class KycService {
     const data: Prisma.ProviderKycCheckUncheckedCreateInput = {
       providerId,
       profileId: profile.id,
-      vehicleId: options.vehicleId,
       checkType: normalized.checkType,
       status: normalized.status,
       vendor: 'prembly',
@@ -626,7 +437,6 @@ export class KycService {
             verifiedAt: normalized.verifiedAt,
             failedAt: normalized.failedAt,
             initiatedByProfileId,
-            vehicleId: options.vehicleId ?? existing.vehicleId,
           },
         });
       } else {
@@ -709,19 +519,13 @@ export class KycService {
 
     const ninCheck = latestByType.get('nin_face');
     const phoneCheck = latestByType.get('phone');
-    const plateCheck = latestByType.get('vehicle_plate');
-    const vinCheck = latestByType.get('vehicle_vin');
-
     const ninStatus = this.normalizeStoredStatus(ninCheck?.status);
     const faceStatus = ninStatus;
     const phoneStatus = this.normalizeStoredStatus(phoneCheck?.status);
-    const vehiclePlateStatus = this.normalizeStoredStatus(plateCheck?.status);
-    const vehicleVinStatus = this.normalizeStoredStatus(vinCheck?.status);
 
     const requiredStatuses: KycCheckStatus[] = [
       ninStatus,
       phoneStatus,
-      vehiclePlateStatus,
     ];
 
     const overallStatus = this.calculateOverallStatus(requiredStatuses);
@@ -729,11 +533,9 @@ export class KycService {
       ninStatus,
       faceStatus,
       phoneStatus,
-      vehiclePlateStatus,
-      vehicleVinStatus,
     });
 
-    const failedMessages = [ninCheck, phoneCheck, plateCheck, vinCheck]
+    const failedMessages = [ninCheck, phoneCheck]
       .filter(
         (check) =>
           check && this.normalizeStoredStatus(check.status) === 'failed',
@@ -754,8 +556,6 @@ export class KycService {
         ninStatus,
         phoneStatus,
         faceStatus,
-        vehiclePlateStatus,
-        vehicleVinStatus,
         ninVerifiedAt:
           ninStatus === 'verified'
             ? (ninCheck?.verifiedAt ?? new Date())
@@ -767,14 +567,6 @@ export class KycService {
         faceVerifiedAt:
           faceStatus === 'verified'
             ? (ninCheck?.verifiedAt ?? new Date())
-            : null,
-        vehiclePlateVerifiedAt:
-          vehiclePlateStatus === 'verified'
-            ? (plateCheck?.verifiedAt ?? new Date())
-            : null,
-        vehicleVinVerifiedAt:
-          vehicleVinStatus === 'verified'
-            ? (vinCheck?.verifiedAt ?? new Date())
             : null,
         faceConfidence: ninCheck?.confidence ?? undefined,
         maskedNin: ninCheck?.maskedIdentifier ?? null,
@@ -791,8 +583,6 @@ export class KycService {
         ninStatus,
         phoneStatus,
         faceStatus,
-        vehiclePlateStatus,
-        vehicleVinStatus,
         ninVerifiedAt:
           ninStatus === 'verified'
             ? (ninCheck?.verifiedAt ?? new Date())
@@ -804,14 +594,6 @@ export class KycService {
         faceVerifiedAt:
           faceStatus === 'verified'
             ? (ninCheck?.verifiedAt ?? new Date())
-            : null,
-        vehiclePlateVerifiedAt:
-          vehiclePlateStatus === 'verified'
-            ? (plateCheck?.verifiedAt ?? new Date())
-            : null,
-        vehicleVinVerifiedAt:
-          vehicleVinStatus === 'verified'
-            ? (vinCheck?.verifiedAt ?? new Date())
             : null,
         faceConfidence: ninCheck?.confidence ?? null,
         maskedNin: ninCheck?.maskedIdentifier ?? null,
@@ -853,8 +635,6 @@ export class KycService {
     ninStatus: KycCheckStatus;
     faceStatus: KycCheckStatus;
     phoneStatus: KycCheckStatus;
-    vehiclePlateStatus: KycCheckStatus;
-    vehicleVinStatus: KycCheckStatus;
   }): number {
     let level = 0;
 
@@ -862,12 +642,6 @@ export class KycService {
       level += 1;
     }
     if (input.phoneStatus === 'verified') {
-      level += 1;
-    }
-    if (input.vehiclePlateStatus === 'verified') {
-      level += 1;
-    }
-    if (input.vehicleVinStatus === 'verified') {
       level += 1;
     }
 
@@ -1007,124 +781,6 @@ export class KycService {
     };
   }
 
-  private normalizePlateResult(
-    plateNumber: string,
-    response: Record<string, unknown>,
-    existingMasked?: string,
-  ): NormalizedCheckResult {
-    const dataObject = this.readObject(response.data);
-    const root = dataObject ?? response;
-    const verification = this.readObject(root.verification);
-
-    const statusFlag = this.readBoolean(root.status);
-    const responseCode =
-      this.readString(root.response_code) ??
-      this.readString(root.responseCode) ??
-      undefined;
-    const verificationStatus = this.readString(
-      verification?.status,
-    )?.toUpperCase();
-
-    const isVerified =
-      verificationStatus === 'VERIFIED' ||
-      (Boolean(statusFlag) && (responseCode === '00' || !responseCode));
-
-    const vendorReference =
-      this.readString(verification?.reference) ??
-      this.readString(root.reference) ??
-      undefined;
-
-    const status: KycCheckStatus = isVerified
-      ? 'verified'
-      : statusFlag
-        ? 'pending'
-        : 'failed';
-
-    const message =
-      this.readString(root.detail) ??
-      this.readString(root.message) ??
-      this.readString(verification?.message) ??
-      undefined;
-
-    return {
-      checkType: 'vehicle_plate',
-      status,
-      responseCode,
-      message,
-      vendorReference,
-      maskedIdentifier: existingMasked ?? this.maskPlate(plateNumber),
-      normalizedData: this.toJsonValue({
-        source: 'prembly',
-        vehicleNumber:
-          this.readString(this.readObject(root.data)?.vehicle_number) ??
-          plateNumber,
-        vehicleName: this.readString(this.readObject(root.data)?.vehicle_name),
-        vehicleColor: this.readString(
-          this.readObject(root.data)?.vehicle_color,
-        ),
-        reference: vendorReference,
-      }) as Prisma.InputJsonValue,
-      rawResponse: this.toJsonValue(response) as Prisma.InputJsonValue,
-      verifiedAt: status === 'verified' ? new Date() : undefined,
-      failedAt: status === 'failed' ? new Date() : undefined,
-    };
-  }
-
-  private normalizeVinResult(
-    vin: string,
-    response: Record<string, unknown>,
-    existingMasked?: string,
-  ): NormalizedCheckResult {
-    const dataObject = this.readObject(response.data);
-    const root = dataObject ?? response;
-    const verification = this.readObject(root.verification);
-
-    const statusFlag = this.readBoolean(root.status);
-    const responseCode =
-      this.readString(root.response_code) ??
-      this.readString(root.responseCode) ??
-      undefined;
-    const verificationStatus = this.readString(
-      verification?.status,
-    )?.toUpperCase();
-
-    const isVerified =
-      verificationStatus === 'VERIFIED' ||
-      (Boolean(statusFlag) && (responseCode === '00' || !responseCode));
-
-    const vendorReference =
-      this.readString(verification?.reference) ??
-      this.readString(root.reference) ??
-      undefined;
-
-    const status: KycCheckStatus = isVerified
-      ? 'verified'
-      : statusFlag
-        ? 'pending'
-        : 'failed';
-
-    return {
-      checkType: 'vehicle_vin',
-      status,
-      responseCode,
-      message:
-        this.readString(root.detail) ??
-        this.readString(root.message) ??
-        this.readString(verification?.message) ??
-        undefined,
-      vendorReference,
-      maskedIdentifier: existingMasked ?? this.maskVin(vin),
-      normalizedData: this.toJsonValue({
-        source: 'prembly',
-        vin: this.readString(this.readObject(root.data)?.vin) ?? vin,
-        reference: vendorReference,
-      }) as Prisma.InputJsonValue,
-      rawResponse: this.toJsonValue(response) as Prisma.InputJsonValue,
-      verifiedAt: status === 'verified' ? new Date() : undefined,
-      failedAt: status === 'failed' ? new Date() : undefined,
-    };
-  }
-
   private normalizeResultByCheckType(
     checkType: KycCheckType,
     response: Record<string, unknown>,
@@ -1138,11 +794,7 @@ export class KycService {
       return this.normalizePhoneResult('', response, existingMasked);
     }
 
-    if (checkType === 'vehicle_plate') {
-      return this.normalizePlateResult('', response, existingMasked);
-    }
-
-    return this.normalizeVinResult('', response, existingMasked);
+    throw new BadRequestException(`Unsupported KYC check type ${checkType}`);
   }
 
   private async resolveSyncTargets(
@@ -1369,28 +1021,6 @@ export class KycService {
     return media;
   }
 
-  private async resolveProviderVehicle(
-    providerId: string,
-    vehicleId?: string,
-  ): Promise<PrismaVehicle | null> {
-    if (!vehicleId?.trim()) {
-      return null;
-    }
-
-    const vehicle = await this.prisma.vehicle.findFirst({
-      where: {
-        id: vehicleId.trim(),
-        providerId,
-      },
-    });
-
-    if (!vehicle) {
-      throw new NotFoundException(`Vehicle ${vehicleId} not found`);
-    }
-
-    return vehicle;
-  }
-
   private async fetchMediaAsBase64(
     bucket: string,
     path: string,
@@ -1412,45 +1042,6 @@ export class KycService {
       this.configService.get<string>('STORAGE_BUCKET_NAME')?.trim() ||
       'kyc-verifications'
     );
-  }
-
-  private async updateVehicleVerificationSnapshot(
-    vehicleId: string,
-    input: {
-      plateNumber?: string;
-      vin?: string;
-      plateVerificationStatus?: string;
-      vinVerificationStatus?: string;
-      verifiedAt?: Date;
-      failedAt?: Date;
-      message?: string;
-    },
-  ): Promise<void> {
-    await this.prisma.vehicle.update({
-      where: {
-        id: vehicleId,
-      },
-      data: {
-        plateNumber: input.plateNumber,
-        vin: input.vin,
-        plateVerificationStatus: input.plateVerificationStatus,
-        vinVerificationStatus: input.vinVerificationStatus,
-        lastVerificationAt: input.verifiedAt ?? input.failedAt ?? new Date(),
-        verificationFailureReason:
-          input.failedAt ||
-          input.plateVerificationStatus === 'failed' ||
-          input.vinVerificationStatus === 'failed'
-            ? (input.message ?? 'Vehicle verification failed')
-            : null,
-      },
-    });
-  }
-
-  private isVinVerificationEnabled(): boolean {
-    const vinEndpoint = this.configService
-      .get<string>('PREMBLY_VIN_ENDPOINT')
-      ?.trim();
-    return Boolean(vinEndpoint);
   }
 
   private isStatusPollingEnabled(): boolean {
@@ -1650,27 +1241,15 @@ export class KycService {
     if (normalized === 'phone') {
       return 'phone';
     }
-    if (normalized === 'vehicle_plate' || normalized === 'plate') {
-      return 'vehicle_plate';
-    }
-    if (normalized === 'vehicle_vin' || normalized === 'vin') {
-      return 'vehicle_vin';
-    }
 
     throw new BadRequestException(
-      'Invalid check type filter. Use: nin_face, phone, vehicle_plate, vehicle_vin',
+      'Invalid check type filter. Use: nin_face or phone',
     );
   }
 
   private humanizeCheckType(checkType: string): string {
     if (checkType === 'nin_face') {
       return 'NIN + Face';
-    }
-    if (checkType === 'vehicle_plate') {
-      return 'Vehicle Plate';
-    }
-    if (checkType === 'vehicle_vin') {
-      return 'Vehicle VIN';
     }
     return 'Phone';
   }
@@ -1776,28 +1355,6 @@ export class KycService {
     return `${trimmed.slice(0, 3)}${'*'.repeat(Math.max(trimmed.length - 5, 3))}${trimmed.slice(-2)}`;
   }
 
-  private maskPlate(plate: string): string {
-    const trimmed = plate.trim().toUpperCase();
-    if (!trimmed) {
-      return '***';
-    }
-    if (trimmed.length <= 3) {
-      return `${trimmed[0] ?? '*'}**`;
-    }
-    return `${trimmed.slice(0, 3)}***`;
-  }
-
-  private maskVin(vin: string): string {
-    const trimmed = vin.trim().toUpperCase();
-    if (!trimmed) {
-      return '***';
-    }
-    if (trimmed.length <= 6) {
-      return `${trimmed.slice(0, 2)}***${trimmed.slice(-1)}`;
-    }
-    return `${trimmed.slice(0, 3)}${'*'.repeat(trimmed.length - 6)}${trimmed.slice(-3)}`;
-  }
-
   private toGraphqlKycStatus(
     profile: PrismaProviderKycProfile,
   ): ProviderKycStatus {
@@ -1809,13 +1366,9 @@ export class KycService {
       ninStatus: profile.ninStatus,
       phoneStatus: profile.phoneStatus,
       faceStatus: profile.faceStatus,
-      vehiclePlateStatus: profile.vehiclePlateStatus,
-      vehicleVinStatus: profile.vehicleVinStatus,
       ninVerifiedAt: profile.ninVerifiedAt ?? undefined,
       phoneVerifiedAt: profile.phoneVerifiedAt ?? undefined,
       faceVerifiedAt: profile.faceVerifiedAt ?? undefined,
-      vehiclePlateVerifiedAt: profile.vehiclePlateVerifiedAt ?? undefined,
-      vehicleVinVerifiedAt: profile.vehicleVinVerifiedAt ?? undefined,
       faceConfidence: profile.faceConfidence
         ? Number(profile.faceConfidence)
         : undefined,
@@ -1834,7 +1387,6 @@ export class KycService {
       id: check.id,
       providerId: check.providerId,
       profileId: check.profileId ?? undefined,
-      vehicleId: check.vehicleId ?? undefined,
       checkType: check.checkType,
       status: check.status,
       vendor: check.vendor,
@@ -1852,34 +1404,6 @@ export class KycService {
       initiatedByProfileId: check.initiatedByProfileId ?? undefined,
       createdAt: check.createdAt,
       updatedAt: check.updatedAt,
-    };
-  }
-
-  private toGraphqlVehicle(vehicle: PrismaVehicle): Vehicle {
-    const normalizedStatus =
-      vehicle.status &&
-      Object.values(VehicleStatus).includes(vehicle.status as VehicleStatus)
-        ? (vehicle.status as VehicleStatus)
-        : VehicleStatus.ACTIVE;
-
-    return {
-      id: vehicle.id,
-      providerId: vehicle.providerId,
-      category: vehicle.category as Vehicle['category'],
-      plateNumber: vehicle.plateNumber ?? undefined,
-      vin: vehicle.vin ?? undefined,
-      make: vehicle.make ?? undefined,
-      model: vehicle.model ?? undefined,
-      color: vehicle.color ?? undefined,
-      capacityKg: vehicle.capacityKg ?? undefined,
-      capacityVolumeCm3: vehicle.capacityVolumeCm3 ?? undefined,
-      plateVerificationStatus: vehicle.plateVerificationStatus ?? undefined,
-      vinVerificationStatus: vehicle.vinVerificationStatus ?? undefined,
-      lastVerificationAt: vehicle.lastVerificationAt ?? undefined,
-      verificationFailureReason: vehicle.verificationFailureReason ?? undefined,
-      status: normalizedStatus,
-      createdAt: vehicle.createdAt,
-      updatedAt: vehicle.updatedAt,
     };
   }
 }

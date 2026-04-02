@@ -3,14 +3,7 @@ import {
   OnboardingStep,
   PublicRole,
   UserRole,
-  VehicleCategory,
 } from '../graphql/enums';
-
-type DriverVehicleShape = {
-  category?: string | null;
-  plateNumber?: string | null;
-  capacityKg?: number | null;
-};
 
 export type DriverProviderShape = {
   id: string;
@@ -18,7 +11,6 @@ export type DriverProviderShape = {
   driverType?: string | null;
   isAvailable?: boolean | null;
   availabilityUpdatedAt?: Date | null;
-  vehicle?: DriverVehicleShape | null;
 };
 
 type DriverMembershipShape = {
@@ -39,36 +31,16 @@ export type DriverOnboardingProfileShape = {
 export const normalizeDriverType = (
   value?: string | null,
 ): DriverType | null => {
-  if (value === DriverType.BIKE || value === VehicleCategory.BIKE) {
+  if (value === DriverType.BIKE) {
     return DriverType.BIKE;
   }
 
-  if (value === DriverType.VAN || value === VehicleCategory.VAN) {
+  if (value === DriverType.VAN) {
     return DriverType.VAN;
   }
 
-  if (value === DriverType.TRUCK || value === VehicleCategory.TRUCK) {
+  if (value === DriverType.TRUCK) {
     return DriverType.TRUCK;
-  }
-
-  return null;
-};
-
-export const mapDriverTypeToVehicleCategory = (
-  driverType?: string | null,
-): VehicleCategory | null => {
-  const normalizedDriverType = normalizeDriverType(driverType);
-
-  if (normalizedDriverType === DriverType.BIKE) {
-    return VehicleCategory.BIKE;
-  }
-
-  if (normalizedDriverType === DriverType.VAN) {
-    return VehicleCategory.VAN;
-  }
-
-  if (normalizedDriverType === DriverType.TRUCK) {
-    return VehicleCategory.TRUCK;
   }
 
   return null;
@@ -83,19 +55,7 @@ export const hasCompletedDriverRegistration = (
   provider?: DriverProviderShape | null,
 ): boolean => {
   const normalizedDriverType = normalizeDriverType(provider?.driverType);
-  const expectedCategory = mapDriverTypeToVehicleCategory(normalizedDriverType);
-
-  if (!normalizedDriverType || !expectedCategory) {
-    return false;
-  }
-
-  return Boolean(
-    provider?.vehicle &&
-      provider.vehicle.category === expectedCategory &&
-      Boolean(provider.vehicle.plateNumber?.trim()) &&
-      typeof provider.vehicle.capacityKg === 'number' &&
-      provider.vehicle.capacityKg > 0,
-  );
+  return Boolean(normalizedDriverType);
 };
 
 export const resolvePublicRole = (

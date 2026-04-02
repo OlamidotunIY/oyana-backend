@@ -13,14 +13,11 @@ import {
 } from '../graphql/types/core';
 import {
   AddDriverComplianceDocumentInput,
-  CompleteDriverRegistrationInput,
   CreateDriverDocumentUploadUrlInput,
   CreateProfileImageUploadUrlInput,
   ReviewDriverOnboardingInput,
   SaveDriverIdentityInfoInput,
   SaveDriverPersonalInfoInput,
-  SaveDriverVehicleInput,
-  SetProviderAvailabilityInput,
   SetProfileImageInput,
   SubmitDriverOnboardingInput,
   SwitchAppModeInput,
@@ -119,15 +116,6 @@ export class UserResolver {
 
   @Mutation(() => DriverProfileRecord)
   @UseGuards(GqlAuthGuard)
-  async saveDriverVehicle(
-    @CurrentUser() user: AuthUser,
-    @Args('input') input: SaveDriverVehicleInput,
-  ): Promise<DriverProfileRecord> {
-    return this.userService.saveDriverVehicle(user.id, input);
-  }
-
-  @Mutation(() => DriverProfileRecord)
-  @UseGuards(GqlAuthGuard)
   async addDriverComplianceDocument(
     @CurrentUser() user: AuthUser,
     @Args('input') input: AddDriverComplianceDocumentInput,
@@ -170,24 +158,6 @@ export class UserResolver {
     @Args('input') input: UpdateDriverPresenceInput,
   ): Promise<DriverPresenceRecord> {
     return this.userService.updateDriverPresence(user.id, input);
-  }
-
-  @Mutation(() => Profile)
-  @UseGuards(GqlAuthGuard)
-  async completeDriverRegistration(
-    @CurrentUser() user: AuthUser,
-    @Args('input') input: CompleteDriverRegistrationInput,
-  ): Promise<Profile> {
-    return this.userService.completeDriverRegistration(user.id, input);
-  }
-
-  @Mutation(() => Profile)
-  @UseGuards(GqlAuthGuard)
-  async setProviderAvailability(
-    @CurrentUser() user: AuthUser,
-    @Args('input') input: SetProviderAvailabilityInput,
-  ): Promise<Profile> {
-    return this.userService.setProviderAvailability(user.id, input);
   }
 
   @Query(() => NotificationSettings)

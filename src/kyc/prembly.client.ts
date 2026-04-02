@@ -5,8 +5,6 @@ import axios, { AxiosError, AxiosInstance } from 'axios';
 export type PremblyCheckType =
   | 'nin_face'
   | 'phone'
-  | 'vehicle_plate'
-  | 'vehicle_vin'
   | 'status';
 
 @Injectable()
@@ -54,20 +52,6 @@ export class PremblyClient {
     });
   }
 
-  async verifyPlate(input: {
-    plateNumber: string;
-  }): Promise<Record<string, unknown>> {
-    return this.postByType('vehicle_plate', {
-      vehicle_number: input.plateNumber,
-    });
-  }
-
-  async verifyVin(input: { vin: string }): Promise<Record<string, unknown>> {
-    return this.postByType('vehicle_vin', {
-      vin: input.vin,
-    });
-  }
-
   async fetchStatus(input: {
     reference: string;
   }): Promise<Record<string, unknown>> {
@@ -82,12 +66,6 @@ export class PremblyClient {
         .get<string>('PREMBLY_NIN_FACE_ENDPOINT')
         ?.trim(),
       phone: this.configService.get<string>('PREMBLY_PHONE_ENDPOINT')?.trim(),
-      vehicle_plate: this.configService
-        .get<string>('PREMBLY_PLATE_ENDPOINT')
-        ?.trim(),
-      vehicle_vin: this.configService
-        .get<string>('PREMBLY_VIN_ENDPOINT')
-        ?.trim(),
       status: this.configService.get<string>('PREMBLY_STATUS_ENDPOINT')?.trim(),
     }[type];
 
@@ -99,9 +77,6 @@ export class PremblyClient {
       nin_face: '/api/v1/biometrics/merchant/data/verification/nin_face',
       phone:
         '/api/v1/biometrics/merchant/data/verification/basic_phone_number_1',
-      vehicle_plate:
-        '/api/v1/biometrics/merchant/data/verification/plate_number',
-      vehicle_vin: undefined,
       status: undefined,
     };
 

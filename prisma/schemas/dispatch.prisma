@@ -48,7 +48,6 @@ model DispatchOffer {
   batchId            String              @map("batch_id") @db.Uuid
   shipmentId         String              @map("shipment_id") @db.Uuid
   providerId         String              @map("provider_id") @db.Uuid
-  vehicleId          String?             @map("vehicle_id") @db.Uuid
   status             DispatchOfferStatus @default(sent)
   sentAt             DateTime?           @map("sent_at") @db.Timestamptz(6)
   respondedAt        DateTime?           @map("responded_at") @db.Timestamptz(6)
@@ -62,7 +61,6 @@ model DispatchOffer {
   batch      DispatchBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
   shipment   Shipment            @relation("ShipmentDispatchOffers", fields: [shipmentId], references: [id], onDelete: Cascade)
   provider   Provider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  vehicle    Vehicle?            @relation(fields: [vehicleId], references: [id])
   assignment ShipmentAssignment?
 
   @@unique([batchId, providerId])
@@ -76,7 +74,6 @@ model ShipmentAssignment {
   id                 String                   @id @default(uuid()) @db.Uuid
   shipmentId         String                   @unique @map("shipment_id") @db.Uuid
   providerId         String                   @map("provider_id") @db.Uuid
-  vehicleId          String?                  @map("vehicle_id") @db.Uuid
   driverProfileId    String?                  @map("driver_profile_id") @db.Uuid
   dispatchOfferId    String?                  @unique @map("dispatch_offer_id") @db.Uuid
   status             ShipmentAssignmentStatus @default(active)
@@ -92,7 +89,6 @@ model ShipmentAssignment {
   // Relations
   shipment      Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   provider      Provider       @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  vehicle       Vehicle?       @relation(fields: [vehicleId], references: [id])
   driver        Profile?       @relation(fields: [driverProfileId], references: [id])
   dispatchOffer DispatchOffer? @relation(fields: [dispatchOfferId], references: [id])
 

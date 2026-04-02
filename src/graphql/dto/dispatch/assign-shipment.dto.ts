@@ -10,9 +10,6 @@ export class AssignShipmentDto {
   providerId: string;
 
   @Field(() => String, { nullable: true })
-  vehicleId?: string;
-
-  @Field(() => String, { nullable: true })
   driverProfileId?: string;
 
   @Field(() => String, { nullable: true })

@@ -12,9 +12,6 @@ export class ProviderKycCheck {
   @Field(() => String, { nullable: true })
   profileId?: string;
 
-  @Field(() => String, { nullable: true })
-  vehicleId?: string;
-
   @Field()
   checkType: string;
 

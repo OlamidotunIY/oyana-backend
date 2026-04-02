@@ -53,7 +53,6 @@ const DISPATCH_ACCEPT_CONFLICT_MESSAGE =
 
 type EligibleDispatchProvider = {
   providerId: string;
-  vehicleId: string;
 };
 
 type DbRetryOptions = {
@@ -229,7 +228,6 @@ export class DispatchService {
           batchId: batch.id,
           shipmentId: shipment.id,
           providerId: provider.providerId,
-          vehicleId: provider.vehicleId,
           status: DispatchOfferStatus.SENT,
           sentAt: now,
           metadata: {
@@ -380,7 +378,6 @@ export class DispatchService {
         batchId: input.batchId,
         providerId: input.providerId,
         shipmentId: input.shipmentId,
-        vehicleId: input.vehicleId,
         status: DispatchOfferStatus.SENT,
         sentAt: new Date(),
         expiresAt: input.expiresAt,
@@ -421,7 +418,6 @@ export class DispatchService {
       data: {
         shipmentId: input.shipmentId,
         providerId: input.providerId,
-        vehicleId: input.vehicleId,
         driverProfileId: input.driverProfileId,
         dispatchOfferId: input.dispatchOfferId,
         agreedPriceMinor: input.agreedPriceMinor,
@@ -442,7 +438,6 @@ export class DispatchService {
       data: {
         shipmentId: input.shipmentId,
         providerId: input.providerId,
-        vehicleId: input.vehicleId,
         driverProfileId: input.driverProfileId,
         dispatchOfferId: input.dispatchOfferId,
         agreedPriceMinor: input.agreedPriceMinor,
@@ -764,6 +759,7 @@ export class DispatchService {
         },
         select: {
           isAvailable: true,
+          driverType: true,
         },
       });
 
@@ -805,44 +801,10 @@ export class DispatchService {
         );
       }
 
-      if (offer.vehicleId) {
-        const vehicle = await tx.vehicle.findFirst({
-          where: {
-            id: offer.vehicleId,
-            providerId,
-            status: 'active',
-            category: shipment.vehicleCategory,
-          },
-          select: {
-            id: true,
-          },
-        });
-
-        if (!vehicle) {
-          throw new ConflictException(
-            'Dispatch vehicle is no longer active for this shipment',
-          );
-        }
-      } else {
-        const fallbackVehicle = await tx.vehicle.findFirst({
-          where: {
-            providerId,
-            status: 'active',
-            category: shipment.vehicleCategory,
-          },
-          select: {
-            id: true,
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        });
-
-        if (!fallbackVehicle) {
-          throw new ConflictException(
-            'No active vehicle is available for this dispatch category',
-          );
-        }
+      if (provider.driverType !== shipment.vehicleCategory) {
+        throw new ConflictException(
+          'Driver category no longer matches this dispatch shipment',
+        );
       }
 
       if (!this.canRespondToOffer(offer.status)) {
@@ -922,7 +884,6 @@ export class DispatchService {
           data: {
             shipmentId: offer.shipmentId,
             providerId,
-            vehicleId: offer.vehicleId,
             dispatchOfferId: offer.id,
             status: ShipmentAssignmentStatus.ACTIVE,
             agreedPriceMinor:
@@ -1178,6 +1139,7 @@ export class DispatchService {
     const providers = await tx.provider.findMany({
       where: {
         isAvailable: true,
+        driverType: vehicleCategory,
         driverProfile: {
           is: {
             onboardingStatus: 'approved',
@@ -1195,12 +1157,6 @@ export class DispatchService {
             },
           },
         },
-        vehicle: {
-          is: {
-            category: vehicleCategory,
-            status: 'active',
-          },
-        },
       },
       orderBy: [
         { priorityScore: 'desc' },
@@ -1209,6 +1165,7 @@ export class DispatchService {
       ],
       select: {
         id: true,
+        driverType: true,
         driverProfile: {
           select: {
             presence: {
@@ -1219,9 +1176,6 @@ export class DispatchService {
               },
             },
           },
-        },
-        vehicle: {
-          select: { id: true, category: true, status: true },
         },
         shipmentAssignments: {
           where: {
@@ -1251,12 +1205,7 @@ export class DispatchService {
     const eligibleProviders: EligibleDispatchProvider[] = [];
 
     for (const provider of providers) {
-      const vehicle = provider.vehicle;
-      if (
-        !vehicle?.id ||
-        vehicle.category !== vehicleCategory ||
-        vehicle.status !== 'active'
-      ) {
+      if (provider.driverType !== vehicleCategory) {
         continue;
       }
 
@@ -1318,7 +1267,6 @@ export class DispatchService {
 
       eligibleProviders.push({
         providerId: provider.id,
-        vehicleId: vehicle.id,
       });
     }
 
@@ -1458,7 +1406,6 @@ export class DispatchService {
   private toGraphqlDispatchOffer(offer: PrismaDispatchOffer): DispatchOffer {
     return {
       ...offer,
-      vehicleId: offer.vehicleId ?? undefined,
       sentAt: offer.sentAt ?? undefined,
       respondedAt: offer.respondedAt ?? undefined,
       expiresAt: offer.expiresAt ?? undefined,
@@ -1472,7 +1419,6 @@ export class DispatchService {
   ): ShipmentAssignment {
     return {
       ...assignment,
-      vehicleId: assignment.vehicleId ?? undefined,
       driverProfileId: assignment.driverProfileId ?? undefined,
       dispatchOfferId: assignment.dispatchOfferId ?? undefined,
       agreedPriceMinor: assignment.agreedPriceMinor ?? undefined,

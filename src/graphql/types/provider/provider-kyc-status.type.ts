@@ -23,12 +23,6 @@ export class ProviderKycStatus {
   @Field()
   faceStatus: string;
 
-  @Field()
-  vehiclePlateStatus: string;
-
-  @Field()
-  vehicleVinStatus: string;
-
   @Field(() => Date, { nullable: true })
   ninVerifiedAt?: Date;
 
@@ -37,12 +31,6 @@ export class ProviderKycStatus {
 
   @Field(() => Date, { nullable: true })
   faceVerifiedAt?: Date;
-
-  @Field(() => Date, { nullable: true })
-  vehiclePlateVerifiedAt?: Date;
-
-  @Field(() => Date, { nullable: true })
-  vehicleVinVerifiedAt?: Date;
 
   @Field(() => Float, { nullable: true })
   faceConfidence?: number;

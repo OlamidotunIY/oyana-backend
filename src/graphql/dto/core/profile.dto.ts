@@ -22,7 +22,6 @@ import {
   PreferredLanguage,
   UserRole,
   UserStatus,
-  VehicleCategory,
 } from '../../enums';
 
 @InputType()
@@ -134,54 +133,6 @@ export class SetProfileImageInput {
 }
 
 @InputType()
-export class SetProviderAvailabilityInput {
-  @Field(() => Boolean)
-  @IsBoolean({ message: 'isAvailable must be a boolean value' })
-  isAvailable: boolean;
-}
-
-@InputType()
-export class CompleteDriverRegistrationInput {
-  @Field()
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2, { message: 'First name must be at least 2 characters long' })
-  @MaxLength(50, { message: 'First name must not exceed 50 characters' })
-  firstName: string;
-
-  @Field()
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(2, { message: 'Last name must be at least 2 characters long' })
-  @MaxLength(50, { message: 'Last name must not exceed 50 characters' })
-  lastName: string;
-
-  @Field(() => DriverType)
-  @IsEnum(DriverType, { message: 'Driver type must be a valid value' })
-  driverType: DriverType;
-
-  @Field(() => UserRole, { nullable: true })
-  @IsOptional()
-  @IsEnum(UserRole, { message: 'role must be a valid driver role' })
-  role?: UserRole;
-
-  @Field()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(24, { message: 'Plate number must not exceed 24 characters' })
-  plateNumber: string;
-
-  @Field(() => Int)
-  @IsInt({ message: 'capacityKg must be a whole number' })
-  @Min(1, { message: 'capacityKg must be greater than zero' })
-  capacityKg: number;
-
-  @Field(() => Boolean)
-  @IsBoolean({ message: 'isAvailable must be a boolean value' })
-  isAvailable: boolean;
-}
-
-@InputType()
 export class CreateDriverDocumentUploadUrlInput {
   @Field(() => DriverComplianceDocumentType)
   @IsEnum(DriverComplianceDocumentType)
@@ -271,53 +222,6 @@ export class SaveDriverIdentityInfoInput {
   @IsString()
   @MaxLength(64)
   insurancePolicyNumber?: string;
-}
-
-@InputType()
-export class SaveDriverVehicleInput {
-  @Field(() => VehicleCategory)
-  @IsEnum(VehicleCategory)
-  category: VehicleCategory;
-
-  @Field()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(24)
-  plateNumber: string;
-
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(32)
-  vin?: string;
-
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  make?: string;
-
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  model?: string;
-
-  @Field(() => String, { nullable: true })
-  @IsOptional()
-  @IsString()
-  @MaxLength(24)
-  color?: string;
-
-  @Field(() => Int)
-  @IsInt()
-  @Min(1)
-  capacityKg: number;
-
-  @Field(() => GraphQLBigInt, { nullable: true })
-  @IsOptional()
-  @Min(1)
-  capacityVolumeCm3?: bigint;
 }
 
 @InputType()

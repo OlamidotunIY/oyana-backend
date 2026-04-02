@@ -6,45 +6,7 @@ import {
   DriverComplianceDocumentType,
   DriverOnboardingStatus,
   NotificationCategory,
-  VehicleCategory,
 } from '../../enums';
-import { GraphQLBigInt } from '../../scalars';
-
-@ObjectType()
-export class DriverVehicleRecord {
-  @Field(() => ID)
-  id: string;
-
-  @Field(() => VehicleCategory)
-  category: VehicleCategory;
-
-  @Field(() => String, { nullable: true })
-  plateNumber?: string | null;
-
-  @Field(() => String, { nullable: true })
-  vin?: string | null;
-
-  @Field(() => String, { nullable: true })
-  make?: string | null;
-
-  @Field(() => String, { nullable: true })
-  model?: string | null;
-
-  @Field(() => String, { nullable: true })
-  color?: string | null;
-
-  @Field(() => Int, { nullable: true })
-  capacityKg?: number | null;
-
-  @Field(() => GraphQLBigInt, { nullable: true })
-  capacityVolumeCm3?: bigint | null;
-
-  @Field()
-  createdAt: Date;
-
-  @Field()
-  updatedAt: Date;
-}
 
 @ObjectType()
 export class DriverComplianceDocumentRecord {
@@ -212,9 +174,6 @@ export class DriverProfileRecord {
 
   @Field(() => Date, { nullable: true })
   approvedAt?: Date | null;
-
-  @Field(() => DriverVehicleRecord, { nullable: true })
-  vehicle?: DriverVehicleRecord | null;
 
   @Field(() => [DriverComplianceDocumentRecord])
   complianceDocuments: DriverComplianceDocumentRecord[];

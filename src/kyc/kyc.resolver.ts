@@ -7,18 +7,14 @@ import { MobileClientGuard } from '../auth/guards/mobile-client.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import {
   CreateKycUploadUrlDto,
-  CreateVehicleDto,
   KycUploadUrl,
   MyKycChecksFilterDto,
   ProviderKycCheck,
   ProviderKycStatus,
   StartNinFaceVerificationDto,
   StartPhoneVerificationDto,
-  StartVehiclePlateVerificationDto,
-  StartVehicleVinVerificationDto,
   SyncKycStatusDto,
   UserType,
-  Vehicle,
 } from '../graphql';
 import { KycService } from './kyc.service';
 import type { AuthUser } from '../auth/auth.types';
@@ -75,26 +71,6 @@ export class KycResolver {
     return this.kycService.startPhoneVerification(user.id, input);
   }
 
-  @Mutation(() => ProviderKycCheck)
-  @Roles(UserType.BUSINESS)
-  @UseGuards(MobileClientGuard)
-  async startVehiclePlateVerification(
-    @CurrentUser() user: AuthUser,
-    @Args('input') input: StartVehiclePlateVerificationDto,
-  ): Promise<ProviderKycCheck> {
-    return this.kycService.startVehiclePlateVerification(user.id, input);
-  }
-
-  @Mutation(() => ProviderKycCheck)
-  @Roles(UserType.BUSINESS)
-  @UseGuards(MobileClientGuard)
-  async startVehicleVinVerification(
-    @CurrentUser() user: AuthUser,
-    @Args('input') input: StartVehicleVinVerificationDto,
-  ): Promise<ProviderKycCheck> {
-    return this.kycService.startVehicleVinVerification(user.id, input);
-  }
-
   @Mutation(() => [ProviderKycCheck])
   @Roles(UserType.BUSINESS)
   @UseGuards(MobileClientGuard)
@@ -103,20 +79,5 @@ export class KycResolver {
     @Args('input') input: SyncKycStatusDto,
   ): Promise<ProviderKycCheck[]> {
     return this.kycService.syncKycStatus(user.id, input);
-  }
-
-  @Mutation(() => Vehicle)
-  @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async createVehicle(
-    @CurrentUser() user: AuthUser,
-    @Args('input') input: CreateVehicleDto,
-  ): Promise<Vehicle> {
-    return this.kycService.createVehicle(user.id, input);
-  }
-
-  @Query(() => [Vehicle])
-  @Roles(UserType.BUSINESS, UserType.ADMIN)
-  async myVehicles(@CurrentUser() user: AuthUser): Promise<Vehicle[]> {
-    return this.kycService.getVehicles(user.id);
   }
 }

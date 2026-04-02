@@ -60,7 +60,6 @@ export const DriverComplianceDocumentType = {
   IDENTITY_DOCUMENT: 'identity_document',
   NIN: 'nin',
   INSURANCE: 'insurance',
-  VEHICLE_REGISTRATION: 'vehicle_registration',
   PROOF_OF_ADDRESS: 'proof_of_address',
 } as const;
 export type DriverComplianceDocumentType =
@@ -186,14 +185,6 @@ export const DriverType = {
   TRUCK: 'truck',
 } as const;
 export type DriverType = (typeof DriverType)[keyof typeof DriverType];
-
-export { VehicleCategory as VehicleType };
-
-export enum VehicleStatus {
-  ACTIVE = 'active',
-  MAINTENANCE = 'maintenance',
-  INACTIVE = 'inactive',
-}
 
 // ============================================================================
 // SHIPMENT ENUMS
@@ -553,7 +544,6 @@ registerEnumType(ProviderStatus, { name: 'ProviderStatus' });
 registerEnumType(ProviderMemberRole, { name: 'ProviderMemberRole' });
 registerEnumType(VehicleCategory, { name: 'VehicleCategory' });
 registerEnumType(DriverType, { name: 'DriverType' });
-registerEnumType(VehicleStatus, { name: 'VehicleStatus' });
 registerEnumType(ShipmentMode, { name: 'ShipmentMode' });
 registerEnumType(ShipmentScheduleType, { name: 'ShipmentScheduleType' });
 registerEnumType(ShipmentStatus, { name: 'ShipmentStatus' });

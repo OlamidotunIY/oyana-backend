@@ -145,7 +145,6 @@ type DashboardShipmentRow = {
   };
   assignment: {
     providerId: string;
-    vehicleId: string | null;
   } | null;
 };
 
@@ -292,7 +291,6 @@ export class AdminOpsService {
           assignment: {
             select: {
               providerId: true,
-              vehicleId: true,
             },
           },
         },
@@ -324,7 +322,6 @@ export class AdminOpsService {
         },
         select: {
           providerId: true,
-          vehicleId: true,
         },
       }),
       this.notifications.summarizeByAudience(),
@@ -369,11 +366,7 @@ export class AdminOpsService {
 
     const activeTruckKeys = new Set<string>();
     for (const assignment of activeAssignments) {
-      activeTruckKeys.add(
-        assignment.vehicleId
-          ? `${assignment.providerId}:${assignment.vehicleId}`
-          : assignment.providerId,
-      );
+      activeTruckKeys.add(assignment.providerId);
     }
 
     return {
@@ -559,13 +552,6 @@ export class AdminOpsService {
             overallStatus: true,
           },
         },
-        vehicle: {
-          select: {
-            category: true,
-            plateNumber: true,
-            capacityKg: true,
-          },
-        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -589,9 +575,6 @@ export class AdminOpsService {
       isAvailable: provider.isAvailable,
       activeAddress: provider.contactProfile?.activeAddress?.address ?? null,
       activeCity: provider.contactProfile?.activeAddress?.city ?? null,
-      primaryVehicleCategory: provider.vehicle?.category ?? null,
-      primaryVehiclePlateNumber: provider.vehicle?.plateNumber ?? null,
-      primaryVehicleCapacityKg: provider.vehicle?.capacityKg ?? null,
       activeAssignments: provider._count.shipmentAssignments,
       openOffers: provider._count.dispatchOffers,
       kycStatus: provider.kycProfile?.overallStatus ?? 'unverified',
@@ -624,13 +607,9 @@ export class AdminOpsService {
       ninStatus: status.ninStatus,
       phoneStatus: status.phoneStatus,
       faceStatus: status.faceStatus,
-      vehiclePlateStatus: status.vehiclePlateStatus,
-      vehicleVinStatus: status.vehicleVinStatus,
       ninVerifiedAt: status.ninVerifiedAt ?? undefined,
       phoneVerifiedAt: status.phoneVerifiedAt ?? undefined,
       faceVerifiedAt: status.faceVerifiedAt ?? undefined,
-      vehiclePlateVerifiedAt: status.vehiclePlateVerifiedAt ?? undefined,
-      vehicleVinVerifiedAt: status.vehicleVinVerifiedAt ?? undefined,
       faceConfidence: status.faceConfidence
         ? Number(status.faceConfidence)
         : undefined,
@@ -664,7 +643,6 @@ export class AdminOpsService {
       id: item.id,
       providerId: item.providerId,
       profileId: item.profileId ?? undefined,
-      vehicleId: item.vehicleId ?? undefined,
       checkType: item.checkType,
       status: item.status,
       vendor: item.vendor,

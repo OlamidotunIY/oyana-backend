@@ -13,6 +13,8 @@ import {
   UpdateShipmentDto,
   CancelShipmentDto,
   AddShipmentItemDto,
+  EstimateShipmentBasePriceDto,
+  ShipmentBasePriceEstimate,
 } from '../graphql';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -71,6 +73,16 @@ export class ShipmentsResolver {
   @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
   async allowedShipmentCurrencies(): Promise<string[]> {
     return this.shipmentsService.getAllowedShipmentCurrencies();
+  }
+
+  @Query(() => ShipmentBasePriceEstimate)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL, UserType.BUSINESS)
+  async estimateShipmentBasePrice(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: EstimateShipmentBasePriceDto,
+  ): Promise<ShipmentBasePriceEstimate> {
+    return this.shipmentsService.estimateShipmentBasePrice(user.id, input);
   }
 
   @Query(() => ShipmentDashboard)
