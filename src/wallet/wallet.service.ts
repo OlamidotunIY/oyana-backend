@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type {
   PaymentIntent as PrismaPaymentIntent,
   Prisma,
@@ -51,6 +52,7 @@ const IDEMPOTENCY_OPERATION_CREATE_WITHDRAWAL = 'wallet_withdrawal_create';
 const MAX_TRANSACTIONS_PAGE_SIZE = 50;
 const DEFAULT_TRANSACTIONS_PAGE_SIZE = 20;
 const WALLET_CURRENCY = 'NGN';
+const DEFAULT_PAYSTACK_FALLBACK_EMAIL_DOMAIN = 'pay.oyana.app';
 
 @Injectable()
 export class WalletService {
@@ -60,6 +62,7 @@ export class WalletService {
     private readonly prisma: PrismaService,
     private readonly paystackService: PaystackService,
     private readonly userService: UserService,
+    private readonly configService: ConfigService,
   ) {}
 
   async getWalletByOwnerId(ownerId: string): Promise<WalletAccount | null> {
@@ -1503,6 +1506,7 @@ export class WalletService {
       select: {
         id: true,
         email: true,
+        phoneE164: true,
         role: true,
         accountRole: true,
         activeAppMode: true,
@@ -1529,8 +1533,46 @@ export class WalletService {
   private resolvePaystackCustomerEmail(profile: {
     id: string;
     email: string | null;
+    phoneE164?: string | null;
   }): string {
-    return profile.email ?? `wallet+${profile.id}@oyana.local`;
+    const normalizedEmail = profile.email?.trim().toLowerCase();
+    if (normalizedEmail && this.isValidEmail(normalizedEmail)) {
+      return normalizedEmail;
+    }
+
+    const fallbackDomain = this.resolvePaystackFallbackEmailDomain();
+    const phoneDigits = profile.phoneE164?.replace(/\D/g, '') ?? '';
+    const localSeed =
+      phoneDigits.length > 0
+        ? `wallet-${phoneDigits}`
+        : `wallet-${profile.id.replace(/[^a-z0-9]/gi, '').toLowerCase()}`;
+    const fallbackLocalPart = localSeed
+      .replace(/[^a-z0-9._+-]/gi, '')
+      .replace(/^[._+-]+/, 'wallet-')
+      .slice(0, 64);
+
+    return `${fallbackLocalPart || `wallet-${profile.id.slice(0, 12).toLowerCase()}`}@${fallbackDomain}`;
+  }
+
+  private resolvePaystackFallbackEmailDomain(): string {
+    const configuredDomain = this.configService
+      .get<string>('PAYSTACK_FALLBACK_EMAIL_DOMAIN')
+      ?.trim()
+      .toLowerCase();
+
+    if (
+      configuredDomain &&
+      /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(configuredDomain) &&
+      !configuredDomain.includes('@')
+    ) {
+      return configuredDomain;
+    }
+
+    return DEFAULT_PAYSTACK_FALLBACK_EMAIL_DOMAIN;
+  }
+
+  private isValidEmail(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   }
 
   private async assertPhoneVerified(ownerProfileId: string): Promise<void> {
