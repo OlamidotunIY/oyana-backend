@@ -175,4 +175,45 @@ export class DispatchResolver {
       `DISPATCH_OFFER_SENT.${providerId}`,
     );
   }
+
+  @Subscription(() => DispatchOffer, {
+    resolve: (payload: { myDispatchOfferUpdated: DispatchOffer }) =>
+      payload.myDispatchOfferUpdated,
+  })
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.BUSINESS)
+  async myDispatchOfferUpdated(@CurrentUser() user: AuthUser) {
+    const providerId = await this.dispatchService.resolveProviderIdForProfile(
+      user.id,
+    );
+    if (!providerId) {
+      throw new ForbiddenException(
+        'No provider account found for the authenticated user',
+      );
+    }
+
+    return this.pubSub.asyncIterableIterator(
+      `DISPATCH_OFFER_UPDATED.PROVIDER.${providerId}`,
+    );
+  }
+
+  @Subscription(() => DispatchOffer, {
+    resolve: (payload: { shipmentDispatchOfferUpdated: DispatchOffer }) =>
+      payload.shipmentDispatchOfferUpdated,
+  })
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL)
+  async shipmentDispatchOfferUpdated(
+    @CurrentUser() user: AuthUser,
+    @Args('shipmentId') shipmentId: string,
+  ) {
+    await this.dispatchService.assertCanViewShipmentDispatchOffers(
+      user.id,
+      shipmentId,
+    );
+
+    return this.pubSub.asyncIterableIterator(
+      `DISPATCH_OFFER_UPDATED.SHIPMENT.${shipmentId}`,
+    );
+  }
 }

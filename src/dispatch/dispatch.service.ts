@@ -135,6 +135,31 @@ export class DispatchService {
     profileId: string,
     shipmentId: string,
   ): Promise<DispatchOffer[]> {
+    await this.assertCanViewShipmentDispatchOffers(profileId, shipmentId);
+
+    const offers = await this.prisma.dispatchOffer.findMany({
+      where: {
+        shipmentId,
+      },
+      include: {
+        provider: true,
+      },
+      orderBy: [{ counteredAt: 'desc' }, { respondedAt: 'desc' }, { sentAt: 'desc' }],
+    });
+
+    return offers.map((offer) =>
+      this.toGraphqlDispatchOffer(offer, {
+        provider: offer.provider
+          ? this.toGraphqlProvider(offer.provider)
+          : undefined,
+      }),
+    );
+  }
+
+  async assertCanViewShipmentDispatchOffers(
+    profileId: string,
+    shipmentId: string,
+  ): Promise<void> {
     const role = await this.requireUserRole(profileId, [
       UserType.ADMIN,
       UserType.INDIVIDUAL,
@@ -164,24 +189,6 @@ export class DispatchService {
         'Only the shipment owner can view dispatch offers',
       );
     }
-
-    const offers = await this.prisma.dispatchOffer.findMany({
-      where: {
-        shipmentId,
-      },
-      include: {
-        provider: true,
-      },
-      orderBy: [{ counteredAt: 'desc' }, { respondedAt: 'desc' }, { sentAt: 'desc' }],
-    });
-
-    return offers.map((offer) =>
-      this.toGraphqlDispatchOffer(offer, {
-        provider: offer.provider
-          ? this.toGraphqlProvider(offer.provider)
-          : undefined,
-      }),
-    );
   }
 
   async dispatchShipmentIfEligible(
@@ -779,6 +786,10 @@ export class DispatchService {
       },
     });
 
+    await this.publishDispatchOfferUpdates(updatedOffer.shipmentId, [
+      updatedOffer.id,
+    ]);
+
     return this.toGraphqlDispatchOffer(updatedOffer);
   }
 
@@ -925,6 +936,10 @@ export class DispatchService {
       },
     });
 
+    await this.publishDispatchOfferUpdates(updatedOffer.shipmentId, [
+      updatedOffer.id,
+    ]);
+
     return this.toGraphqlDispatchOffer(updatedOffer);
   }
 
@@ -1021,6 +1036,10 @@ export class DispatchService {
         providerId: offer.providerId,
       },
     });
+
+    await this.publishDispatchOfferUpdates(updatedOffer.shipmentId, [
+      updatedOffer.id,
+    ]);
 
     return this.toGraphqlDispatchOffer(updatedOffer);
   }
@@ -1333,6 +1352,8 @@ export class DispatchService {
       });
     }
 
+    await this.publishDispatchOfferUpdates(acceptedOffer.shipmentId);
+
     return this.toGraphqlDispatchOffer(acceptedOffer);
   }
 
@@ -1609,6 +1630,8 @@ export class DispatchService {
         },
       });
     }
+
+    await this.publishDispatchOfferUpdates(acceptedOffer.shipmentId);
 
     return this.toGraphqlDispatchOffer(acceptedOffer);
   }
@@ -2077,6 +2100,38 @@ export class DispatchService {
       closedAt: batch.closedAt ?? undefined,
       expiresAt: batch.expiresAt ?? undefined,
     };
+  }
+
+  private async publishDispatchOfferUpdates(
+    shipmentId: string,
+    offerIds?: string[],
+  ): Promise<void> {
+    const offers = await this.prisma.dispatchOffer.findMany({
+      where: {
+        shipmentId,
+        ...(offerIds?.length ? { id: { in: offerIds } } : {}),
+      },
+      include: {
+        provider: true,
+      },
+    });
+
+    for (const offer of offers) {
+      const payload = this.toGraphqlDispatchOffer(offer, {
+        provider: offer.provider
+          ? this.toGraphqlProvider(offer.provider)
+          : undefined,
+      });
+
+      await Promise.all([
+        this.pubSub.publish(`DISPATCH_OFFER_UPDATED.PROVIDER.${offer.providerId}`, {
+          myDispatchOfferUpdated: payload,
+        }),
+        this.pubSub.publish(`DISPATCH_OFFER_UPDATED.SHIPMENT.${offer.shipmentId}`, {
+          shipmentDispatchOfferUpdated: payload,
+        }),
+      ]);
+    }
   }
 
   private toGraphqlDispatchOffer(

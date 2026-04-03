@@ -1,6 +1,6 @@
-import { Resolver, Query, Mutation, Args } from '@nestjs/graphql';
-import { UseGuards } from '@nestjs/common';
-import { MarketPlaceService } from './market-place.service';
+import { Resolver, Query, Mutation, Args, Subscription } from '@nestjs/graphql';
+import { Inject, UseGuards } from '@nestjs/common';
+import { MARKETPLACE_PUBSUB, MarketPlaceService } from './market-place.service';
 import {
   ShipmentBid,
   Shipment,
@@ -17,10 +17,14 @@ import { GqlAuthGuard } from '../auth/guards/gql-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/auth.types';
 import { UserType } from '../graphql/enums';
+import { PubSub } from 'graphql-subscriptions';
 
 @Resolver(() => ShipmentBid)
 export class MarketPlaceResolver {
-  constructor(private readonly marketPlaceService: MarketPlaceService) {}
+  constructor(
+    private readonly marketPlaceService: MarketPlaceService,
+    @Inject(MARKETPLACE_PUBSUB) private readonly pubSub: PubSub,
+  ) {}
 
   @Query(() => MarketplaceShipmentsResult)
   @UseGuards(GqlAuthGuard, RolesGuard)
@@ -109,5 +113,25 @@ export class MarketPlaceResolver {
     @Args('input') input: AwardShipmentBidDto,
   ): Promise<ShipmentBidAward> {
     return this.marketPlaceService.awardShipmentBid(user.id, input);
+  }
+
+  @Subscription(() => ShipmentBid, {
+    resolve: (payload: { freightRequestBidUpdated: ShipmentBid }) =>
+      payload.freightRequestBidUpdated,
+  })
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.INDIVIDUAL, UserType.ADMIN)
+  async freightRequestBidUpdated(
+    @CurrentUser() user: AuthUser,
+    @Args('shipmentId') shipmentId: string,
+  ) {
+    await this.marketPlaceService.assertCanViewFreightRequestBids(
+      user.id,
+      shipmentId,
+    );
+
+    return this.pubSub.asyncIterableIterator(
+      `FREIGHT_REQUEST_BID_UPDATED.${shipmentId}`,
+    );
   }
 }

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,6 +12,7 @@ import type {
   ShipmentBid as PrismaShipmentBid,
   ShipmentBidAward as PrismaShipmentBidAward,
 } from '@prisma/client';
+import { PubSub } from 'graphql-subscriptions';
 import { PrismaService } from '../database/prisma.service';
 import {
   AwardShipmentBidDto,
@@ -34,12 +36,14 @@ import { UserService } from '../user/user.service';
 
 const DEFAULT_MARKETPLACE_TAKE = 20;
 const MAX_MARKETPLACE_TAKE = 50;
+export const MARKETPLACE_PUBSUB = 'MARKETPLACE_PUBSUB';
 
 @Injectable()
 export class MarketPlaceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
+    @Inject(MARKETPLACE_PUBSUB) private readonly pubSub: PubSub,
   ) {}
 
   async marketplaceShipments(
@@ -379,32 +383,7 @@ export class MarketPlaceService {
     profileId: string,
     shipmentId: string,
   ): Promise<ShipmentBid[]> {
-    const role = await this.requireUserRole(profileId, [
-      UserType.ADMIN,
-      UserType.INDIVIDUAL,
-    ]);
-    const shipment = await this.prisma.shipment.findUnique({
-      where: {
-        id: shipmentId,
-      },
-      select: {
-        id: true,
-        customerProfileId: true,
-        mode: true,
-      },
-    });
-
-    if (!shipment) {
-      throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
-    }
-
-    if (shipment.mode !== ShipmentMode.MARKETPLACE) {
-      throw new BadRequestException('Shipment is not a marketplace request');
-    }
-
-    if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
-      throw new ForbiddenException('Only owner can view bids on this request');
-    }
+    await this.assertCanViewFreightRequestBids(profileId, shipmentId);
 
     const bids = await this.prisma.shipmentBid.findMany({
       where: {
@@ -455,6 +434,38 @@ export class MarketPlaceService {
           : undefined,
       }),
     );
+  }
+
+  async assertCanViewFreightRequestBids(
+    profileId: string,
+    shipmentId: string,
+  ): Promise<void> {
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
+    const shipment = await this.prisma.shipment.findUnique({
+      where: {
+        id: shipmentId,
+      },
+      select: {
+        id: true,
+        customerProfileId: true,
+        mode: true,
+      },
+    });
+
+    if (!shipment) {
+      throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+    }
+
+    if (shipment.mode !== ShipmentMode.MARKETPLACE) {
+      throw new BadRequestException('Shipment is not a marketplace request');
+    }
+
+    if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
+      throw new ForbiddenException('Only owner can view bids on this request');
+    }
   }
 
   async createShipmentBid(
@@ -529,6 +540,10 @@ export class MarketPlaceService {
         },
       });
 
+      await this.publishFreightRequestBidUpdates(updatedBid.shipmentId, [
+        updatedBid.id,
+      ]);
+
       return this.toGraphqlShipmentBid(updatedBid);
     }
 
@@ -542,6 +557,8 @@ export class MarketPlaceService {
         status: BidStatus.ACTIVE,
       },
     });
+
+    await this.publishFreightRequestBidUpdates(bid.shipmentId, [bid.id]);
 
     return this.toGraphqlShipmentBid(bid);
   }
@@ -587,6 +604,10 @@ export class MarketPlaceService {
       },
     });
 
+    await this.publishFreightRequestBidUpdates(updatedBid.shipmentId, [
+      updatedBid.id,
+    ]);
+
     return this.toGraphqlShipmentBid(updatedBid);
   }
 
@@ -617,6 +638,10 @@ export class MarketPlaceService {
         status: BidStatus.WITHDRAWN,
       },
     });
+
+    await this.publishFreightRequestBidUpdates(updatedBid.shipmentId, [
+      updatedBid.id,
+    ]);
 
     return this.toGraphqlShipmentBid(updatedBid);
   }
@@ -738,6 +763,8 @@ export class MarketPlaceService {
 
       return createdAward;
     });
+
+    await this.publishFreightRequestBidUpdates(input.shipmentId);
 
     return this.toGraphqlShipmentBidAward(award);
   }
@@ -917,6 +944,66 @@ export class MarketPlaceService {
       cancellationReason: shipment.cancellationReason ?? undefined,
       ...(overrides ?? {}),
     };
+  }
+
+  private async publishFreightRequestBidUpdates(
+    shipmentId: string,
+    bidIds?: string[],
+  ): Promise<void> {
+    const bids = await this.prisma.shipmentBid.findMany({
+      where: {
+        shipmentId,
+        ...(bidIds?.length ? { id: { in: bidIds } } : {}),
+      },
+      include: {
+        award: true,
+        provider: true,
+        shipment: {
+          include: {
+            pickupAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+            dropoffAddress: {
+              select: {
+                address: true,
+                city: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    for (const bid of bids) {
+      const payload = this.toGraphqlShipmentBid(bid, {
+        shipment: bid.shipment
+          ? this.toGraphqlShipment(bid.shipment, {
+              pickupAddressSummary: this.toAddressSummary(
+                bid.shipment.pickupAddress,
+              ),
+              dropoffAddressSummary: this.toAddressSummary(
+                bid.shipment.dropoffAddress,
+              ),
+            })
+          : undefined,
+        award: bid.award
+          ? this.toGraphqlShipmentBidAward(bid.award)
+          : undefined,
+        provider: bid.provider
+          ? this.toGraphqlProvider(bid.provider)
+          : undefined,
+      });
+
+      await this.pubSub.publish(
+        `FREIGHT_REQUEST_BID_UPDATED.${bid.shipmentId}`,
+        {
+          freightRequestBidUpdated: payload,
+        },
+      );
+    }
   }
 
   private toGraphqlShipmentBid(
