@@ -1,6 +1,8 @@
 import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 import { DispatchOfferStatus } from '../../enums';
 import { GraphQLJSON } from 'graphql-scalars';
+import { GraphQLBigInt } from '../../scalars';
+import { Provider } from '../provider';
 
 @ObjectType()
 export class DispatchOffer {
@@ -31,8 +33,23 @@ export class DispatchOffer {
   @Field(() => Int, { nullable: true })
   providerEtaMinutes?: number;
 
+  @Field(() => GraphQLBigInt, { nullable: true })
+  counterAmountMinor?: bigint;
+
+  @Field(() => String, { nullable: true })
+  counterCurrency?: string;
+
+  @Field(() => String, { nullable: true })
+  counterMessage?: string;
+
+  @Field(() => Date, { nullable: true })
+  counteredAt?: Date;
+
   @Field(() => GraphQLJSON, { nullable: true })
   metadata?: any;
+
+  @Field(() => Provider, { nullable: true })
+  provider?: Provider;
 
   @Field()
   createdAt: Date;

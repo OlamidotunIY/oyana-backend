@@ -3,6 +3,7 @@ import { BidStatus } from '../../enums';
 import { GraphQLBigInt } from '../../scalars';
 import { Shipment } from '../shipment/shipment.type';
 import { ShipmentBidAward } from './shipment-bid-award.type';
+import { Provider } from '../provider';
 
 @ObjectType()
 export class ShipmentBid {
@@ -32,6 +33,9 @@ export class ShipmentBid {
 
   @Field(() => ShipmentBidAward, { nullable: true })
   award?: ShipmentBidAward;
+
+  @Field(() => Provider, { nullable: true })
+  provider?: Provider;
 
   @Field()
   createdAt: Date;

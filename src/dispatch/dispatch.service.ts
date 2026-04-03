@@ -11,10 +11,12 @@ import type {
   DispatchBatch as PrismaDispatchBatch,
   DispatchOffer as PrismaDispatchOffer,
   Prisma,
+  Provider as PrismaProvider,
   Shipment as PrismaShipment,
   ShipmentAssignment as PrismaShipmentAssignment,
 } from '@prisma/client';
 import { PubSub } from 'graphql-subscriptions';
+import { resolveProfileRole } from '../auth/utils/roles.util';
 import { PrismaService } from '../database/prisma.service';
 import type { DispatchShipmentJobTrigger } from '../queue/queue.constants';
 import {
@@ -33,7 +35,10 @@ import {
   ShipmentAssignment,
   ShipmentAssignmentStatus,
   ShipmentStatus,
+  Provider,
+  RespondToShipmentDispatchOfferDto,
   UpdateDispatchOfferDto,
+  UserType,
   VehicleCategory,
   NotificationCategory,
 } from '../graphql';
@@ -124,6 +129,59 @@ export class DispatchService {
     });
 
     return offers.map((offer) => this.toGraphqlDispatchOffer(offer));
+  }
+
+  async shipmentDispatchOffers(
+    profileId: string,
+    shipmentId: string,
+  ): Promise<DispatchOffer[]> {
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
+
+    const shipment = await this.prisma.shipment.findUnique({
+      where: {
+        id: shipmentId,
+      },
+      select: {
+        id: true,
+        customerProfileId: true,
+        mode: true,
+      },
+    });
+
+    if (!shipment) {
+      throw new NotFoundException(`Shipment with id ${shipmentId} not found`);
+    }
+
+    if (shipment.mode !== ShipmentMode.DISPATCH) {
+      throw new BadRequestException('Shipment is not a dispatch request');
+    }
+
+    if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
+      throw new ForbiddenException(
+        'Only the shipment owner can view dispatch offers',
+      );
+    }
+
+    const offers = await this.prisma.dispatchOffer.findMany({
+      where: {
+        shipmentId,
+      },
+      include: {
+        provider: true,
+      },
+      orderBy: [{ counteredAt: 'desc' }, { respondedAt: 'desc' }, { sentAt: 'desc' }],
+    });
+
+    return offers.map((offer) =>
+      this.toGraphqlDispatchOffer(offer, {
+        provider: offer.provider
+          ? this.toGraphqlProvider(offer.provider)
+          : undefined,
+      }),
+    );
   }
 
   async dispatchShipmentIfEligible(
@@ -397,10 +455,11 @@ export class DispatchService {
 
     if (
       input.status !== DispatchOfferStatus.ACCEPTED &&
-      input.status !== DispatchOfferStatus.DECLINED
+      input.status !== DispatchOfferStatus.DECLINED &&
+      input.status !== DispatchOfferStatus.COUNTERED
     ) {
       throw new BadRequestException(
-        'Only ACCEPTED or DECLINED statuses are allowed for this action',
+        'Only ACCEPTED, DECLINED, or COUNTERED statuses are allowed for this action',
       );
     }
 
@@ -408,7 +467,31 @@ export class DispatchService {
       return this.declineDispatchOffer(providerId, input);
     }
 
+    if (input.status === DispatchOfferStatus.COUNTERED) {
+      return this.counterDispatchOffer(providerId, input);
+    }
+
     return this.acceptDispatchOffer(providerId, input);
+  }
+
+  async respondToShipmentDispatchOffer(
+    profileId: string,
+    input: RespondToShipmentDispatchOfferDto,
+  ): Promise<DispatchOffer> {
+    if (
+      input.status !== DispatchOfferStatus.ACCEPTED &&
+      input.status !== DispatchOfferStatus.DECLINED
+    ) {
+      throw new BadRequestException(
+        'Only ACCEPTED or DECLINED statuses are allowed for shipper dispatch review',
+      );
+    }
+
+    if (input.status === DispatchOfferStatus.DECLINED) {
+      return this.declineShipmentDispatchOffer(profileId, input);
+    }
+
+    return this.acceptShipmentDispatchOffer(profileId, input);
   }
 
   async createShipmentAssignment(
@@ -699,6 +782,560 @@ export class DispatchService {
     return this.toGraphqlDispatchOffer(updatedOffer);
   }
 
+  private async counterDispatchOffer(
+    providerId: string,
+    input: UpdateDispatchOfferDto,
+  ): Promise<DispatchOffer> {
+    const offer = await this.prisma.dispatchOffer.findFirst({
+      where: {
+        id: input.offerId,
+        providerId,
+      },
+    });
+
+    if (!offer) {
+      throw new NotFoundException('Dispatch offer not found for this provider');
+    }
+
+    if (!this.canRespondToOffer(offer.status)) {
+      throw new BadRequestException(
+        'Dispatch offer has already been responded to',
+      );
+    }
+
+    if (offer.expiresAt && offer.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Dispatch offer has expired');
+    }
+
+    if (input.counterAmountMinor == null) {
+      throw new BadRequestException(
+        'Counter amount is required when submitting a counter offer',
+      );
+    }
+
+    const counterAmountMinor = BigInt(input.counterAmountMinor);
+    if (counterAmountMinor <= BigInt(0)) {
+      throw new BadRequestException('Counter amount must be greater than 0');
+    }
+
+    const shipment = await this.prisma.shipment.findUnique({
+      where: {
+        id: offer.shipmentId,
+      },
+      select: {
+        id: true,
+        trackingCode: true,
+        customerProfileId: true,
+        status: true,
+        pricingCurrency: true,
+        finalPriceMinor: true,
+        quotedPriceMinor: true,
+      },
+    });
+
+    if (!shipment) {
+      throw new NotFoundException(
+        `Shipment with id ${offer.shipmentId} not found`,
+      );
+    }
+
+    if (
+      shipment.status !== ShipmentStatus.CREATED &&
+      shipment.status !== ShipmentStatus.BROADCASTING
+    ) {
+      throw new BadRequestException(
+        `Cannot counter dispatch offer from shipment status ${shipment.status}`,
+      );
+    }
+
+    const currentPriceMinor =
+      shipment.finalPriceMinor ?? shipment.quotedPriceMinor ?? null;
+    if (currentPriceMinor != null && counterAmountMinor <= currentPriceMinor) {
+      throw new BadRequestException(
+        'Counter amount must be higher than the current shipment price',
+      );
+    }
+
+    const counterCurrency = (
+      input.counterCurrency ?? shipment.pricingCurrency
+    )?.toUpperCase();
+
+    if (!counterCurrency) {
+      throw new BadRequestException(
+        'Counter currency is required for a counter offer',
+      );
+    }
+
+    if (
+      shipment.pricingCurrency &&
+      counterCurrency !== shipment.pricingCurrency.toUpperCase()
+    ) {
+      throw new BadRequestException(
+        'Counter offers must use the shipment pricing currency',
+      );
+    }
+
+    const now = input.respondedAt ?? new Date();
+    const updatedOffer = await this.prisma.dispatchOffer.update({
+      where: { id: offer.id },
+      data: {
+        status: DispatchOfferStatus.COUNTERED,
+        respondedAt: now,
+        providerEtaMinutes: input.providerEtaMinutes,
+        counterAmountMinor,
+        counterCurrency,
+        counterMessage: input.counterMessage?.trim() || undefined,
+        counteredAt: now,
+      },
+    });
+
+    await this.notifications.notifyCustomer(shipment.customerProfileId, {
+      category: NotificationCategory.DISPATCH,
+      title: `Counter offer on ${shipment.trackingCode}`,
+      body: 'A driver submitted a higher price for this dispatch request.',
+      entityType: 'shipment',
+      entityId: shipment.id,
+      metadata: {
+        providerId,
+        offerId: updatedOffer.id,
+        counterAmountMinor: counterAmountMinor.toString(),
+        counterCurrency,
+      },
+    });
+
+    await this.notifications.notifyProviderTeam(providerId, {
+      category: NotificationCategory.DISPATCH,
+      title: 'Counter offer submitted',
+      body: `You submitted a higher price for shipment ${shipment.trackingCode}.`,
+      entityType: 'dispatch_offer',
+      entityId: updatedOffer.id,
+    });
+
+    await this.notifications.notifyAdmins({
+      category: NotificationCategory.DISPATCH,
+      title: 'Dispatch counter offer submitted',
+      body: `Provider submitted a counter offer for shipment ${shipment.trackingCode}.`,
+      entityType: 'dispatch_offer',
+      entityId: updatedOffer.id,
+      metadata: {
+        providerId,
+        shipmentId: shipment.id,
+        counterAmountMinor: counterAmountMinor.toString(),
+        counterCurrency,
+      },
+    });
+
+    return this.toGraphqlDispatchOffer(updatedOffer);
+  }
+
+  private async declineShipmentDispatchOffer(
+    profileId: string,
+    input: RespondToShipmentDispatchOfferDto,
+  ): Promise<DispatchOffer> {
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
+
+    const shipment = await this.prisma.shipment.findUnique({
+      where: {
+        id: input.shipmentId,
+      },
+      select: {
+        id: true,
+        customerProfileId: true,
+        trackingCode: true,
+        mode: true,
+      },
+    });
+
+    if (!shipment) {
+      throw new NotFoundException(
+        `Shipment with id ${input.shipmentId} not found`,
+      );
+    }
+
+    if (shipment.mode !== ShipmentMode.DISPATCH) {
+      throw new BadRequestException('Shipment is not a dispatch request');
+    }
+
+    if (role !== UserType.ADMIN && shipment.customerProfileId !== profileId) {
+      throw new ForbiddenException(
+        'Only the shipment owner can review dispatch counters',
+      );
+    }
+
+    const offer = await this.prisma.dispatchOffer.findFirst({
+      where: {
+        id: input.offerId,
+        shipmentId: input.shipmentId,
+      },
+    });
+
+    if (!offer) {
+      throw new NotFoundException('Dispatch offer not found for this shipment');
+    }
+
+    if (offer.status === DispatchOfferStatus.DECLINED) {
+      return this.toGraphqlDispatchOffer(offer);
+    }
+
+    if (!this.canOwnerRespondToCounterOffer(offer.status)) {
+      throw new BadRequestException(
+        'Only pending counter offers can be declined by the shipper',
+      );
+    }
+
+    const updatedOffer = await this.prisma.dispatchOffer.update({
+      where: { id: offer.id },
+      data: {
+        status: DispatchOfferStatus.DECLINED,
+        respondedAt: input.respondedAt ?? new Date(),
+      },
+    });
+
+    await this.notifications.notifyCustomer(shipment.customerProfileId, {
+      category: NotificationCategory.DISPATCH,
+      title: `Counter offer declined for ${shipment.trackingCode}`,
+      body: 'You declined the driver counter offer.',
+      entityType: 'dispatch_offer',
+      entityId: updatedOffer.id,
+    });
+
+    await this.notifications.notifyProviderTeam(offer.providerId, {
+      category: NotificationCategory.DISPATCH,
+      title: 'Counter offer declined',
+      body: `Your counter offer for shipment ${shipment.trackingCode} was declined.`,
+      entityType: 'dispatch_offer',
+      entityId: updatedOffer.id,
+    });
+
+    await this.notifications.notifyAdmins({
+      category: NotificationCategory.DISPATCH,
+      title: 'Dispatch counter declined',
+      body: `Shipper declined the counter offer for shipment ${shipment.trackingCode}.`,
+      entityType: 'dispatch_offer',
+      entityId: updatedOffer.id,
+      metadata: {
+        shipmentId: shipment.id,
+        providerId: offer.providerId,
+      },
+    });
+
+    return this.toGraphqlDispatchOffer(updatedOffer);
+  }
+
+  private async acceptShipmentDispatchOffer(
+    profileId: string,
+    input: RespondToShipmentDispatchOfferDto,
+  ): Promise<DispatchOffer> {
+    const now = new Date();
+    let acceptanceContext:
+      | {
+          shipmentId: string;
+          trackingCode: string;
+          customerProfileId: string;
+          providerId: string;
+        }
+      | undefined;
+
+    const role = await this.requireUserRole(profileId, [
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ]);
+
+    const acceptedOffer = await this.prisma.$transaction(async (tx) => {
+      const shipmentSeed = await tx.shipment.findUnique({
+        where: {
+          id: input.shipmentId,
+        },
+        select: {
+          id: true,
+          customerProfileId: true,
+          trackingCode: true,
+          mode: true,
+        },
+      });
+
+      if (!shipmentSeed) {
+        throw new NotFoundException(
+          `Shipment with id ${input.shipmentId} not found`,
+        );
+      }
+
+      if (shipmentSeed.mode !== ShipmentMode.DISPATCH) {
+        throw new BadRequestException('Shipment is not a dispatch request');
+      }
+
+      if (
+        role !== UserType.ADMIN &&
+        shipmentSeed.customerProfileId !== profileId
+      ) {
+        throw new ForbiddenException(
+          'Only the shipment owner can review dispatch counters',
+        );
+      }
+
+      await tx.$queryRaw`
+            SELECT id
+            FROM "shipments"
+            WHERE id = ${shipmentSeed.id}::uuid
+            FOR UPDATE
+          `;
+
+      const offer = await tx.dispatchOffer.findUnique({
+        where: {
+          id: input.offerId,
+        },
+      });
+
+      if (!offer || offer.shipmentId !== shipmentSeed.id) {
+        throw new NotFoundException('Dispatch offer not found for this shipment');
+      }
+
+      if (offer.status === DispatchOfferStatus.ACCEPTED) {
+        return offer;
+      }
+
+      if (!this.canOwnerRespondToCounterOffer(offer.status)) {
+        throw new BadRequestException(
+          'Only pending counter offers can be accepted by the shipper',
+        );
+      }
+
+      const shipment = await tx.shipment.findUnique({
+        where: {
+          id: shipmentSeed.id,
+        },
+        select: {
+          id: true,
+          trackingCode: true,
+          customerProfileId: true,
+          status: true,
+          vehicleCategory: true,
+          pricingCurrency: true,
+          finalPriceMinor: true,
+          quotedPriceMinor: true,
+        },
+      });
+
+      if (!shipment) {
+        throw new NotFoundException(
+          `Shipment with id ${shipmentSeed.id} not found`,
+        );
+      }
+
+      if (
+        shipment.status !== ShipmentStatus.CREATED &&
+        shipment.status !== ShipmentStatus.BROADCASTING &&
+        shipment.status !== ShipmentStatus.ASSIGNED
+      ) {
+        throw new BadRequestException(
+          `Cannot accept counter offer from shipment status ${shipment.status}`,
+        );
+      }
+
+      const provider = await tx.provider.findUnique({
+        where: {
+          id: offer.providerId,
+        },
+        select: {
+          isAvailable: true,
+          driverType: true,
+        },
+      });
+
+      if (!provider?.isAvailable) {
+        throw new ConflictException(
+          'Provider is currently unavailable and cannot receive this assignment',
+        );
+      }
+
+      if (provider.driverType !== shipment.vehicleCategory) {
+        throw new ConflictException(
+          'Driver category no longer matches this dispatch shipment',
+        );
+      }
+
+      const existingAssignment = await tx.shipmentAssignment.findUnique({
+        where: {
+          shipmentId: shipment.id,
+        },
+      });
+
+      if (existingAssignment) {
+        const isSameProviderActiveAssignment =
+          existingAssignment.providerId === offer.providerId &&
+          existingAssignment.status === ShipmentAssignmentStatus.ACTIVE;
+
+        if (!isSameProviderActiveAssignment) {
+          throw new ConflictException(DISPATCH_ACCEPT_CONFLICT_MESSAGE);
+        }
+      }
+
+      const acceptedUpdate = await tx.dispatchOffer.updateMany({
+        where: {
+          id: offer.id,
+          status: DispatchOfferStatus.COUNTERED,
+        },
+        data: {
+          status: DispatchOfferStatus.ACCEPTED,
+          respondedAt: input.respondedAt ?? now,
+        },
+      });
+
+      if (acceptedUpdate.count === 0) {
+        const refreshedOffer = await tx.dispatchOffer.findUnique({
+          where: { id: offer.id },
+        });
+
+        if (refreshedOffer?.status === DispatchOfferStatus.ACCEPTED) {
+          return refreshedOffer;
+        }
+
+        throw new ConflictException(DISPATCH_ACCEPT_CONFLICT_MESSAGE);
+      }
+
+      const updatedOffer = await tx.dispatchOffer.findUnique({
+        where: {
+          id: offer.id,
+        },
+      });
+
+      if (!updatedOffer) {
+        throw new NotFoundException('Dispatch offer no longer exists');
+      }
+
+      const agreedPriceMinor =
+        updatedOffer.counterAmountMinor ??
+        shipment.finalPriceMinor ??
+        shipment.quotedPriceMinor;
+      const agreedCurrency =
+        updatedOffer.counterCurrency ?? shipment.pricingCurrency;
+
+      if (agreedPriceMinor == null || !agreedCurrency) {
+        throw new BadRequestException(
+          'Unable to resolve the agreed shipment price for this assignment',
+        );
+      }
+
+      if (!existingAssignment) {
+        await tx.shipmentAssignment.create({
+          data: {
+            shipmentId: shipment.id,
+            providerId: offer.providerId,
+            dispatchOfferId: offer.id,
+            status: ShipmentAssignmentStatus.ACTIVE,
+            agreedPriceMinor,
+            currency: agreedCurrency,
+          },
+        });
+      } else {
+        await tx.shipmentAssignment.update({
+          where: {
+            id: existingAssignment.id,
+          },
+          data: {
+            providerId: offer.providerId,
+            dispatchOfferId: offer.id,
+            status: ShipmentAssignmentStatus.ACTIVE,
+            agreedPriceMinor,
+            currency: agreedCurrency,
+            cancelledAt: null,
+            cancellationReason: null,
+          },
+        });
+      }
+
+      await tx.shipment.update({
+        where: {
+          id: shipment.id,
+        },
+        data: {
+          status: ShipmentStatus.ASSIGNED,
+          finalPriceMinor: agreedPriceMinor,
+          pricingCurrency: agreedCurrency,
+        },
+      });
+
+      await tx.dispatchOffer.updateMany({
+        where: {
+          shipmentId: shipment.id,
+          id: {
+            not: offer.id,
+          },
+          status: {
+            in: [
+              DispatchOfferStatus.SENT,
+              DispatchOfferStatus.VIEWED,
+              DispatchOfferStatus.COUNTERED,
+            ],
+          },
+        },
+        data: {
+          status: DispatchOfferStatus.CANCELLED,
+        },
+      });
+
+      await tx.dispatchBatch.update({
+        where: {
+          id: offer.batchId,
+        },
+        data: {
+          status: DispatchBatchStatus.ASSIGNED,
+          closedAt: now,
+        },
+      });
+
+      acceptanceContext = {
+        shipmentId: shipment.id,
+        trackingCode: shipment.trackingCode,
+        customerProfileId: shipment.customerProfileId,
+        providerId: offer.providerId,
+      };
+
+      return updatedOffer;
+    });
+
+    if (acceptanceContext) {
+      await this.notifications.notifyCustomer(
+        acceptanceContext.customerProfileId,
+        {
+          category: NotificationCategory.DISPATCH,
+          title: `Counter accepted for ${acceptanceContext.trackingCode}`,
+          body: 'You accepted the driver counter offer and the shipment is now assigned.',
+          entityType: 'shipment',
+          entityId: acceptanceContext.shipmentId,
+        },
+      );
+
+      await this.notifications.notifyProviderTeam(
+        acceptanceContext.providerId,
+        {
+          category: NotificationCategory.DISPATCH,
+          title: 'Counter offer accepted',
+          body: `Your counter offer for shipment ${acceptanceContext.trackingCode} was accepted.`,
+          entityType: 'shipment',
+          entityId: acceptanceContext.shipmentId,
+        },
+      );
+
+      await this.notifications.notifyAdmins({
+        category: NotificationCategory.DISPATCH,
+        title: 'Dispatch counter accepted',
+        body: `Counter offer accepted for shipment ${acceptanceContext.trackingCode}.`,
+        entityType: 'shipment',
+        entityId: acceptanceContext.shipmentId,
+        metadata: {
+          providerId: acceptanceContext.providerId,
+          offerId: acceptedOffer.id,
+        },
+      });
+    }
+
+    return this.toGraphqlDispatchOffer(acceptedOffer);
+  }
+
   private async acceptDispatchOffer(
     providerId: string,
     input: UpdateDispatchOfferDto,
@@ -909,7 +1546,11 @@ export class DispatchService {
             not: offer.id,
           },
           status: {
-            in: [DispatchOfferStatus.SENT, DispatchOfferStatus.VIEWED],
+            in: [
+              DispatchOfferStatus.SENT,
+              DispatchOfferStatus.VIEWED,
+              DispatchOfferStatus.COUNTERED,
+            ],
           },
         },
         data: {
@@ -1014,6 +1655,10 @@ export class DispatchService {
       status === DispatchOfferStatus.SENT ||
       status === DispatchOfferStatus.VIEWED
     );
+  }
+
+  private canOwnerRespondToCounterOffer(status: string): boolean {
+    return status === DispatchOfferStatus.COUNTERED;
   }
 
   private buildDueShipmentWhere() {
@@ -1394,6 +2039,37 @@ export class DispatchService {
     return providerId;
   }
 
+  private async requireUserRole(
+    profileId: string,
+    preferredRoles: UserType[] = [
+      UserType.BUSINESS,
+      UserType.ADMIN,
+      UserType.INDIVIDUAL,
+    ],
+  ): Promise<UserType> {
+    const profile = await this.prisma.profile.findUnique({
+      where: {
+        id: profileId,
+      },
+      select: {
+        role: true,
+        accountRole: true,
+        activeAppMode: true,
+        driverProfile: {
+          select: {
+            onboardingStatus: true,
+          },
+        },
+      },
+    });
+
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    return resolveProfileRole(profile, preferredRoles);
+  }
+
   private toGraphqlDispatchBatch(batch: PrismaDispatchBatch): DispatchBatch {
     return {
       ...batch,
@@ -1403,14 +2079,31 @@ export class DispatchService {
     };
   }
 
-  private toGraphqlDispatchOffer(offer: PrismaDispatchOffer): DispatchOffer {
+  private toGraphqlDispatchOffer(
+    offer: PrismaDispatchOffer,
+    related?: { provider?: Provider },
+  ): DispatchOffer {
     return {
       ...offer,
       sentAt: offer.sentAt ?? undefined,
       respondedAt: offer.respondedAt ?? undefined,
       expiresAt: offer.expiresAt ?? undefined,
       providerEtaMinutes: offer.providerEtaMinutes ?? undefined,
+      counterAmountMinor: offer.counterAmountMinor ?? undefined,
+      counterCurrency: offer.counterCurrency ?? undefined,
+      counterMessage: offer.counterMessage ?? undefined,
+      counteredAt: offer.counteredAt ?? undefined,
       metadata: offer.metadata ?? undefined,
+      provider: related?.provider,
+    };
+  }
+
+  private toGraphqlProvider(provider: PrismaProvider): Provider {
+    return {
+      ...provider,
+      profileId: provider.profileId ?? undefined,
+      driverType: provider.driverType ?? undefined,
+      ratingAvg: provider.ratingAvg ? Number(provider.ratingAvg) : 0,
     };
   }
 

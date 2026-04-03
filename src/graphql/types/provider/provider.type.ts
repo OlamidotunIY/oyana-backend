@@ -1,6 +1,6 @@
 import { ObjectType, Field, ID, Int, Float } from '@nestjs/graphql';
 import { GraphQLBigInt } from '../../scalars';
-import { ProviderStatus } from '../../enums';
+import { ProviderStatus, VehicleCategory } from '../../enums';
 
 @ObjectType()
 export class Provider {
@@ -15,6 +15,9 @@ export class Provider {
 
   @Field(() => ProviderStatus)
   status: ProviderStatus;
+
+  @Field(() => VehicleCategory, { nullable: true })
+  driverType?: VehicleCategory;
 
   @Field(() => GraphQLBigInt)
   minWalletThresholdMinor: bigint;

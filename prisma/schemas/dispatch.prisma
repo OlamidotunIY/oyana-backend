@@ -13,6 +13,7 @@ enum DispatchBatchStatus {
 enum DispatchOfferStatus {
   sent
   viewed
+  countered
   accepted
   declined
   expired
@@ -53,6 +54,10 @@ model DispatchOffer {
   respondedAt        DateTime?           @map("responded_at") @db.Timestamptz(6)
   expiresAt          DateTime?           @map("expires_at") @db.Timestamptz(6)
   providerEtaMinutes Int?                @map("provider_eta_minutes")
+  counterAmountMinor BigInt?             @map("counter_amount_minor")
+  counterCurrency    String?             @map("counter_currency") @db.Char(3)
+  counterMessage     String?             @map("counter_message")
+  counteredAt        DateTime?           @map("countered_at") @db.Timestamptz(6)
   metadata           Json?
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)

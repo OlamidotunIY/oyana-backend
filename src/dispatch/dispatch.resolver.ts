@@ -11,6 +11,7 @@ import {
   CreateDispatchOfferDto,
   DispatchBatch,
   DispatchOffer,
+  RespondToShipmentDispatchOfferDto,
   Shipment,
   ShipmentAssignment,
   UpdateDispatchOfferDto,
@@ -42,6 +43,16 @@ export class DispatchResolver {
     return this.dispatchService.myDispatchOffers(user.id);
   }
 
+  @Query(() => [DispatchOffer])
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL)
+  async shipmentDispatchOffers(
+    @CurrentUser() user: AuthUser,
+    @Args('shipmentId') shipmentId: string,
+  ): Promise<DispatchOffer[]> {
+    return this.dispatchService.shipmentDispatchOffers(user.id, shipmentId);
+  }
+
   @Mutation(() => DispatchBatch)
   @UseGuards(GqlAuthGuard, RolesGuard)
   @Roles(UserType.ADMIN)
@@ -68,6 +79,16 @@ export class DispatchResolver {
     @Args('input') input: UpdateDispatchOfferDto,
   ): Promise<DispatchOffer> {
     return this.dispatchService.respondToDispatchOffer(user.id, input);
+  }
+
+  @Mutation(() => DispatchOffer)
+  @UseGuards(GqlAuthGuard, RolesGuard)
+  @Roles(UserType.ADMIN, UserType.INDIVIDUAL)
+  async respondToShipmentDispatchOffer(
+    @CurrentUser() user: AuthUser,
+    @Args('input') input: RespondToShipmentDispatchOfferDto,
+  ): Promise<DispatchOffer> {
+    return this.dispatchService.respondToShipmentDispatchOffer(user.id, input);
   }
 
   @Mutation(() => Shipment)

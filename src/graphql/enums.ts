@@ -267,6 +267,7 @@ export type DispatchBatchStatus =
 export const DispatchOfferStatus = {
   SENT: 'sent',
   VIEWED: 'viewed',
+  COUNTERED: 'countered',
   ACCEPTED: 'accepted',
   DECLINED: 'declined',
   EXPIRED: 'expired',

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type {
   Prisma,
+  Provider as PrismaProvider,
   Shipment as PrismaShipment,
   ShipmentBid as PrismaShipmentBid,
   ShipmentBidAward as PrismaShipmentBidAward,
@@ -17,6 +18,7 @@ import {
   CreateShipmentBidDto,
   MarketplaceShipmentsFilterDto,
   MarketplaceShipmentsResult,
+  Provider,
   Shipment,
   ShipmentAssignmentStatus,
   ShipmentBid,
@@ -410,6 +412,7 @@ export class MarketPlaceService {
       },
       include: {
         award: true,
+        provider: true,
         shipment: {
           include: {
             pickupAddress: {
@@ -446,6 +449,9 @@ export class MarketPlaceService {
           : undefined,
         award: bid.award
           ? this.toGraphqlShipmentBidAward(bid.award)
+          : undefined,
+        provider: bid.provider
+          ? this.toGraphqlProvider(bid.provider)
           : undefined,
       }),
     );
@@ -915,13 +921,23 @@ export class MarketPlaceService {
 
   private toGraphqlShipmentBid(
     bid: PrismaShipmentBid,
-    related?: { shipment?: Shipment; award?: ShipmentBidAward },
+    related?: { shipment?: Shipment; award?: ShipmentBidAward; provider?: Provider },
   ): ShipmentBid {
     return {
       ...bid,
       message: bid.message ?? undefined,
       shipment: related?.shipment,
       award: related?.award,
+      provider: related?.provider,
+    };
+  }
+
+  private toGraphqlProvider(provider: PrismaProvider): Provider {
+    return {
+      ...provider,
+      profileId: provider.profileId ?? undefined,
+      driverType: provider.driverType ?? undefined,
+      ratingAvg: provider.ratingAvg ? Number(provider.ratingAvg) : 0,
     };
   }
 
