@@ -2100,10 +2100,17 @@ export class DispatchService {
 
   private toGraphqlProvider(provider: PrismaProvider): Provider {
     return {
-      ...provider,
+      id: provider.id,
+      businessName: provider.businessName,
       profileId: provider.profileId ?? undefined,
+      status: provider.status as Provider['status'],
+      minWalletThresholdMinor: provider.minWalletThresholdMinor,
       driverType: provider.driverType ?? undefined,
       ratingAvg: provider.ratingAvg ? Number(provider.ratingAvg) : 0,
+      ratingCount: provider.ratingCount,
+      priorityScore: provider.priorityScore,
+      createdAt: provider.createdAt,
+      updatedAt: provider.updatedAt,
     };
   }
 
