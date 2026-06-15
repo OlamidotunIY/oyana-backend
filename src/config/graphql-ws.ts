@@ -1,6 +1,5 @@
 import {
   ApolloServerPluginLandingPageLocalDefault,
-  ApolloServerPluginLandingPageProductionDefault,
 } from '@apollo/server/plugin/landingPage/default';
 import type { ApolloServerPlugin } from '@apollo/server';
 import { ApolloServerPluginUsageReporting } from '@apollo/server/plugin/usageReporting';
@@ -235,13 +234,10 @@ export const GqlConfig = GraphQLModule.forRootAsync<ApolloDriverConfig>({
     return {
       playground: false, // Disabled in favor of Apollo Sandbox
       plugins: [
-        isProduction
-          ? ApolloServerPluginLandingPageProductionDefault({
-              graphRef: configService.get('APOLLO_GRAPH_REF')!,
-              embed: true,
-              includeCookies: true, // Enable cookie support for authentication
-            })
-          : ApolloServerPluginLandingPageLocalDefault(),
+        ApolloServerPluginLandingPageLocalDefault({
+          embed: true,
+          includeCookies: true,
+        }),
         // Enable Apollo Studio reporting in production
         ...(isProduction && configService.get('APOLLO_KEY')
           ? [
